@@ -1,0 +1,5 @@
+{
+    "1": "Functions specification is valid JSON dictionary and shall contain name, description, parameters (including type, properties and required parameter list), returns value descriptions should clearly describe success and failure information.",
+    "2": "Function names shall be clear and distinguishable, so that reader clearly understands the purpose of the function.",
+    "3": "Do not use optional function parameters as they can be difficult to use"
+}

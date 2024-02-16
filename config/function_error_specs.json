@@ -1,0 +1,9 @@
+{
+    "file_not_found": "The requested file was not found. Please find the file by name and try again.",
+    "directory_not_found": "The requested input directory was not found. Please check the directory path e.g. find all folders by name from current directory or retrieve the current directory structure (if not retrieved already) and then revise the directory name",
+    "no_matching_folders_found": "No matching folders were found. Have you retrieved current directory structure to check if there are similar folder names? If not, find if the current directory structure contains similar folder names, otherwise inform user that no matching folders were found.",
+    "no_matching_files_found": "No matching files were found. Please find files by an extension from the directory.",
+    "json_load_content_error": "An error occurred while loading the content to JSON file. Please check the content contains valid json and try once again.",
+    "invalid_input": "Invalid input provided. Please check the function input parameters and try again.",
+    "generic_error": "An unexpected error occurred. Please check the function input parameters and try again."
+}

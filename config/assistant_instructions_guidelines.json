@@ -1,0 +1,9 @@
+{
+    "1": "Instructions are very clear and provide detailed information for the assistant about what tasks assistant shall do and what is the acceptance criteria for each task",
+    "2": "Describe what assistant shall do instead of describing what assistant shall not do.",
+    "3": "For knowlegde retrieval, the instructions shall contain how to use the files which have been uploaded, e,g,, When doing functionality X, you need to retrieve information from file Y and use it for Z.",
+    "4": "Instructions shall not leave room for misunderstandings",
+    "5": "Address an assistant always as \"you\" or by its name, especially when instructions are at the end or beginning.",
+    "6": "Provide Context: Include necessary background information.",
+    "7": "Use Examples: Give examples to clarify complex requests."
+}

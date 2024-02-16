@@ -1,0 +1,266 @@
+[
+    {
+        "type": "function",
+        "function": {
+            "name": "copy_multiple_files_by_extension",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Copies files of a certain type from an input directory to an output directory",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input_directory": {
+                        "type": "string",
+                        "description": "The path to the input directory from which files are copied"
+                    },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "The path to the output directory where files will be copied to"
+                    },
+                    "file_extension": {
+                        "type": "string",
+                        "description": "The type of files to copy, e.g., '.txt'"
+                    }
+                },
+                "required": [
+                    "input_directory",
+                    "output_directory",
+                    "file_extension"
+                ]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "copy_specific_file_to_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Copy a single file to output directory from the known input files",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input_directory": {
+                        "type": "string",
+                        "description": "The path to the input directory"
+                    },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "The path to the output directory"
+                    },
+                    "file_name": {
+                        "type": "string",
+                        "description": "The name of the file to be copied"
+                    }
+                },
+                "required": [
+                    "input_directory",
+                    "output_directory",
+                    "file_name"
+                ]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "retrieve_file_content_from_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Retrieves the content of a specified file in a given directory. Returns an empty JSON result if the content is not found.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input_directory": {
+                        "type": "string",
+                        "description": "The path to the directory containing the file."
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "The name of the file whose content is to be retrieved."
+                    }
+                },
+                "required": [
+                    "input_directory",
+                    "filename"
+                ]
+            },
+            "returns": {
+                "type": "string",
+                "description": "A JSON string containing the file content or an empty JSON result if the content is not found."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_file_with_specified_content",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Creates a new file with the provided content in the specified directory, with an optional file extension",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "The name of the file to be created"
+                    },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "The path to the output directory where the file will be created"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The content to be written to the file"
+                    },
+                    "file_extension": {
+                        "type": "string",
+                        "description": "The optional file extension to be used for the created file, e.g., '.txt'",
+                        "default": ""
+                    }
+                },
+                "required": [
+                    "file_name",
+                    "output_directory",
+                    "content"
+                ]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "retrieve_current_directory_structure_subfolders",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Get the directory structure from the current directory and its sub-directories.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            },
+            "returns": {
+                "type": "string",
+                "description": "A JSON string containing information about directories and sub-directories in the current directory."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_all_folders_by_name_from_current_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Searches for matching folders with a given name in the current directory and its subdirectories. The search is case-sensitive and uses fuzzy matching.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "folder_name": {
+                        "type": "string",
+                        "description": "The name of the folder to search for."
+                    }
+                },
+                "required": [
+                    "folder_name"
+                ]
+            },
+            "returns": {
+                "type": "string",
+                "description": "A JSON string. If matching folders are found, it returns their paths. If no matching folders are found, it returns a JSON string with a 'function_error' key indicating that no folders with the given name were found."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_files_by_name_in_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Searches for files matching specific criteria by name in a directory and its sub-directories (case-insensitive).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "The directory to search in."
+                    },
+                    "file_name_contains": {
+                        "type": "string",
+                        "description": "A partial or full file name to search for."
+                    }
+                },
+                "required": [
+                    "directory",
+                    "file_name_contains"
+                ]
+            },
+            "returns": {
+                "type": "list of string",
+                "description": "A list of file paths that match the specified name criteria."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_files_by_extension_in_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Searches for files matching specific criteria by file extension in a directory and its sub-directories (case-insensitive).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "The directory to search in."
+                    },
+                    "file_extension": {
+                        "type": "string",
+                        "description": "The file extension to filter by."
+                    }
+                },
+                "required": [
+                    "directory",
+                    "file_extension"
+                ]
+            },
+            "returns": {
+                "type": "list of string",
+                "description": "A list of file paths that match the specified extension criteria."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_current_datetime",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Get the current time as a JSON string.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            },
+            "returns": {
+                "type": "string",
+                "description": "The current time in JSON format (YYYY-MM-DD HH:MM:SS)."
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_detailed_files_info_in_directory",
+            "module": "azure.ai.assistant.functions.file_functions",
+            "description": "Get information about files inside a given folder and its subfolders and return result as a JSON string.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "The path to the folder containing the files."
+                    }
+                },
+                "required": [
+                    "directory"
+                ]
+            },
+            "returns": {
+                "type": "string",
+                "description": "A JSON string containing file information. Each file is represented as a dictionary with keys 'filename', 'size_bytes', 'file_type', and 'last_updated'."
+            }
+        }
+    }
+]
