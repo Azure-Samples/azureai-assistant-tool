@@ -24,11 +24,11 @@ The Azure AI Assistant Tool is currently in Alpha status. This early stage of de
 ## Installation & Setup
 
 ### Prerequisites
-Before installing Application Name, you need to have Python installed on your system (Python 3.8 or newer is recommended). 
+Before installing Azure AI Assistant Tool, you need to have Python installed on your system (Python 3.8 or newer is recommended). 
 You can download Python from [the official website](https://www.python.org/downloads/).
 
 #### PySide6 Dependency
-This application depends on the PySide6 libraries for its graphical user interface. PySide6 is dynamically linked, meaning you need to have PySide6 installed on your system to run Application Name.
+This application depends on the PySide6 libraries for its graphical user interface. PySide6 is dynamically linked, meaning you need to have PySide6 installed on your system to run Azure AI Assistant Tool.
 
 ### Install azure.ai.assistant Python library
 - Go under `sdk/azure-ai-assistant` folder
@@ -75,7 +75,7 @@ This application depends on the PySide6 libraries for its graphical user interfa
   - `python main.py` (or python3 depends on your environment)
 
 ## License
-Application Name is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
 ### Notice Regarding PySide6
 The Azure AI Assistant Tool uses PySide6, which is licensed under the GNU Lesser General Public License (LGPL). 
