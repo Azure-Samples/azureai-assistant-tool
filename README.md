@@ -30,7 +30,12 @@ You can download Python from [the official website](https://www.python.org/downl
 #### PySide6 Dependency
 This application depends on the PySide6 libraries for its graphical user interface. PySide6 is dynamically linked, meaning you need to have PySide6 installed on your system to run Azure AI Assistant Tool.
 
-### Install azure.ai.assistant Python library
+### Build and install azure.ai.assistant Python library
+
+During the Alpha phase of development, the azure.ai.assistant library is included within this tool's repository, as it has not yet been released on PyPI. 
+Using following instructions, you can build the wheel or alternatively use directly the wheel package provided under releases.
+
+- Ensure wheel is installed to build the library package. You can install it using the command: `pip install wheel`
 - Go under `sdk/azure-ai-assistant` folder
 - Make sure wheel is installed: `pip install wheel` (or pip3 e.g. in Mac)
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
@@ -72,7 +77,7 @@ This application depends on the PySide6 libraries for its graphical user interfa
 ## Launch the application
 
 - Run the following command in root of this repository
-  - `python main.py` (or python3 depends on your environment)
+  - `python main.py` (or `python3`, depends on your environment)
 
 ## License
 Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
