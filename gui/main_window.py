@@ -16,7 +16,6 @@ import traceback
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
-from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
@@ -30,6 +29,7 @@ from azure.ai.assistant.management.logger_module import logger
 from gui.menu import AssistantsMenu, FunctionsMenu, GuidelinesMenu, TasksMenu, SettingsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.speech_input_handler import SpeechInputHandler
+from gui.speech_synthesis_handler import SpeechSynthesisHandler
 from gui.assistant_client_manager import AssistantClientManager
 from .conversation_sidebar import ConversationSidebar
 from .diagnostic_sidebar import DiagnosticsSidebar
@@ -118,6 +118,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.initialize_signals()
         self.initialize_ui_layout()
         self.initialize_speech_input()
+        self.initialize_speech_output()
 
     def initialize_ui_components(self):
         # Main window settings
@@ -212,6 +213,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         except ValueError as e:
             QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech input handler: {e}")
             logger.error(f"Error initializing speech input handler: {e}")
+
+    def initialize_speech_output(self):
+        try:
+            self.speech_synthesis_handler = SpeechSynthesisHandler()
+        except ValueError as e:
+            QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech synthesis handler: {e}")
+            logger.error(f"Error initializing speech synthesis handler: {e}")
 
     def set_active_ai_client_type(self, ai_client_type : AIClientType):
         # If the active AI client type is not yet initialized, return and set the active AI client type in deferred_init
@@ -467,6 +475,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name)
         last_assistant_message = conversation.get_last_text_message(assistant_name)
+        if self.conversation_sidebar.is_listening:
+            self.speech_input_handler.stop_listening_from_mic()
+            self.speech_synthesis_handler.synthesize_speech(last_assistant_message.content)
+            self.speech_input_handler.start_listening_from_mic()
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
 

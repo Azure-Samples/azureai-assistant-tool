@@ -111,6 +111,35 @@ class AssistantClient:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
+    @classmethod
+    def from_config(
+        cls, 
+        config: AssistantConfig, 
+        callbacks: Optional[AssistantClientCallbacks] = None
+    ) -> "AssistantClient":
+        """
+        Creates a new assistant client from the given configuration.
+
+        New assistant client is created in the service and assistant configuration is saved with the given configuration.
+
+        :param config: The configuration to use to create the assistant client.
+        :type config: AssistantConfig
+        :param callbacks: The callbacks to use for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
+
+        :return: The new assistant client.
+        :rtype: AssistantClient
+        """
+        try:
+            # check if config contains assistant_id which is not null or empty, if so, set is_create to False
+            if config.assistant_id:
+                return AssistantClient(config.to_json(), callbacks, is_create=False)
+            else:
+                return AssistantClient(config.to_json(), callbacks, is_create=True)
+        except Exception as e:
+            logger.error(f"Failed to create assistant client from config: {e}")
+            raise EngineError(f"Failed to create assistant client from config: {e}")
+
     def sync_from_cloud(self) -> "AssistantClient":
         """
         Synchronizes the assistant client with the cloud service configuration.
@@ -152,20 +181,27 @@ class AssistantClient:
             # Create or update the assistant
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
-                #start_time = time.time()
+                start_time = time.time()
                 self._create_assistant(assistant_config)
-                #end_time = time.time()
-                #print(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
+                end_time = time.time()
+                logger.info(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
             else:
-                #start_time = time.time()
-                self._update_assistant(assistant_config)
-                #end_time = time.time()
-                #print(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
+                start_time = time.time()
+                config_manager = AssistantConfigManager.get_instance()
+                local_config = config_manager.get_config(self.name)
+                # check if the local configuration is different from the given configuration
+                if local_config and local_config != assistant_config:
+                    logger.info("Local config is different from the given configuration. Updating the assistant...")
+                    self._update_assistant(assistant_config)
+                else:
+                    logger.info("Local config is the same as the given configuration. No need to update the assistant.")
+                end_time = time.time()
+                logger.info(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
 
-            #start_time = time.time()
+            start_time = time.time()
             self._load_selected_functions(assistant_config)
-            #end_time = time.time()
-            #print(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
+            end_time = time.time()
+            logger.info(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
             self._assistant_config = assistant_config
 
             # Update the local configuration using AssistantConfigManager

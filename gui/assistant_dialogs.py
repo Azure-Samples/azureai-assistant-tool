@@ -467,8 +467,8 @@ class AssistantConfigDialog(QDialog):
 
     def add_file(self):
         options = QFileDialog.Options()
-        filePath, _ = QFileDialog.getOpenFileName(self, "Select Knowledge File", "",
-                                                  "Knowledge Files (*.json *.pdf *.txt *.csv)", options=options)
+        filePath, _ = QFileDialog.getOpenFileName(self, "Select File", "",
+                                                "All Files (*)", options=options)
         if filePath:
             if filePath in self.knowledge_files_dict:
                 QMessageBox.warning(self, "File Already Added", f"The file '{filePath}' is already in the list.")
