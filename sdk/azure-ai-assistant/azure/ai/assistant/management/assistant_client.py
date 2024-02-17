@@ -184,24 +184,24 @@ class AssistantClient:
                 start_time = time.time()
                 self._create_assistant(assistant_config)
                 end_time = time.time()
-                logger.info(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
+                logger.debug(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
             else:
                 start_time = time.time()
                 config_manager = AssistantConfigManager.get_instance()
                 local_config = config_manager.get_config(self.name)
                 # check if the local configuration is different from the given configuration
                 if local_config and local_config != assistant_config:
-                    logger.info("Local config is different from the given configuration. Updating the assistant...")
+                    logger.debug("Local config is different from the given configuration. Updating the assistant...")
                     self._update_assistant(assistant_config)
                 else:
-                    logger.info("Local config is the same as the given configuration. No need to update the assistant.")
+                    logger.debug("Local config is the same as the given configuration. No need to update the assistant.")
                 end_time = time.time()
-                logger.info(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
+                logger.debug(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
 
             start_time = time.time()
             self._load_selected_functions(assistant_config)
             end_time = time.time()
-            logger.info(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
+            logger.debug(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
             self._assistant_config = assistant_config
 
             # Update the local configuration using AssistantConfigManager
@@ -246,6 +246,7 @@ class AssistantClient:
         :rtype: None
         """
         try:
+            logger.info(f"Purging assistant with name: {self.name}")
             # retrieve the assistant configuration
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
@@ -375,7 +376,7 @@ class AssistantClient:
                     self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
                     return None
                 elif run.status == "failed":
-                    logger.info(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
+                    logger.warning(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
                     run_end_time = str(datetime.now())
                     self._callbacks.on_run_failed(self._name, run.id, run_end_time, run.last_error.code, run.last_error.message, thread_name)
                     return None
@@ -461,7 +462,7 @@ class AssistantClient:
             try:
                 function_args = json.loads(tool_call.function.arguments)
             except json.JSONDecodeError:
-                logger.info(f"Function {function_name} has invalid arguments.")
+                logger.error(f"Function {function_name} has invalid arguments.")
                 return json.dumps({"function_error": function_name, "error": "Invalid JSON arguments."})
             
             # Update the arguments if necessary
@@ -475,7 +476,7 @@ class AssistantClient:
                 logger.error(f"Error in function call: {function_name}. Error: {str(e)}")
                 return json.dumps({"function_error": function_name, "error": str(e)})
         else:
-            logger.info(f"Function: {function_name} is not available.")
+            logger.error(f"Function: {function_name} is not available.")
             return json.dumps({"function_error": function_name, "error": "Function is not available."})
 
     def _load_selected_functions(self, assistant_config: AssistantConfig):
@@ -505,7 +506,7 @@ class AssistantClient:
             # Retrieve the function from the imported module
             return getattr(module, function_name)
         except Exception as e:
-            logger.info(f"Error importing system {function_name} from {module_name}: {e}")
+            logger.error(f"Error importing system {function_name} from {module_name}: {e}")
             raise EngineError(f"Error importing system {function_name} from {module_name}: {e}")
 
     def _import_user_function_from_module(self, module_name, function_name):
