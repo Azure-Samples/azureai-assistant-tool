@@ -7,15 +7,17 @@
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 from gui.directives_dialogs import DirectivesDialog
+from gui.settings_dialogs import DebugViewDialog
 from gui.assistant_dialogs import AssistantConfigDialog, ExportAssistantDialog
 from gui.function_dialogs import CreateFunctionDialog, FunctionErrorsDialog
 from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog, ShowScheduledTasksDialog
 from gui.settings_dialogs import ClientSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
+from gui.log_broadcaster import LogBroadcaster
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
-from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 
 
 class AssistantsMenu:
@@ -83,13 +85,19 @@ class SettingsMenu:
     def __init__(self, main_window):
         self.main_window = main_window
         self.diagnosticsMenu = self.main_window.menuBar().addMenu('&Settings')
-        self.setup_diagnostics_menu()
+        self.debugViewDialog = None
+        self.broadcaster = None
+        self.setup_menu()
 
-    def setup_diagnostics_menu(self):
+    def setup_menu(self):
         # Action for function diagnostics
-        diagAction = QAction("Diagnostics", self.main_window, checkable=True)
+        diagAction = QAction("Diagnostics View", self.main_window, checkable=True)
         diagAction.triggered.connect(self.toggle_diagnostics_sidebar)
         self.diagnosticsMenu.addAction(diagAction)
+
+        debugViewAction = QAction("Debug View", self.main_window)
+        debugViewAction.triggered.connect(self.show_debug_view)
+        self.diagnosticsMenu.addAction(debugViewAction)
 
         # Action for settings
         settingsAction = QAction("Chat Completion", self.main_window)
@@ -98,6 +106,15 @@ class SettingsMenu:
 
     def toggle_diagnostics_sidebar(self, state):
         self.main_window.diagnostics_sidebar.setVisible(not self.main_window.diagnostics_sidebar.isVisible())
+
+    def show_debug_view(self):
+        if not self.debugViewDialog:
+            self.broadcaster = LogBroadcaster()
+            add_broadcaster_to_logger(self.broadcaster)
+            self.debugViewDialog = DebugViewDialog(self.broadcaster, self.main_window)
+        self.debugViewDialog.show()
+        self.debugViewDialog.raise_()
+        self.debugViewDialog.activateWindow()
 
     def show_client_settings(self):
         dialog = ClientSettingsDialog(self.main_window)

@@ -4,6 +4,19 @@
 import logging
 import os
 
+
+class BroadcasterLoggingHandler(logging.Handler):
+    def __init__(self, broadcaster):
+        super().__init__()
+        self.broadcaster = broadcaster
+
+    def emit(self, record):
+        try:
+            message = self.format(record)
+            self.broadcaster.emit(message)
+        except Exception:
+            self.handleError(record)
+
 def setup_logger() -> logging.Logger:
     """
     Sets up a logger named 'assistant_logger' with INFO level. The logger configuration for console logging
@@ -24,9 +37,7 @@ def setup_logger() -> logging.Logger:
     log_to_console = os.getenv('ASSISTANT_LOG_TO_CONSOLE', 'false').lower() in ('true', '1', 't')
 
     # Default to file logging if ASSISTANT_LOG_TO_CONSOLE is not 'true'
-    log_to_file = not log_to_console
-
-    if log_to_file:
+    if not log_to_console:
         # Set the file handler with UTF-8 encoding for file output
         file_handler = logging.FileHandler('assistant.log', encoding='utf-8')
         file_handler.setFormatter(formatter)
@@ -39,6 +50,25 @@ def setup_logger() -> logging.Logger:
         logger.addHandler(stream_handler)
 
     return logger
+
+def add_broadcaster_to_logger(broadcaster) -> None:
+    """
+    Adds or updates the broadcaster in the global logger.
+
+    :param broadcaster: An instance of LogBroadcaster to broadcast log messages.
+    """
+    global logger
+
+    # Check if a BroadcasterLoggingHandler is already added and update it
+    for handler in logger.handlers:
+        if isinstance(handler, BroadcasterLoggingHandler):
+            handler.broadcaster = broadcaster
+            break
+    else:  # If no BroadcasterLoggingHandler is found, add a new one
+        broadcast_handler = BroadcasterLoggingHandler(broadcaster)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s')
+        broadcast_handler.setFormatter(formatter)
+        logger.addHandler(broadcast_handler)
 
 # Example usage:
 # To enable console logging, set the environment variable ASSISTANT_LOG_TO_CONSOLE=true before running the script.

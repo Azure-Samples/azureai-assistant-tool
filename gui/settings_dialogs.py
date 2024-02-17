@@ -4,9 +4,44 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QTextEdit
+from PySide6.QtCore import Signal, Slot
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 import os, json
+from azure.ai.assistant.management.logger_module import logger
+
+
+class DebugViewDialog(QDialog):
+    # Define a signal for appending text
+    appendTextSignal = Signal(str)
+
+    def __init__(self, broadcaster, parent=None):
+        super(DebugViewDialog, self).__init__(parent)
+        self.setWindowTitle("Debug View")
+        self.resize(600, 400)
+        self.textEdit = QTextEdit()
+        self.textEdit.setReadOnly(True)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.textEdit)
+        self.setLayout(layout)
+
+        # Connect the signal to the slot within this dialog
+        self.appendTextSignal.connect(self.append_text_slot)
+
+        # Subscribe to log messages
+        broadcaster.subscribe(self.queue_append_text)
+
+    @Slot(str)
+    def append_text_slot(self, message):
+        self.textEdit.append(message)
+
+    def queue_append_text(self, message):
+        try:
+            # Emit the signal, which will safely invoke the slot in the GUI thread
+            self.appendTextSignal.emit(message)
+        except Exception as e:
+            logger.error(f"Failed to append log message: {e}")
 
 
 class ClientSettingsDialog(QDialog):
