@@ -381,16 +381,16 @@ class ConversationSidebar(QWidget):
             QMessageBox.warning(self, "Error", "Please select an assistant first.")
             return
         threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        thread_name = self.create_conversation_thread(threads_client)
+        thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.thread_timeout)
         self._select_thread(thread_name)
 
     def on_cancel_run_button_clicked(self):
         """Handle clicks on the cancel run button."""
         self.main_window.on_cancel_run_button_clicked()
 
-    def create_conversation_thread(self, threads_client : ConversationThreadClient, is_scheduled_task=False):
+    def create_conversation_thread(self, threads_client : ConversationThreadClient, is_scheduled_task=False, timeout: float=None):
         try:
-            unique_thread_name = threads_client.create_conversation_thread()
+            unique_thread_name = threads_client.create_conversation_thread(timeout=timeout)
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
 

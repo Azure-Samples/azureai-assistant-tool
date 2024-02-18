@@ -11,7 +11,7 @@ from gui.settings_dialogs import DebugViewDialog
 from gui.assistant_dialogs import AssistantConfigDialog, ExportAssistantDialog
 from gui.function_dialogs import CreateFunctionDialog, FunctionErrorsDialog
 from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog, ShowScheduledTasksDialog
-from gui.settings_dialogs import ClientSettingsDialog
+from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
 
@@ -81,28 +81,23 @@ class FunctionsMenu:
         dialog.show()
 
 
-class SettingsMenu:
+class DiagnosticsMenu:
     def __init__(self, main_window):
         self.main_window = main_window
-        self.diagnosticsMenu = self.main_window.menuBar().addMenu('&Settings')
+        self.diagnosticsMenu = self.main_window.menuBar().addMenu('&Diagnostics')
         self.debugViewDialog = None
         self.broadcaster = None
         self.setup_menu()
 
     def setup_menu(self):
         # Action for function diagnostics
-        diagAction = QAction("Diagnostics View", self.main_window, checkable=True)
+        diagAction = QAction("Run View", self.main_window, checkable=True)
         diagAction.triggered.connect(self.toggle_diagnostics_sidebar)
         self.diagnosticsMenu.addAction(diagAction)
 
         debugViewAction = QAction("Debug View", self.main_window)
         debugViewAction.triggered.connect(self.show_debug_view)
         self.diagnosticsMenu.addAction(debugViewAction)
-
-        # Action for settings
-        settingsAction = QAction("Chat Completion", self.main_window)
-        settingsAction.triggered.connect(lambda: self.show_client_settings())
-        self.diagnosticsMenu.addAction(settingsAction)
 
     def toggle_diagnostics_sidebar(self, state):
         self.main_window.diagnostics_sidebar.setVisible(not self.main_window.diagnostics_sidebar.isVisible())
@@ -116,6 +111,25 @@ class SettingsMenu:
         self.debugViewDialog.raise_()
         self.debugViewDialog.activateWindow()
 
+
+class SettingsMenu:
+    def __init__(self, main_window):
+        self.main_window = main_window
+        self.settingsMenu = self.main_window.menuBar().addMenu('&Settings')
+        self.debugViewDialog = None
+        self.broadcaster = None
+        self.setup_menu()
+
+    def setup_menu(self):
+        chatSettingsAction = QAction("Chat Completion", self.main_window)
+        chatSettingsAction.triggered.connect(lambda: self.show_client_settings())
+        self.settingsMenu.addAction(chatSettingsAction)
+
+        # General settings
+        generalSettingsAction = QAction("General", self.main_window)
+        generalSettingsAction.triggered.connect(lambda: self.show_general_settings())
+        self.settingsMenu.addAction(generalSettingsAction)
+
     def show_client_settings(self):
         dialog = ClientSettingsDialog(self.main_window)
         if dialog.exec_() == QDialog.Accepted:
@@ -123,6 +137,10 @@ class SettingsMenu:
                 self.main_window.initialize_chat_components()
             except Exception as e:
                 QMessageBox.warning(self.main_window, "Error", f"An error occurred while updating the settings: {e}")
+
+    def show_general_settings(self):
+        dialog = GeneralSettingsDialog(self.main_window)
+        dialog.show()
 
 
 class TasksMenu:

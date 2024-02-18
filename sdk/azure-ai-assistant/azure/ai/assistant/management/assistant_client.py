@@ -10,6 +10,7 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.functions.system_function_mappings import system_functions
 from typing import Optional
 from openai import AzureOpenAI, OpenAI
 from typing import Union
@@ -307,7 +308,8 @@ class AssistantClient:
     def process_messages(
             self, 
             thread_name : str,
-            additional_instructions : Optional[str] = None
+            additional_instructions : Optional[str] = None,
+            timeout : Optional[float] = None
     ) -> None:
         """
         Process the messages in given thread.
@@ -316,6 +318,8 @@ class AssistantClient:
         :type thread_name: str
         :param additional_instructions: Additional instructions to provide to the assistant.
         :type additional_instructions: Optional[str]
+        :param timeout: The timeout in seconds to wait for the processing to complete.
+        :type timeout: Optional[float]
 
         :return: None
         :rtype: None
@@ -334,13 +338,15 @@ class AssistantClient:
             if additional_instructions is None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id
+                    assistant_id=assistant_id,
+                    timeout=timeout
                 )
             else:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=assistant_id,
-                    additional_instructions=additional_instructions
+                    additional_instructions=additional_instructions,
+                    timeout=timeout
                 )
 
             # call the start_run callback
@@ -353,7 +359,8 @@ class AssistantClient:
                 logger.info(f"Retrieving run: {run.id} with status: {run.status}")
                 run = self._ai_client.beta.threads.runs.retrieve(
                     thread_id=thread_id,
-                    run_id=run.id
+                    run_id=run.id,
+                    timeout=timeout
                 )
 
                 if run is None:
@@ -404,7 +411,7 @@ class AssistantClient:
         logger.info("User processing run cancellation requested.")
         self._user_input_processing_cancel_requested = True
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls):
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
             self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
@@ -418,6 +425,7 @@ class AssistantClient:
             thread_id=thread_id,
             run_id=run_id,
             tool_outputs=tool_outputs,
+            timeout=timeout
         )
         return True
 
@@ -480,24 +488,27 @@ class AssistantClient:
             return json.dumps({"function_error": function_name, "error": "Function is not available."})
 
     def _load_selected_functions(self, assistant_config: AssistantConfig):
+        functions = {}
+
         try:
-            functions = {}
             for func_spec in assistant_config.selected_functions:
                 logger.info(f"Loading selected function: {func_spec['function']['name']}")
                 function_name = func_spec["function"]["name"]
                 module_name = func_spec["function"].get("module", "default.module.path")
-                # if module contains azure.ai.assistant.functions, it is a system function
-                if module_name.startswith("azure.ai.assistant.functions"):
-                    functions[function_name] = self._import_system_function_from_module(module_name, function_name)
+
+                # Check if it is a system function
+                if function_name in system_functions:
+                    functions[function_name] = system_functions[function_name]
                 elif module_name.startswith("functions"):
+                    # Dynamic loading for user-defined functions
                     functions[function_name] = self._import_user_function_from_module(module_name, function_name)
                 else:
                     logger.error(f"Invalid module name: {module_name}")
                     raise EngineError(f"Invalid module name: {module_name}")
+                self._functions = functions
         except Exception as e:
             logger.error(f"Error loading selected functions for assistant: {e}")
             raise EngineError(f"Error loading selected functions for assistant: {e}")
-        self._functions = functions
 
     def _import_system_function_from_module(self, module_name, function_name):
         try:

@@ -57,17 +57,21 @@ class ConversationThreadClient:
         return cls._instances[ai_client_type]
 
     def create_conversation_thread(
-            self
+            self,
+            timeout: Optional[float] = None
     ) -> str:
         """
         Creates a conversation thread.
+
+        :param timeout: The timeout for the request.
+        :type timeout: float, optional
 
         :return: The name of the created thread.
         :rtype: str
         """
         try:
             # Create a new conversation thread for the assistant
-            thread = self._ai_client.beta.threads.create()
+            thread = self._ai_client.beta.threads.create(timeout=timeout)
             # Add the new thread to the thread config
             self._thread_config.add_thread(thread.id, "New Thread")
             thread_name = self._thread_config.get_thread_name_by_id(thread.id)
@@ -132,7 +136,8 @@ class ConversationThreadClient:
 
     def _get_conversation_thread_messages(
             self, 
-            thread_name : str
+            thread_name : str,
+            timeout : Optional[float] = None
     ) -> List[ThreadMessage]:
         """
         Retrieves the conversation thread messages.
@@ -140,13 +145,17 @@ class ConversationThreadClient:
         :param thread_name: The name of the thread to retrieve the messages from.
         :type thread_name: str
 
+        :param timeout: The timeout for the request.
+        :type timeout: float, optional
+
         :return: The conversation thread messages.
         :rtype: list
         """
         try:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             messages = self._ai_client.beta.threads.messages.list(
-                thread_id=thread_id
+                thread_id=thread_id,
+                timeout=timeout
             )
             return messages.data
         except Exception as e:
@@ -156,18 +165,21 @@ class ConversationThreadClient:
     def retrieve_conversation(
             self,
             thread_name: str,
+            timeout: Optional[float] = None
     ) -> Conversation:
         """
         Retrieves the conversation from the given thread name.
 
         :param thread_name: The name of the thread to retrieve the conversation from.
         :type thread_name: str
+        :param timeout: The timeout for the request.
+        :type timeout: float, optional
 
         :return: The conversation.
         :rtype: Conversation
         """
         try:
-            messages = self._get_conversation_thread_messages(thread_name)
+            messages = self._get_conversation_thread_messages(thread_name, timeout)
             conversation = self._retrieve_messages(messages)
             return conversation
         except Exception as e:
@@ -211,7 +223,8 @@ class ConversationThreadClient:
             message : str,
             thread_name : str,
             file_paths : Optional[list] = None,
-            additional_instructions : Optional[str] = None
+            additional_instructions : Optional[str] = None,
+            timeout : Optional[float] = None
     ) -> None:
         """
         Creates a new assistant thread message.
@@ -224,6 +237,8 @@ class ConversationThreadClient:
         :type file_paths: list, optional
         :param additional_instructions: The additional instructions to add to the message.
         :type additional_instructions: str, optional
+        :param timeout: The timeout for the request.
+        :type timeout: float, optional
         """
         try:
 
@@ -241,7 +256,8 @@ class ConversationThreadClient:
                 thread_id,
                 role="user",
                 content=message,
-                file_ids=file_ids
+                file_ids=file_ids,
+                timeout=timeout
             )
 
             logger.info(f"Created message: {message} in thread: {thread_id}, files: {file_ids}")
