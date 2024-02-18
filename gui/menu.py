@@ -172,8 +172,10 @@ class TasksMenu:
         dialog.show()
 
     def show_scheduled_tasks(self):
-        dialog = ShowScheduledTasksDialog(self.main_window)
-        dialog.show()
+        # Show not implemented dialog
+        QMessageBox.information(self.main_window, "Not Implemented", "This feature is not implemented yet.")
+        #dialog = ShowScheduledTasksDialog(self.main_window)
+        #dialog.show()
 
 
 class GuidelinesMenu:
