@@ -87,10 +87,19 @@ def add_broadcaster_to_logger(broadcaster) -> None:
     # Add broadcaster to the global logger
     add_broadcaster_to_specific_logger(logger)
     
+    #loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    #openai_loggers = [logger for logger in loggers if logger.name.startswith("openai")]
+    #print(openai_loggers)
+    # [<Logger openai._legacy_response (WARNING)>, <Logger openai (WARNING)>, <Logger openai._response (WARNING)>, <Logger openai._base_client (DEBUG)>]
+
     # Add broadcaster to the OpenAI logger
-    openai_logger = logging.getLogger("openai._base_client")
+    #openai_logger = logging.getLogger("openai._base_client")
+    #add_broadcaster_to_specific_logger(openai_logger)
+
+    # Add broadcaster to the OpenAI logger
+    openai_logger = logging.getLogger("openai")
     add_broadcaster_to_specific_logger(openai_logger)
-    
+
 # Example usage:
 # To enable console logging, set the environment variable ASSISTANT_LOG_TO_CONSOLE=true before running the script.
 # If ASSISTANT_LOG_TO_CONSOLE is not set or set to false, logging will default to file.

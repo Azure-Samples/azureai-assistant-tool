@@ -77,7 +77,7 @@ class DebugViewDialog(QDialog):
         logger.setLevel(level)
 
         # Set the log level for the OpenAI logger
-        openai_logger = logging.getLogger("openai._base_client")
+        openai_logger = logging.getLogger("openai")
         openai_logger.setLevel(level)
 
     def clear_log_window(self):
