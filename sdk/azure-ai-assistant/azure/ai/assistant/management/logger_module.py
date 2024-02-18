@@ -70,6 +70,27 @@ def add_broadcaster_to_logger(broadcaster) -> None:
         broadcast_handler.setFormatter(formatter)
         logger.addHandler(broadcast_handler)
 
+    # Function to add broadcaster to any logger
+    def add_broadcaster_to_specific_logger(target_logger):
+        # Check if a BroadcasterLoggingHandler is already added and update it
+        for handler in target_logger.handlers:
+            if isinstance(handler, BroadcasterLoggingHandler):
+                handler.broadcaster = broadcaster
+                return  # Exit if the broadcaster is already added
+        
+        # If no BroadcasterLoggingHandler is found, add a new one
+        broadcast_handler = BroadcasterLoggingHandler(broadcaster)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s')
+        broadcast_handler.setFormatter(formatter)
+        target_logger.addHandler(broadcast_handler)
+    
+    # Add broadcaster to the global logger
+    add_broadcaster_to_specific_logger(logger)
+    
+    # Add broadcaster to the OpenAI logger
+    openai_logger = logging.getLogger("openai._base_client")
+    add_broadcaster_to_specific_logger(openai_logger)
+    
 # Example usage:
 # To enable console logging, set the environment variable ASSISTANT_LOG_TO_CONSOLE=true before running the script.
 # If ASSISTANT_LOG_TO_CONSOLE is not set or set to false, logging will default to file.

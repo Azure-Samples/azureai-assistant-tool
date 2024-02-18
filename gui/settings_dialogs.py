@@ -20,6 +20,19 @@ class DebugViewDialog(QDialog):
         self.resize(600, 400)
         self.broadcaster = broadcaster
 
+        # Filter LineEdit
+        self.filterLineEdit = QLineEdit()
+        self.filterLineEdit.setPlaceholderText("Filter logs (e.g., 'INFO')")
+        self.filterLineEdit.textChanged.connect(self.apply_filter)
+
+        # Add the filter LineEdit to the layout
+        filterLayout = QHBoxLayout()
+        filterLayout.addWidget(QLabel("Filter:"))
+        filterLayout.addWidget(self.filterLineEdit)
+
+        # Store log messages
+        self.logMessages = []
+
         self.textEdit = QTextEdit()
         self.textEdit.setReadOnly(True)
 
@@ -27,13 +40,20 @@ class DebugViewDialog(QDialog):
         for level in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
             self.logLevelComboBox.addItem(level, getattr(logging, level))
         self.logLevelComboBox.currentIndexChanged.connect(self.change_log_level)
+        self.change_log_level(0)
 
         layout = QVBoxLayout()
+        layout.addLayout(filterLayout)
         layout.addWidget(self.textEdit)
+
+        # Clear Button
+        self.clearButton = QPushButton("Clear")
+        self.clearButton.clicked.connect(self.clear_log_window)
 
         levelSelectionLayout = QHBoxLayout()
         levelSelectionLayout.addWidget(QLabel("Log Level:"))
         levelSelectionLayout.addWidget(self.logLevelComboBox)
+        levelSelectionLayout.addWidget(self.clearButton)
         layout.addLayout(levelSelectionLayout)
 
         self.setLayout(layout)
@@ -44,6 +64,10 @@ class DebugViewDialog(QDialog):
     @Slot(str)
     def append_text_slot(self, message):
         self.textEdit.append(message)
+        # Store the message
+        self.logMessages.append(message)
+        # Apply the current filter
+        self.apply_filter()
 
     def queue_append_text(self, message):
         self.appendTextSignal.emit(message)
@@ -51,6 +75,23 @@ class DebugViewDialog(QDialog):
     def change_log_level(self, index):
         level = self.logLevelComboBox.itemData(index)
         logger.setLevel(level)
+
+        # Set the log level for the OpenAI logger
+        openai_logger = logging.getLogger("openai._base_client")
+        openai_logger.setLevel(level)
+
+    def clear_log_window(self):
+        self.textEdit.clear()
+
+    def apply_filter(self):
+        # Clear the textEdit widget
+        self.textEdit.clear()
+        # Get the current filter text
+        filter_text = self.filterLineEdit.text().lower()
+        # Re-add messages that match the filter
+        for message in self.logMessages:
+            if filter_text in message.lower():
+                self.textEdit.append(message)
 
 
 class ClientSettingsDialog(QDialog):

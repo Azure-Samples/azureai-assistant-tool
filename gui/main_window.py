@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import os
+import os, time
 import traceback
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
@@ -276,11 +276,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         return self.active_ai_client_type.name
 
     def on_cancel_run_button_clicked(self):
-        logger.info("on_cancel_run_button_clicked on main_window")
+        logger.debug("on_cancel_run_button_clicked on main_window")
         # cancel runs for all assistants in self.assistants_processing
         #TODO ensure thread safety
         for assistant_name in self.assistants_processing:
-            logger.info(f"Cancel run for assistant {assistant_name}")
+            logger.debug(f"Cancel run for assistant {assistant_name}")
             assistant_client = self.assistant_client_manager.get_client(assistant_name)
             if assistant_client is not None:
                 assistant_client.cancel_processing()
@@ -319,7 +319,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def on_user_input_complete(self, user_input):
         try:
-            #thread_creation_start = time.time() 
+            on_user_input_complete_start = time.time() 
             assistants = self.conversation_sidebar.get_selected_assistants()
             # check if assistants is empty list
             if not assistants:
@@ -347,8 +347,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 additional_instructions = None
 
             self.executor.submit(self.process_input, user_input, assistants, updated_thread_name, False, file_paths, additional_instructions)
-            #thread_creation_end = time.time()  # End timing after thread starts
-            #print(f"Time taken for thread creation and start: {thread_creation_end - thread_creation_start} seconds")
+            on_user_input_complete_end = time.time()  # End timing after thread starts
+            logger.debug(f"Time taken for on_user_input_complete: {on_user_input_complete_end - on_user_input_complete_start} seconds")
             self.conversation_view.inputField.clear()
         except Exception as e:
             error_message = f"An error occurred while processing the user input: {e}\n\nTraceback:\n{traceback.format_exc()}"
@@ -362,10 +362,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def setup_conversation_thread(self, is_scheduled_task=False):
         threads_client = self.conversation_thread_clients[self.active_ai_client_type]
         if is_scheduled_task:
-            logger.info(f"setup_conversation_thread for scheduled task")
+            logger.debug(f"setup_conversation_thread for scheduled task")
             return self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task)
         else:
-            logger.info(f"setup_conversation_thread for user input")
+            logger.debug(f"setup_conversation_thread for user input")
             if self.conversation_sidebar.threadList.count() == 0 or not self.conversation_sidebar.threadList.selectedItems():
                 thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task)
                 self.conversation_sidebar.select_conversation_thread_by_name(thread_name)
@@ -375,14 +375,14 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def process_input(self, user_input, assistants, thread_name, is_scheduled_task, file_paths=None, additional_instructions=None):
         try:
-            logger.info(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
+            logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
 
-            #start_time = time.time()
+            start_time = time.time()
             # Create message to thread
             self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths, additional_instructions)
             
-            #end_time = time.time()  # Record the end time
-            #print(f"Total time taken for starting thread: {end_time - start_time} seconds")
+            end_time = time.time()  # Record the end time
+            logger.debug(f"Total time taken for starting conversation thread: {end_time - start_time} seconds")
 
             for assistant_name in assistants:
                 # Signal the start of processing
@@ -411,19 +411,19 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     # Callbacks for ConversationSidebarCallbacks
     def on_listening_started(self):
-        logger.info("on_listening_started on main_window")
+        logger.debug("on_listening_started on main_window")
         if not self.speech_input_handler.is_initialized:
             QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the SPEECH_KEY and SPEECH_REGION environment variables are set correctly.")
             return False
         return self.speech_input_handler.start_listening_from_mic()
 
     def on_listening_stopped(self):
-        logger.info("on_listening_stopped on main_window")
+        logger.debug("on_listening_stopped on main_window")
         self.speech_input_handler.stop_listening_from_mic()
 
     # Callbacks for ConversationViewCallbacks
     def on_text_input_field_clicked(self):
-        logger.info("on_text_field_clicked on main_window")
+        logger.debug("on_text_field_clicked on main_window")
 
     # Callbacks for AssistantManagerCallbacks
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
@@ -458,6 +458,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def on_run_failed(self, assistant_name, run_identifier, run_end_time, error_code, error_message, thread_name):
         error_string = f"Run failed due to error code: {error_code}, message: {error_message}"
+        logger.warning(error_string)
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, error_string)
 
         # failed state is terminal state, so update all messages in conversation view after the run has ended
@@ -486,7 +487,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         for message in conversation.messages:
             if message.type == "file":
                 file_path = message.retrieve_file(assistant_config.output_folder_path)
-                logger.info(f"File downloaded to {file_path} on run end")
+                logger.debug(f"File downloaded to {file_path} on run end")
 
     # Callbacks for TaskManagerCallbacks
     def on_task_started(self, task: Task, schedule_id):
@@ -554,7 +555,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.speech_input_handler.stop_listening_from_mic()
             self.assistant_config_manager.save_configs()
             for ai_client_type in AIClientType:
-                logger.info(f"CloseEvent: save_conversation_threads for ai_client_type {ai_client_type.name}")
+                logger.debug(f"CloseEvent: save_conversation_threads for ai_client_type {ai_client_type.name}")
                 if self.conversation_thread_clients[ai_client_type] is not None:
                     self.conversation_thread_clients[ai_client_type].save_conversation_threads()
             self.executor.shutdown(wait=True)
