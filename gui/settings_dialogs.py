@@ -4,8 +4,8 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QTextEdit, QHBoxLayout, QCheckBox
-from PySide6.QtCore import Signal, Slot
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QTextEdit, QHBoxLayout, QCheckBox, QListWidget, QListWidgetItem
+from PySide6.QtCore import Signal, Slot, Qt
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 import os, json, logging
 from azure.ai.assistant.management.logger_module import logger
@@ -24,6 +24,7 @@ class DebugViewDialog(QDialog):
         self.filterLineEdit = QLineEdit()
         self.filterLineEdit.setPlaceholderText("Filter logs (e.g., 'INFO')")
         self.filterLineEdit.textChanged.connect(self.apply_filter)
+        self.filterLineEdit.returnPressed.connect(self.add_filter_word)
 
         # Add the filter LineEdit to the layout
         filterLayout = QHBoxLayout()
@@ -46,8 +47,19 @@ class DebugViewDialog(QDialog):
         layout.addLayout(filterLayout)
         layout.addWidget(self.textEdit)
 
+        # Filter List
+        self.filterList = QListWidget()
+        self.filterList.itemChanged.connect(self.apply_filter)  # Connect to apply_filter when a checkbox state changes
+
+        filterListLayout = QHBoxLayout()
+        filterListLayout.addWidget(QLabel("Filter List:"))
+        filterListLayout.addWidget(self.filterList)
+        layout.addLayout(filterListLayout)
+
         # Clear Button
         self.clearButton = QPushButton("Clear")
+        self.clearButton.setAutoDefault(False)
+        self.clearButton.setDefault(False)
         self.clearButton.clicked.connect(self.clear_log_window)
 
         levelSelectionLayout = QHBoxLayout()
@@ -85,14 +97,48 @@ class DebugViewDialog(QDialog):
         self.logMessages.clear()
 
     def apply_filter(self):
+        # Check if any filter is selected
+        is_any_filter_selected = any(self.filterList.item(i).checkState() == Qt.CheckState.Checked for i in range(self.filterList.count()))
+
         # Clear the textEdit widget
         self.textEdit.clear()
-        # Get the current filter text
-        filter_text = self.filterLineEdit.text().lower()
-        # Re-add messages that match the filter
-        for message in self.logMessages:
-            if filter_text in message.lower():
-                self.textEdit.append(message)
+
+        if is_any_filter_selected:
+            # Filter based on selected items in the list box
+            selected_filters = [self.filterList.item(i).text().lower() for i in range(self.filterList.count()) if self.filterList.item(i).checkState() == Qt.CheckState.Checked]
+
+            # Re-add messages that match any of the selected filters
+            for message in self.logMessages:
+                if any(filter_word in message.lower() for filter_word in selected_filters):
+                    self.textEdit.append(message)
+        else:
+            # Get the current filter text
+            filter_text = self.filterLineEdit.text().lower()
+            # Re-add messages that match the filter
+            for message in self.logMessages:
+                if filter_text in message.lower():
+                    self.textEdit.append(message)
+        pass
+
+    def add_filter_word(self):
+        # Get the text from QLineEdit
+        filter_word = self.filterLineEdit.text()
+        if not filter_word:
+            return
+
+        # Create a new QListWidgetItem
+        item = QListWidgetItem(filter_word)
+        #item.setFlags(item.flags() | Qt.ItemIsUserCheckable)  # Make the item checkable
+        item.setCheckState(Qt.CheckState.Unchecked)  # Set the item to be checked by default
+
+        # Add the item to the list
+        self.filterList.addItem(item)
+
+        # Clear the QLineEdit for the next filter word
+        #self.filterLineEdit.clear()
+
+        # Apply the current filter with the new filter word added
+        self.apply_filter()
 
 
 class GeneralSettingsDialog(QDialog):
