@@ -17,58 +17,64 @@ class DebugViewDialog(QDialog):
     def __init__(self, broadcaster, parent=None):
         super(DebugViewDialog, self).__init__(parent)
         self.setWindowTitle("Debug View")
-        self.resize(600, 400)
+        self.resize(800, 800)  # Adjusted for additional space
         self.broadcaster = broadcaster
-
-        # Filter LineEdit
-        self.filterLineEdit = QLineEdit()
-        self.filterLineEdit.setPlaceholderText("Filter logs (e.g., 'INFO')")
-        self.filterLineEdit.textChanged.connect(self.apply_filter)
-        self.filterLineEdit.returnPressed.connect(self.add_filter_word)
-
-        # Add the filter LineEdit to the layout
-        filterLayout = QHBoxLayout()
-        filterLayout.addWidget(QLabel("Filter:"))
-        filterLayout.addWidget(self.filterLineEdit)
-
         # Store log messages
         self.logMessages = []
 
+        mainLayout = QVBoxLayout()  # Top level layout is now vertical
+
+        # Filter LineEdit at the top
+        self.filterLineEdit = QLineEdit()
+        self.filterLineEdit.setPlaceholderText("Add new filter (e.g., 'ERROR') and press Enter")
+        self.filterLineEdit.textChanged.connect(self.apply_filter)
+        self.filterLineEdit.returnPressed.connect(self.add_filter_word)
+        mainLayout.addWidget(self.filterLineEdit)
+
+        # Horizontal layout for filter list and log view
+        contentLayout = QHBoxLayout()
+
+        # Filter List Section
+        filterListLayout = QVBoxLayout()
+        self.filterList = QListWidget()
+        self.filterList.setFixedWidth(200)
+        self.filterList.itemChanged.connect(self.apply_filter)
+        filterListLayout.addWidget(QLabel("Filters:"))
+        filterListLayout.addWidget(self.filterList)
+
+        # Log View Section
+        logViewLayout = QVBoxLayout()
         self.textEdit = QTextEdit()
         self.textEdit.setReadOnly(True)
+        logViewLayout.addWidget(QLabel("Log:"))
+        logViewLayout.addWidget(self.textEdit)
 
+        # Optional: Add other controls like log level selection and clear button to the logViewLayout
+        controlLayout = QHBoxLayout()
         self.logLevelComboBox = QComboBox()
-        for level in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
-            self.logLevelComboBox.addItem(level, getattr(logging, level))
-        self.logLevelComboBox.currentIndexChanged.connect(self.change_log_level)
-        self.change_log_level(0)
-
-        layout = QVBoxLayout()
-        layout.addLayout(filterLayout)
-        layout.addWidget(self.textEdit)
-
-        # Filter List
-        self.filterList = QListWidget()
-        self.filterList.itemChanged.connect(self.apply_filter)  # Connect to apply_filter when a checkbox state changes
-
-        filterListLayout = QHBoxLayout()
-        filterListLayout.addWidget(QLabel("Filter List:"))
-        filterListLayout.addWidget(self.filterList)
-        layout.addLayout(filterListLayout)
-
-        # Clear Button
         self.clearButton = QPushButton("Clear")
         self.clearButton.setAutoDefault(False)
         self.clearButton.setDefault(False)
         self.clearButton.clicked.connect(self.clear_log_window)
+        controlLayout.addWidget(QLabel("Log Level:"))
+        controlLayout.addWidget(self.logLevelComboBox)
+        controlLayout.addWidget(self.clearButton)
+        logViewLayout.addLayout(controlLayout)
 
-        levelSelectionLayout = QHBoxLayout()
-        levelSelectionLayout.addWidget(QLabel("Log Level:"))
-        levelSelectionLayout.addWidget(self.logLevelComboBox)
-        levelSelectionLayout.addWidget(self.clearButton)
-        layout.addLayout(levelSelectionLayout)
+        # Populate log level combo box
+        for level in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
+            self.logLevelComboBox.addItem(level, getattr(logging, level))
+        self.logLevelComboBox.currentIndexChanged.connect(self.change_log_level)
+        self.change_log_level(0)  # Set default log level
 
-        self.setLayout(layout)
+        # Combine filter list and log view sections into the content layout
+        contentLayout.addLayout(filterListLayout, 1)  # Filter list section
+        contentLayout.addLayout(logViewLayout, 3)  # Log view section
+
+        # Add the content layout below the filter QLineEdit
+        mainLayout.addLayout(contentLayout)
+
+        self.setLayout(mainLayout)
 
         self.appendTextSignal.connect(self.append_text_slot)
         self.broadcaster.subscribe(self.queue_append_text)
