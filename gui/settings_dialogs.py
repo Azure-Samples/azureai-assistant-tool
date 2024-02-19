@@ -46,6 +46,14 @@ class DebugViewDialog(QDialog):
         logViewLayout = QVBoxLayout()
         self.textEdit = QTextEdit()
         self.textEdit.setReadOnly(True)
+        self.textEdit.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #c0c0c0; /* Adjusted to have a 1px solid border */
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                border-radius: 4px;
+                padding: 1px; /* Adds padding inside the QTextEdit widget */
+            }
+        """)
         logViewLayout.addWidget(QLabel("Log:"))
         logViewLayout.addWidget(self.textEdit)
 
