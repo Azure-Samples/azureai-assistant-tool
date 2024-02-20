@@ -14,23 +14,25 @@ Improve Reliability and Scalability: Provide a reliable and scalable framework f
 
 The Azure AI Assistant Tool is currently in Alpha status. This early stage of development means the project is actively evolving, with significant updates and improvements expected. Users should anticipate changes as we work towards refining features, enhancing functionality, and expanding capabilities. We welcome feedback and contributions during this phase to help shape the future of the tool.
 
-## Features
+# Features
 
 - Easy Configuration: Set up assistant instructions, models, files, and tools.
-- Tool Integration: Incorporate knowledge retrieval, code interpreters, and built-in system and dynamic user functions to enhance assistant skills and capabilities.
+- Assistant Tool Integration: Incorporate knowledge retrieval, code interpreter, and built-in system and dynamic user functions to enhance assistant skills and capabilities.
 - Dynamic User Functions: Quickly create and apply user-defined functions to assistants.
 - Task Management: Efficiently manage and schedule tasks, including batch and multi-step operations, for parallel execution.
+- Speech Input and Output: Speech transcription and synthesis capabilities using Azure CognitiveServices Speech SDK.
+- Diagnostic: Run and Debug views to help identify the problems using log view output, e.g. latencies in the assistant execution flow.
 
-## Installation & Setup
+# Installation & Setup
 
-### Prerequisites
+## Prerequisites
 Before installing Azure AI Assistant Tool, you need to have Python installed on your system (Python 3.8 or newer is recommended). 
 You can download Python from [the official website](https://www.python.org/downloads/).
 
-#### PySide6 Dependency
+### PySide6 Dependency
 This application depends on the PySide6 libraries for its graphical user interface. PySide6 is dynamically linked, meaning you need to have PySide6 installed on your system to run Azure AI Assistant Tool.
 
-### Build and install azure.ai.assistant Python library
+## Build and install azure.ai.assistant Python library
 
 During the Alpha phase of development, the azure.ai.assistant library is included within this tool's repository, as it has not yet been released on PyPI. 
 Using following instructions, you can build the wheel or alternatively use directly the wheel package provided under releases.
@@ -40,9 +42,9 @@ Using following instructions, you can build the wheel or alternatively use direc
 - Make sure wheel is installed: `pip install wheel` (or pip3 e.g. in Mac)
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.3a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl`
 
-### Install dependencies
+## Install dependencies
 - pip install PySide6 (or use pip3 e.g. in Mac)
 - pip install openai
 - pip install python-Levenshtein
@@ -50,10 +52,10 @@ Using following instructions, you can build the wheel or alternatively use direc
 - pip install Pillow
 - pip install azure-cognitiveservices-speech
   - This is required for microphone functionality
-- pip install --force-reinstall --no-deps azure_ai_assistant-0.2.3a1-py3-none-any.whl
-  - azure_ai_assistant-0.2.3a1-py3-none-any.whl can be found under the release tags in repo currently
+- pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl
+  - azure_ai_assistant-0.2.4a1-py3-none-any.whl can be found under the release tags in repo currently
 
-### Setup Environment Variables
+## Setup Environment Variables
 1. Set the OpenAI key and endpoint and version (optional)
   - Windows: 
     - setx OPENAI_API_KEY "Your OpenAI Key"
@@ -74,15 +76,15 @@ Using following instructions, you can build the wheel or alternatively use direc
     - export SPEECH_KEY="Your Speech Key"
     - export SPEECH_REGION="Your Speech Region"
 
-## Launch the application
+# Launch the application
 
 - Run the following command in root of this repository
   - `python main.py` (or `python3`, depends on your environment)
 
-## License
+# License
 Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
-### Notice Regarding PySide6
+## Notice Regarding PySide6
 The Azure AI Assistant Tool uses PySide6, which is licensed under the GNU Lesser General Public License (LGPL). 
 By using PySide6, you are able to modify and redistribute the library under the same license. 
 For more information on PySide6's license, please visit [Qt Licensing](https://www.qt.io/licensing/).

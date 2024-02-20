@@ -91,15 +91,20 @@ class DebugViewDialog(QDialog):
         self.setLayout(mainLayout)
 
         # Initialize the LogMessageProcessor in a separate thread
+        self.setupProcessorThread()
+
+        self.broadcaster.subscribe(self.queue_append_text)
+
+    def setupProcessorThread(self):
+        # Initialize or reinitialize the LogMessageProcessor and its thread
+        if hasattr(self, 'processorThread') and self.processorThread.isRunning():
+            return  # The thread is already running, no need to set up again
+        
         self.processorThread = QThread()
         self.logProcessor = LogMessageProcessor()
         self.logProcessor.moveToThread(self.processorThread)
-        self.processorThread.start()
-
-        # Connect the processor's signal to the UI update method
         self.logProcessor.updateUI.connect(self.append_text_slot)
-
-        self.broadcaster.subscribe(self.queue_append_text)
+        self.processorThread.start()
 
     def append_text_slot(self, message):
         self.textEdit.append(message)
@@ -163,6 +168,11 @@ class DebugViewDialog(QDialog):
 
         # Apply the current filter with the new filter word added
         self.apply_filter()
+
+    def showEvent(self, event):
+        # Ensure the processor thread is set up and running when dialog is shown
+        self.setupProcessorThread()
+        super().showEvent(event)
 
     def closeEvent(self, event):
         # Properly handle the thread's closure
