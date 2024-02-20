@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QMessageBox
 from gui.status_bar import ActivityStatus
 from azure.ai.assistant.management.logger_module import logger
 import azure.cognitiveservices.speech as speechsdk
-import os
+import os, time
 
 
 class SpeechInputHandler:
@@ -84,9 +84,12 @@ class SpeechInputHandler:
 
             # Proceed with starting the microphone listening as consent is given or already obtained
             logger.info("Starting recognition from microphone.")
+            start_time = time.time()
             if hasattr(self.main_window, 'start_animation_signal'):
                 self.main_window.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING)
             self.speech_recognizer.start_continuous_recognition_async().get()
+            stop_time = time.time()
+            logger.info(f"Time taken for speech recognition to start: {stop_time - start_time} seconds")
             self.is_listening = True  # Set flag to indicate listening has started
             return True
 
@@ -94,6 +97,9 @@ class SpeechInputHandler:
         if self.is_listening:
             logger.info("Stopping recognition from microphone.")
             self.is_listening = False  # Reset flag to indicate not listening
+            start_time = time.time()
             if hasattr(self.main_window, 'stop_animation_signal'):
                 self.main_window.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING)
             self.speech_recognizer.stop_continuous_recognition_async().get()
+            stop_time = time.time()
+            logger.info(f"Time taken for speech recognition to stop: {stop_time - start_time} seconds")

@@ -432,7 +432,10 @@ class AssistantClient:
     def _process_tool_calls(self, name, run_id, tool_calls):
         tool_outputs = []
         for tool_call in tool_calls:
+            start_time = time.time()
             function_response = self._handle_function_call(tool_call)
+            end_time = time.time()
+            logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
             # call the on_function_call_processed callback
             self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
@@ -463,7 +466,7 @@ class AssistantClient:
 
     def _handle_function_call(self, tool_call):
         logger.info(f"Handling function call: {tool_call.function.name} with arguments: {tool_call.function.arguments}")
-        
+
         function_name = tool_call.function.name
         function_to_call = self._functions.get(function_name)
         if function_to_call:

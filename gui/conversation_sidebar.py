@@ -12,7 +12,7 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
-import os
+import os, time
 
 from gui.assistant_client_manager import AssistantClientManager
 from gui.utils import resource_path
@@ -390,7 +390,10 @@ class ConversationSidebar(QWidget):
 
     def create_conversation_thread(self, threads_client : ConversationThreadClient, is_scheduled_task=False, timeout: float=None):
         try:
+            start_time = time.time()
             unique_thread_name = threads_client.create_conversation_thread(timeout=timeout)
+            end_time = time.time()
+            logger.debug(f"Total time taken to create a new conversation thread: {end_time - start_time} seconds")
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
 

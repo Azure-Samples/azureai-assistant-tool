@@ -17,6 +17,9 @@ class UserInputSignal(QObject):
 class UserInputSendSignal(QObject):
     send_signal = Signal(str)
 
+class SpeechSynthesisCompleteSignal(QObject):
+    complete_signal = Signal()
+
 class ConversationViewClear(QObject):
     update_signal = Signal()
 
