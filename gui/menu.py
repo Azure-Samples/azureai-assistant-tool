@@ -7,10 +7,10 @@
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 from gui.directives_dialogs import DirectivesDialog
-from gui.settings_dialogs import DebugViewDialog
+from gui.debug_dialog import DebugViewDialog
 from gui.assistant_dialogs import AssistantConfigDialog, ExportAssistantDialog
 from gui.function_dialogs import CreateFunctionDialog, FunctionErrorsDialog
-from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog, ShowScheduledTasksDialog
+from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog
 from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
@@ -105,8 +105,8 @@ class DiagnosticsMenu:
     def show_debug_view(self):
         if not self.debugViewDialog:
             self.broadcaster = LogBroadcaster()
-            add_broadcaster_to_logger(self.broadcaster)
             self.debugViewDialog = DebugViewDialog(self.broadcaster, self.main_window)
+            add_broadcaster_to_logger(self.broadcaster)
         self.debugViewDialog.show()
         self.debugViewDialog.raise_()
         self.debugViewDialog.activateWindow()

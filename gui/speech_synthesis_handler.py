@@ -35,12 +35,12 @@ summary_instructions = [{
 
 class SpeechSynthesisHandler:
     def __init__(self, 
-                 client : OpenAI,
-                 model: str,
+                 main_window,
                  complete_signal=None
     ):
-        self.client = client
-        self.model = model
+        self.main_window = main_window
+        self.client : OpenAI = main_window.chat_client
+        self.model = main_window.chat_completion_model
         self.complete_signal = complete_signal
         self.is_initialized = False
         speech_key = os.environ.get('SPEECH_KEY')
@@ -76,8 +76,8 @@ class SpeechSynthesisHandler:
             return
 
         try:
-            if self.get_words_count(text) >= 20:
-                logger.info("Text is too long, creating summary before speech synthesis.")
+            if self.get_words_count(text) >= MAX_SUMMARY_WORDS and self.main_window.user_text_summarization_in_synthesis:
+                logger.info(f"Text is longer than {MAX_SUMMARY_WORDS} words, creating summary of text for speech synthesis.")
                 start_time = time.time()
                 text = self.get_summary(text)
                 stop_time = time.time()

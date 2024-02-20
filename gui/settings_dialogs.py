@@ -4,155 +4,9 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QTextEdit, QHBoxLayout, QCheckBox, QListWidget, QListWidgetItem
-from PySide6.QtCore import Signal, Slot, Qt
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QHBoxLayout, QCheckBox
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
-import os, json, logging
-from azure.ai.assistant.management.logger_module import logger
-
-
-class DebugViewDialog(QDialog):
-    appendTextSignal = Signal(str)
-
-    def __init__(self, broadcaster, parent=None):
-        super(DebugViewDialog, self).__init__(parent)
-        self.setWindowTitle("Debug View")
-        self.resize(800, 800)  # Adjusted for additional space
-        self.broadcaster = broadcaster
-        # Store log messages
-        self.logMessages = []
-
-        mainLayout = QVBoxLayout()  # Top level layout is now vertical
-
-        # Filter LineEdit at the top
-        self.filterLineEdit = QLineEdit()
-        self.filterLineEdit.setPlaceholderText("Add new filter (e.g., 'ERROR') and press Enter")
-        self.filterLineEdit.textChanged.connect(self.apply_filter)
-        self.filterLineEdit.returnPressed.connect(self.add_filter_word)
-        mainLayout.addWidget(self.filterLineEdit)
-
-        # Horizontal layout for filter list and log view
-        contentLayout = QHBoxLayout()
-
-        # Filter List Section
-        filterListLayout = QVBoxLayout()
-        self.filterList = QListWidget()
-        self.filterList.setFixedWidth(200)
-        self.filterList.itemChanged.connect(self.apply_filter)
-        filterListLayout.addWidget(QLabel("Filters:"))
-        filterListLayout.addWidget(self.filterList)
-
-        # Log View Section
-        logViewLayout = QVBoxLayout()
-        self.textEdit = QTextEdit()
-        self.textEdit.setReadOnly(True)
-        self.textEdit.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #c0c0c0; /* Adjusted to have a 1px solid border */
-                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
-                border-radius: 4px;
-                padding: 1px; /* Adds padding inside the QTextEdit widget */
-            }
-        """)
-        logViewLayout.addWidget(QLabel("Log:"))
-        logViewLayout.addWidget(self.textEdit)
-
-        # Optional: Add other controls like log level selection and clear button to the logViewLayout
-        controlLayout = QHBoxLayout()
-        self.logLevelComboBox = QComboBox()
-        self.clearButton = QPushButton("Clear")
-        self.clearButton.setAutoDefault(False)
-        self.clearButton.setDefault(False)
-        self.clearButton.clicked.connect(self.clear_log_window)
-        controlLayout.addWidget(QLabel("Log Level:"))
-        controlLayout.addWidget(self.logLevelComboBox)
-        controlLayout.addWidget(self.clearButton)
-        logViewLayout.addLayout(controlLayout)
-
-        # Populate log level combo box
-        for level in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
-            self.logLevelComboBox.addItem(level, getattr(logging, level))
-        self.logLevelComboBox.currentIndexChanged.connect(self.change_log_level)
-        self.change_log_level(0)  # Set default log level
-
-        # Combine filter list and log view sections into the content layout
-        contentLayout.addLayout(filterListLayout, 1)  # Filter list section
-        contentLayout.addLayout(logViewLayout, 3)  # Log view section
-
-        # Add the content layout below the filter QLineEdit
-        mainLayout.addLayout(contentLayout)
-
-        self.setLayout(mainLayout)
-
-        self.appendTextSignal.connect(self.append_text_slot)
-        self.broadcaster.subscribe(self.queue_append_text)
-
-    @Slot(str)
-    def append_text_slot(self, message):
-        self.textEdit.append(message)
-        # Store the message
-        self.logMessages.append(message)
-        # Apply the current filter
-        self.apply_filter()
-
-    def queue_append_text(self, message):
-        self.appendTextSignal.emit(message)
-
-    def change_log_level(self, index):
-        level = self.logLevelComboBox.itemData(index)
-        logger.setLevel(level)
-
-        # Set the log level for the OpenAI logger
-        openai_logger = logging.getLogger("openai")
-        openai_logger.setLevel(level)
-
-    def clear_log_window(self):
-        self.textEdit.clear()
-        self.logMessages.clear()
-
-    def apply_filter(self):
-        # Check if any filter is selected
-        is_any_filter_selected = any(self.filterList.item(i).checkState() == Qt.CheckState.Checked for i in range(self.filterList.count()))
-
-        # Clear the textEdit widget
-        self.textEdit.clear()
-
-        if is_any_filter_selected:
-            # Filter based on selected items in the list box
-            selected_filters = [self.filterList.item(i).text().lower() for i in range(self.filterList.count()) if self.filterList.item(i).checkState() == Qt.CheckState.Checked]
-
-            # Re-add messages that match any of the selected filters
-            for message in self.logMessages:
-                if any(filter_word in message.lower() for filter_word in selected_filters):
-                    self.textEdit.append(message)
-        else:
-            # Get the current filter text
-            filter_text = self.filterLineEdit.text().lower()
-            # Re-add messages that match the filter
-            for message in self.logMessages:
-                if filter_text in message.lower():
-                    self.textEdit.append(message)
-        pass
-
-    def add_filter_word(self):
-        # Get the text from QLineEdit
-        filter_word = self.filterLineEdit.text()
-        if not filter_word:
-            return
-
-        # Create a new QListWidgetItem
-        item = QListWidgetItem(filter_word)
-        #item.setFlags(item.flags() | Qt.ItemIsUserCheckable)  # Make the item checkable
-        item.setCheckState(Qt.CheckState.Unchecked)  # Set the item to be checked by default
-
-        # Add the item to the list
-        self.filterList.addItem(item)
-
-        # Clear the QLineEdit for the next filter word
-        #self.filterLineEdit.clear()
-
-        # Apply the current filter with the new filter word added
-        self.apply_filter()
+import os, json
 
 
 class GeneralSettingsDialog(QDialog):
@@ -188,6 +42,10 @@ class GeneralSettingsDialog(QDialog):
         self.useChatCompletionForThreadsCheckbox = QCheckBox("Enable chat completion for friendly conversation thread names", self)
         self.useChatCompletionForThreadsCheckbox.setChecked(self.main_window.use_chat_completion_for_thread_name)
 
+        # Text summarization checkbox for long messages for speech synthesis
+        self.useTextSummarizationCheckbox = QCheckBox("Enable text summarization for long messages for speech synthesis", self)
+        self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
+
         # Buttons
         self.buttonsLayout = QHBoxLayout()
         self.okButton = QPushButton("OK", self)
@@ -199,6 +57,7 @@ class GeneralSettingsDialog(QDialog):
         self.layout.addLayout(self.threadTimeoutLayout)
         self.layout.addLayout(self.runTimeoutLayout)
         self.layout.addWidget(self.useChatCompletionForThreadsCheckbox)
+        self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
 
         # Connect signals
@@ -206,15 +65,13 @@ class GeneralSettingsDialog(QDialog):
         self.cancelButton.clicked.connect(self.reject)
 
     def accept(self):
-        # Validate and save the timeout settings here
-        # Example validation:
         try:
             thread_timeout = float(self.threadTimeoutEdit.text())
             run_timeout = float(self.runTimeoutEdit.text())
-            use_chat_completion_for_thread_name = self.useChatCompletionForThreadsCheckbox.isChecked()
             self.main_window.thread_timeout = thread_timeout
             self.main_window.run_timeout = run_timeout
-            self.main_window.use_chat_completion_for_thread_name = use_chat_completion_for_thread_name
+            self.main_window.use_chat_completion_for_thread_name = self.useChatCompletionForThreadsCheckbox.isChecked()
+            self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
             super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
         except ValueError:
