@@ -5,17 +5,35 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QTextEdit, QHBoxLayout, QListWidget, QListWidgetItem
-from PySide6.QtCore import Signal, Slot, Qt, QObject, QThread, Qt, QMetaObject, Q_ARG
-import logging
+from PySide6.QtCore import Signal, Slot, Qt, QObject, QThread, Qt, QMetaObject, Q_ARG, QTimer
+import logging, threading
 from azure.ai.assistant.management.logger_module import logger
 
 
 class LogMessageProcessor(QObject):
     updateUI = Signal(str)  # Signal to send processed log messages to the UI thread
 
+    def __init__(self):
+        super().__init__()
+        self.messageBuffer = []
+        self.thread_lock = threading.Lock()
+        self.bufferTimer = QTimer(self)
+        self.bufferTimer.timeout.connect(self.flushBuffer)
+        self.bufferTimer.start(1000)  # Flush buffer every 1000 milliseconds (1 second)
+
     @Slot(str)
     def processMessage(self, message):
-        self.updateUI.emit(message)
+        with self.thread_lock:
+            self.messageBuffer.append(message)
+            if not self.bufferTimer.isActive():
+                self.bufferTimer.start()
+
+    def flushBuffer(self):
+        with self.thread_lock:
+            if self.messageBuffer:
+                for message in self.messageBuffer:
+                    self.updateUI.emit(message)
+                self.messageBuffer.clear()
 
 
 class DebugViewDialog(QDialog):

@@ -311,6 +311,10 @@ class ConversationSidebar(QWidget):
 
     def populate_assistants(self, assistant_names):
         """Populate the assistant list with given assistant names."""
+        # Capture the currently selected assistant's name
+        currently_selected_assistants = self.get_selected_assistants()
+
+        # Clear and repopulate the list
         self.assistantList.clear()
         for name in assistant_names:
             item = QListWidgetItem(self.assistantList)
@@ -318,6 +322,16 @@ class ConversationSidebar(QWidget):
             item.setSizeHint(widget.sizeHint())
             self.assistantList.addItem(item)
             self.assistantList.setItemWidget(item, widget)
+
+        # Restore selection if the assistant is still in the list
+        for i in range(self.assistantList.count()):
+            item = self.assistantList.item(i)
+            widget : AssistantItemWidget = self.assistantList.itemWidget(item)
+            if widget.label.text() in currently_selected_assistants:  # Assuming the label's text stores the assistant's name
+                # This selects the item, adjust if multiple selection is needed
+                self.assistantList.setCurrentItem(item)
+                # check the checkbox
+                widget.checkbox.setChecked(True)
 
     def get_selected_assistants(self):
         """Return a list of names of the selected assistants."""

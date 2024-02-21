@@ -157,7 +157,7 @@ class ClientSettingsDialog(QDialog):
                 self.settings.update(loaded_settings)
 
     def set_initial_states(self):
-        ai_client_type = self.settings.get("ai_client_type", AIClientType.OPEN_AI.name)
+        ai_client_type = self.settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         api_version = self.settings.get("api_version", "2023-09-01-preview")
         self.azure_api_version_input.setText(api_version)
 

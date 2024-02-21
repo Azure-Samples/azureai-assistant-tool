@@ -353,7 +353,7 @@ class AssistantClient:
             run_start_time = str(datetime.now())
             self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
 
-            while not self._user_input_processing_cancel_requested:
+            while True:
                 time.sleep(0.5)
 
                 logger.info(f"Retrieving run: {run.id} with status: {run.status}")
@@ -370,7 +370,7 @@ class AssistantClient:
                 logger.info(f"Processing run: {run.id} with status: {run.status}")
 
                 if self._user_input_processing_cancel_requested:
-                    self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id)
+                    self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
                     self._user_input_processing_cancel_requested = False
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
