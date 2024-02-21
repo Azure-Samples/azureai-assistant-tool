@@ -73,12 +73,17 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def initialize_chat_components(self):
-        self.init_chat_completion()
-        self.conversation_title_creator = ConversationTitleCreator(self.chat_client, self.chat_completion_model)
-        self.instructions_checker = InstructionsChecker(self.chat_client, self.chat_completion_model)
-        self.function_creator = FunctionCreator(self.chat_client, self.chat_completion_model)
-        self.task_request_creator = TaskRequestCreator(self.chat_client, self.chat_completion_model)
-        self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
+        try:
+            self.init_chat_completion()
+            self.conversation_title_creator = ConversationTitleCreator(self.chat_client, self.chat_completion_model)
+            self.instructions_checker = InstructionsChecker(self.chat_client, self.chat_completion_model)
+            self.function_creator = FunctionCreator(self.chat_client, self.chat_completion_model)
+            self.task_request_creator = TaskRequestCreator(self.chat_client, self.chat_completion_model)
+            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
+        except Exception as e:
+            error_message = f"An error occurred while initializing the chat components: {e}"
+            self.error_signal.error_signal.emit(error_message)
+            logger.error(error_message)
 
     def initialize_assistant_components(self):
         self.scheduled_task_threads = {}
@@ -405,6 +410,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_conversation_title(self, text, thread_name, is_scheduled_task):
+        if not hasattr(self, 'conversation_title_creator') or self.conversation_title_creator is None:
+            error_message = "Conversation title creator not initialized, cannot update conversation title, check the chat completion settings"
+            self.error_signal.error_signal.emit(error_message)
+            logger.error(error_message)
+            return thread_name
+
         # Generate a new thread title based on the user's input text
         new_thread_name = self.conversation_title_creator.get_thread_title(thread_name + " " + text)
         if is_scheduled_task:
