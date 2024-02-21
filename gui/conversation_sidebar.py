@@ -380,9 +380,12 @@ class ConversationSidebar(QWidget):
         if not selected_assistants:
             QMessageBox.warning(self, "Error", "Please select an assistant first.")
             return
-        threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.thread_timeout)
-        self._select_thread(thread_name)
+        try:
+            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.thread_timeout)
+            self._select_thread(thread_name)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"An error occurred while creating a new thread: {e}")
 
     def on_cancel_run_button_clicked(self):
         """Handle clicks on the cancel run button."""
@@ -434,11 +437,11 @@ class ConversationSidebar(QWidget):
     def _select_thread(self, unique_thread_name):
         # Select the thread item in the sidebar
         self._select_threadlist_item(unique_thread_name)
-        threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        #TODO separate threads per ai_client_type in the json file
-        threads_client.set_current_conversation_thread(unique_thread_name)
-        self.main_window.conversation_view.conversationView.clear()
         try:
+            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            #TODO separate threads per ai_client_type in the json file
+            threads_client.set_current_conversation_thread(unique_thread_name)
+            self.main_window.conversation_view.conversationView.clear()
             # Retrieve the messages for the selected thread
             conversation = threads_client.retrieve_conversation(unique_thread_name)
             if conversation.messages is not None:

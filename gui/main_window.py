@@ -49,8 +49,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         }
         self.thread_timeout : float = 30.0
         self.run_timeout : float = 30.0
-        self.use_chat_completion_for_thread_name : bool = True
-        self.user_text_summarization_in_synthesis : bool = True
+        self.use_chat_completion_for_thread_name : bool = False
+        self.user_text_summarization_in_synthesis : bool = False
         self.in_background = False
         self.initialize_singletons()
         self.initialize_ui()
@@ -66,7 +66,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         try:
             self.initialize_chat_components()
             self.initialize_assistant_components()
-            self.set_active_ai_client_type(AIClientType.OPEN_AI)
+            self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
             self.error_signal.error_signal.emit(error_message)
@@ -89,7 +89,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.scheduled_task_threads = {}
         self.thread_lock = threading.Lock()
         self.assistants_processing = {}
-        self.active_ai_client_type = AIClientType.OPEN_AI # default to OpenAI
+        self.active_ai_client_type = AIClientType.AZURE_OPEN_AI # default to Azure OpenAI
         self.conversation_thread_clients : dict[AIClientType, ConversationThreadClient] = {}
         for ai_client_type in AIClientType:
             try:
@@ -112,7 +112,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def init_chat_completion(self):
         self.load_chat_completion_settings()
 
-        ai_client_type = self.chat_completion_settings.get("ai_client_type", AIClientType.OPEN_AI.name)
+        ai_client_type = self.chat_completion_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.chat_completion_model = self.chat_completion_settings.get("model", "gpt-4-1106-preview")
         api_version = self.chat_completion_settings.get("api_version", "2023-09-01-preview")
         if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
@@ -343,7 +343,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             # Update the thread title based on the user's input
             if self.use_chat_completion_for_thread_name:
+                start_time = time.time()
                 updated_thread_name = self.update_conversation_title(user_input, thread_name, False)
+                end_time = time.time()
+                logger.debug(f"Total time taken for updating conversation title: {end_time - start_time} seconds")
                 self.update_conversation_title_signal.update_signal.emit(thread_name, updated_thread_name)
                 thread_name = updated_thread_name
 
@@ -357,10 +360,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             self.executor.submit(self.process_input, user_input, assistants, thread_name, False, file_paths, additional_instructions)
             on_user_input_complete_end = time.time()  # End timing after thread starts
-            logger.debug(f"Time taken for on_user_input_complete: {on_user_input_complete_end - on_user_input_complete_start} seconds")
+            logger.debug(f"Time taken for entering user input: {on_user_input_complete_end - on_user_input_complete_start} seconds")
             self.conversation_view.inputField.clear()
         except Exception as e:
-            error_message = f"An error occurred while processing the user input: {e}\n\nTraceback:\n{traceback.format_exc()}"
+            error_message = f"An error occurred while processing the user input: {e}"
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
@@ -370,6 +373,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def setup_conversation_thread(self, is_scheduled_task=False):
         threads_client = self.conversation_thread_clients[self.active_ai_client_type]
+        if threads_client is None:
+            error_message = f"Conversation thread client not initialized for active_ai_client_type {self.active_ai_client_type.name}, cannot setup conversation thread"
+            logger.error(error_message)
+            raise ValueError(error_message)
         if is_scheduled_task:
             logger.debug(f"setup_conversation_thread for scheduled task")
             return self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task, timeout=self.thread_timeout)
