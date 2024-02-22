@@ -328,8 +328,7 @@ class ConversationSidebar(QWidget):
             item = self.assistantList.item(i)
             widget : AssistantItemWidget = self.assistantList.itemWidget(item)
             if widget.label.text() in currently_selected_assistants:  # Assuming the label's text stores the assistant's name
-                # This selects the item, adjust if multiple selection is needed
-                self.assistantList.setCurrentItem(item)
+                # self.assistantList.setCurrentItem(item)
                 # check the checkbox
                 widget.checkbox.setChecked(True)
 
