@@ -19,14 +19,22 @@ class LogMessageProcessor(QObject):
         self.thread_lock = threading.Lock()
         self.bufferTimer = QTimer(self)
         self.bufferTimer.timeout.connect(self.flushBuffer)
-        self.bufferTimer.start(1000)  # Flush buffer every 1000 milliseconds (1 second)
+
+    def startTimer(self):
+        # Safe method to start the timer from the correct thread
+        self.bufferTimer.start(1000)  # Adjust the interval as needed
+
+    def stopTimer(self):
+        # Safe method to stop the timer
+        self.bufferTimer.stop()
 
     @Slot(str)
     def processMessage(self, message):
         with self.thread_lock:
             self.messageBuffer.append(message)
             if not self.bufferTimer.isActive():
-                self.bufferTimer.start()
+                # Use QMetaObject.invokeMethod to safely start the timer from the correct thread
+                QMetaObject.invokeMethod(self.bufferTimer, "start", Qt.AutoConnection, Q_ARG(int, 1000))
 
     def flushBuffer(self):
         with self.thread_lock:
@@ -121,6 +129,8 @@ class DebugViewDialog(QDialog):
         self.processorThread = QThread()
         self.logProcessor = LogMessageProcessor()
         self.logProcessor.moveToThread(self.processorThread)
+        self.processorThread.started.connect(self.logProcessor.startTimer)
+        self.processorThread.finished.connect(self.logProcessor.stopTimer)
         self.logProcessor.updateUI.connect(self.append_text_slot)
         self.processorThread.start()
 
