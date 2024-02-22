@@ -13,11 +13,10 @@ class AIClientType(Enum):
     """
     An enum for the different types of AI clients.
     """
-    OPEN_AI = auto()
-    """OpenAI client"""
     AZURE_OPEN_AI = auto()
     """Azure OpenAI client"""
-
+    OPEN_AI = auto()
+    """OpenAI client"""
 
 class AIClientFactory:
     _instance = None
@@ -28,7 +27,7 @@ class AIClientFactory:
     """
     def __init__(self) -> None:
         if AIClientFactory._instance is not None:
-            raise Exception("This class is a singleton!")
+            raise Exception("AIClientFactory is a singleton class")
         else:
             AIClientFactory._instance = self
 

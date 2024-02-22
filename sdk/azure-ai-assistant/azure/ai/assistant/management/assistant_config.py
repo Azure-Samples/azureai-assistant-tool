@@ -43,6 +43,20 @@ class AssistantConfig:
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
 
+    def __eq__(self, other):
+        if not isinstance(other, AssistantConfig):
+            return NotImplemented
+
+        return (self._name == other._name and
+                self._instructions == other._instructions and
+                self._assistant_id == other._assistant_id and
+                self._ai_client_type == other._ai_client_type and
+                self._model == other._model and
+                self._knowledge_files == other._knowledge_files and
+                self._selected_functions == other._selected_functions and
+                self._knowledge_retrieval == other._knowledge_retrieval and
+                self._code_interpreter == other._code_interpreter)
+
     @classmethod
     def from_dict(
         self, 

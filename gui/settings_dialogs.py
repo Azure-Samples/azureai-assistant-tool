@@ -4,9 +4,78 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QHBoxLayout, QCheckBox
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 import os, json
+
+
+class GeneralSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super(GeneralSettingsDialog, self).__init__(parent)
+        self.setWindowTitle("General Settings")
+        self.main_window = parent
+
+        # Initialize the UI components
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.layout = QVBoxLayout(self)
+
+        # Thread timeout configuration
+        self.threadTimeoutLayout = QHBoxLayout()
+        self.threadTimeoutLabel = QLabel("Thread Timeout (s):", self)
+        self.threadTimeoutEdit = QLineEdit(self)
+        self.threadTimeoutEdit.setText(str(self.main_window.thread_timeout))
+        self.threadTimeoutLayout.addWidget(self.threadTimeoutLabel)
+        self.threadTimeoutLayout.addWidget(self.threadTimeoutEdit)
+        
+        # Run timeout configuration
+        self.runTimeoutLayout = QHBoxLayout()
+        self.runTimeoutLabel = QLabel("Run Timeout (s):", self)
+        self.runTimeoutEdit = QLineEdit(self)
+        # self.main_window.run_timeout is float, so we need to convert it to string
+        self.runTimeoutEdit.setText(str(self.main_window.run_timeout))
+        self.runTimeoutLayout.addWidget(self.runTimeoutLabel)
+        self.runTimeoutLayout.addWidget(self.runTimeoutEdit)
+
+        # Chat completion for friendly conversation thread names
+        self.useChatCompletionForThreadsCheckbox = QCheckBox("Enable chat completion for friendly conversation thread names", self)
+        self.useChatCompletionForThreadsCheckbox.setChecked(self.main_window.use_chat_completion_for_thread_name)
+
+        # Text summarization checkbox for long messages for speech synthesis
+        self.useTextSummarizationCheckbox = QCheckBox("Enable text summarization for long messages for speech synthesis", self)
+        self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
+
+        # Buttons
+        self.buttonsLayout = QHBoxLayout()
+        self.okButton = QPushButton("OK", self)
+        self.cancelButton = QPushButton("Cancel", self)
+        self.buttonsLayout.addWidget(self.okButton)
+        self.buttonsLayout.addWidget(self.cancelButton)
+
+        # Adding layouts to the main layout
+        self.layout.addLayout(self.threadTimeoutLayout)
+        self.layout.addLayout(self.runTimeoutLayout)
+        self.layout.addWidget(self.useChatCompletionForThreadsCheckbox)
+        self.layout.addWidget(self.useTextSummarizationCheckbox)
+        self.layout.addLayout(self.buttonsLayout)
+
+        # Connect signals
+        self.okButton.clicked.connect(self.accept)
+        self.cancelButton.clicked.connect(self.reject)
+
+    def accept(self):
+        try:
+            thread_timeout = float(self.threadTimeoutEdit.text())
+            run_timeout = float(self.runTimeoutEdit.text())
+            self.main_window.thread_timeout = thread_timeout
+            self.main_window.run_timeout = run_timeout
+            self.main_window.use_chat_completion_for_thread_name = self.useChatCompletionForThreadsCheckbox.isChecked()
+            self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
+            # Here you would save these values to your settings or pass them to where they are needed
+            super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for the timeouts.")
 
 
 class ClientSettingsDialog(QDialog):
@@ -88,7 +157,7 @@ class ClientSettingsDialog(QDialog):
                 self.settings.update(loaded_settings)
 
     def set_initial_states(self):
-        ai_client_type = self.settings.get("ai_client_type", AIClientType.OPEN_AI.name)
+        ai_client_type = self.settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         api_version = self.settings.get("api_version", "2023-09-01-preview")
         self.azure_api_version_input.setText(api_version)
 

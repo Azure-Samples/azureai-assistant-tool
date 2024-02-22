@@ -10,6 +10,7 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.functions.system_function_mappings import system_functions
 from typing import Optional
 from openai import AzureOpenAI, OpenAI
 from typing import Union
@@ -111,6 +112,35 @@ class AssistantClient:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
+    @classmethod
+    def from_config(
+        cls, 
+        config: AssistantConfig, 
+        callbacks: Optional[AssistantClientCallbacks] = None
+    ) -> "AssistantClient":
+        """
+        Creates a new assistant client from the given configuration.
+
+        New assistant client is created in the service and assistant configuration is saved with the given configuration.
+
+        :param config: The configuration to use to create the assistant client.
+        :type config: AssistantConfig
+        :param callbacks: The callbacks to use for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
+
+        :return: The new assistant client.
+        :rtype: AssistantClient
+        """
+        try:
+            # check if config contains assistant_id which is not null or empty, if so, set is_create to False
+            if config.assistant_id:
+                return AssistantClient(config.to_json(), callbacks, is_create=False)
+            else:
+                return AssistantClient(config.to_json(), callbacks, is_create=True)
+        except Exception as e:
+            logger.error(f"Failed to create assistant client from config: {e}")
+            raise EngineError(f"Failed to create assistant client from config: {e}")
+
     def sync_from_cloud(self) -> "AssistantClient":
         """
         Synchronizes the assistant client with the cloud service configuration.
@@ -152,20 +182,27 @@ class AssistantClient:
             # Create or update the assistant
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
-                #start_time = time.time()
+                start_time = time.time()
                 self._create_assistant(assistant_config)
-                #end_time = time.time()
-                #print(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
+                end_time = time.time()
+                logger.debug(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
             else:
-                #start_time = time.time()
-                self._update_assistant(assistant_config)
-                #end_time = time.time()
-                #print(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
+                start_time = time.time()
+                config_manager = AssistantConfigManager.get_instance()
+                local_config = config_manager.get_config(self.name)
+                # check if the local configuration is different from the given configuration
+                if local_config and local_config != assistant_config:
+                    logger.debug("Local config is different from the given configuration. Updating the assistant...")
+                    self._update_assistant(assistant_config)
+                else:
+                    logger.debug("Local config is the same as the given configuration. No need to update the assistant.")
+                end_time = time.time()
+                logger.debug(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
 
-            #start_time = time.time()
+            start_time = time.time()
             self._load_selected_functions(assistant_config)
-            #end_time = time.time()
-            #print(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
+            end_time = time.time()
+            logger.debug(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
             self._assistant_config = assistant_config
 
             # Update the local configuration using AssistantConfigManager
@@ -210,6 +247,7 @@ class AssistantClient:
         :rtype: None
         """
         try:
+            logger.info(f"Purging assistant with name: {self.name}")
             # retrieve the assistant configuration
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
@@ -270,7 +308,8 @@ class AssistantClient:
     def process_messages(
             self, 
             thread_name : str,
-            additional_instructions : Optional[str] = None
+            additional_instructions : Optional[str] = None,
+            timeout : Optional[float] = None
     ) -> None:
         """
         Process the messages in given thread.
@@ -279,6 +318,8 @@ class AssistantClient:
         :type thread_name: str
         :param additional_instructions: Additional instructions to provide to the assistant.
         :type additional_instructions: Optional[str]
+        :param timeout: The timeout in seconds to wait for the processing to complete.
+        :type timeout: Optional[float]
 
         :return: None
         :rtype: None
@@ -297,26 +338,29 @@ class AssistantClient:
             if additional_instructions is None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id
+                    assistant_id=assistant_id,
+                    timeout=timeout
                 )
             else:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=assistant_id,
-                    additional_instructions=additional_instructions
+                    additional_instructions=additional_instructions,
+                    timeout=timeout
                 )
 
             # call the start_run callback
             run_start_time = str(datetime.now())
             self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
 
-            while not self._user_input_processing_cancel_requested:
+            while True:
                 time.sleep(0.5)
 
                 logger.info(f"Retrieving run: {run.id} with status: {run.status}")
                 run = self._ai_client.beta.threads.runs.retrieve(
                     thread_id=thread_id,
-                    run_id=run.id
+                    run_id=run.id,
+                    timeout=timeout
                 )
 
                 if run is None:
@@ -326,7 +370,7 @@ class AssistantClient:
                 logger.info(f"Processing run: {run.id} with status: {run.status}")
 
                 if self._user_input_processing_cancel_requested:
-                    self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id)
+                    self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
                     self._user_input_processing_cancel_requested = False
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
@@ -339,7 +383,7 @@ class AssistantClient:
                     self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
                     return None
                 elif run.status == "failed":
-                    logger.info(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
+                    logger.warning(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
                     run_end_time = str(datetime.now())
                     self._callbacks.on_run_failed(self._name, run.id, run_end_time, run.last_error.code, run.last_error.message, thread_name)
                     return None
@@ -367,7 +411,7 @@ class AssistantClient:
         logger.info("User processing run cancellation requested.")
         self._user_input_processing_cancel_requested = True
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls):
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
             self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
@@ -381,13 +425,17 @@ class AssistantClient:
             thread_id=thread_id,
             run_id=run_id,
             tool_outputs=tool_outputs,
+            timeout=timeout
         )
         return True
 
     def _process_tool_calls(self, name, run_id, tool_calls):
         tool_outputs = []
         for tool_call in tool_calls:
+            start_time = time.time()
             function_response = self._handle_function_call(tool_call)
+            end_time = time.time()
+            logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
             # call the on_function_call_processed callback
             self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
@@ -418,14 +466,14 @@ class AssistantClient:
 
     def _handle_function_call(self, tool_call):
         logger.info(f"Handling function call: {tool_call.function.name} with arguments: {tool_call.function.arguments}")
-        
+
         function_name = tool_call.function.name
         function_to_call = self._functions.get(function_name)
         if function_to_call:
             try:
                 function_args = json.loads(tool_call.function.arguments)
             except json.JSONDecodeError:
-                logger.info(f"Function {function_name} has invalid arguments.")
+                logger.error(f"Function {function_name} has invalid arguments.")
                 return json.dumps({"function_error": function_name, "error": "Invalid JSON arguments."})
             
             # Update the arguments if necessary
@@ -439,28 +487,31 @@ class AssistantClient:
                 logger.error(f"Error in function call: {function_name}. Error: {str(e)}")
                 return json.dumps({"function_error": function_name, "error": str(e)})
         else:
-            logger.info(f"Function: {function_name} is not available.")
+            logger.error(f"Function: {function_name} is not available.")
             return json.dumps({"function_error": function_name, "error": "Function is not available."})
 
     def _load_selected_functions(self, assistant_config: AssistantConfig):
+        functions = {}
+
         try:
-            functions = {}
             for func_spec in assistant_config.selected_functions:
                 logger.info(f"Loading selected function: {func_spec['function']['name']}")
                 function_name = func_spec["function"]["name"]
                 module_name = func_spec["function"].get("module", "default.module.path")
-                # if module contains azure.ai.assistant.functions, it is a system function
-                if module_name.startswith("azure.ai.assistant.functions"):
-                    functions[function_name] = self._import_system_function_from_module(module_name, function_name)
+
+                # Check if it is a system function
+                if function_name in system_functions:
+                    functions[function_name] = system_functions[function_name]
                 elif module_name.startswith("functions"):
+                    # Dynamic loading for user-defined functions
                     functions[function_name] = self._import_user_function_from_module(module_name, function_name)
                 else:
                     logger.error(f"Invalid module name: {module_name}")
                     raise EngineError(f"Invalid module name: {module_name}")
+                self._functions = functions
         except Exception as e:
             logger.error(f"Error loading selected functions for assistant: {e}")
             raise EngineError(f"Error loading selected functions for assistant: {e}")
-        self._functions = functions
 
     def _import_system_function_from_module(self, module_name, function_name):
         try:
@@ -469,7 +520,7 @@ class AssistantClient:
             # Retrieve the function from the imported module
             return getattr(module, function_name)
         except Exception as e:
-            logger.info(f"Error importing system {function_name} from {module_name}: {e}")
+            logger.error(f"Error importing system {function_name} from {module_name}: {e}")
             raise EngineError(f"Error importing system {function_name} from {module_name}: {e}")
 
     def _import_user_function_from_module(self, module_name, function_name):

@@ -30,20 +30,12 @@
   - `find_files_by_name_in_directory`: Searches for files matching specific criteria by name in a directory and its sub-directories (case-insensitive).
   - `find_files_by_extension_in_directory`: Searches for files matching specific criteria by file extension in a directory and its sub-directories (case-insensitive).
 
-- GitHub Functions
-  - `fetch_new_github_issues`: Fetches new issues from a specified GitHub repository since a given date, returning the issue number and title.
-
-  - `get_github_issue_body_by_number`:Retrieves the content body of a specific issue from a GitHub repository using its issue number.
-
-  - `fetch_closed_github_issues`: Fetches closed issues from a specified GitHub repository, returning their issue number and title.
-
-  - `get_github_issue_body_with_comments`: Retrieves the body of a specific issue from a GitHub repository along with all its comments.
-
 ## Dependencies
 - openai
 - python-Levenshtein
 - fuzzywuzzy
 - azure-cognitiveservices-speech
+- Pillow
 
 ## Setup keys
 1. Set the OpenAI key
@@ -59,7 +51,3 @@
   - Linux/Mac: 
     - export SPEECH_KEY="Your Speech Key"
     - export SPEECH_REGION="Your Speech Region"
-
-3. If you use GitHub functions, better to set the PAT (to avoid hitting rate limits)
-  - Windows:
-    - setx GITHUB_TOKEN "Your GitHub Personal Access Token"

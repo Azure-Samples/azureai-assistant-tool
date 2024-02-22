@@ -24,6 +24,7 @@ class CreateTaskDialog(QDialog):
         self.main_window = main_window
         self.task_manager = task_manager
         self.config_folder = config_folder
+        self.request_list = []
         self.setWindowTitle("Create/Edit Task")
         self.setGeometry(100, 100, 700, 600)
 
@@ -376,6 +377,9 @@ class CreateTaskDialog(QDialog):
                 error_message = "Please enter a request."
                 raise Exception(error_message)
 
+            if not hasattr(self.main_window, 'task_request_creator') or self.main_window.task_request_creator is None:
+                self.error_signal.error_signal.emit("Task request creator not initialized, please check chat completion settings.")
+                return
             input_file_type = self.main_window.task_request_creator.get_input_file_type(self.user_request_batch.toPlainText())
             # remove single quotes from input file type if there is any
             input_file_type = input_file_type.replace("'", "")

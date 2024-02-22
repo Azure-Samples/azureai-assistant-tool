@@ -229,6 +229,9 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionSpec(self, user_request):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
+            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
+                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
+                return
             self.spec_json = self.main_window.function_creator.get_function_spec(user_request)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
@@ -243,6 +246,9 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionImpl(self, user_request, spec_json):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
+            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
+                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
+                return
             func_impl = self.main_window.function_creator.get_function_impl(user_request, spec_json)
             self.code = self.extract_python_code(func_impl)
         except Exception as e:

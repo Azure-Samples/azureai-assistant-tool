@@ -12,7 +12,7 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
-import os
+import os, time
 
 from gui.assistant_client_manager import AssistantClientManager
 from gui.utils import resource_path
@@ -311,6 +311,10 @@ class ConversationSidebar(QWidget):
 
     def populate_assistants(self, assistant_names):
         """Populate the assistant list with given assistant names."""
+        # Capture the currently selected assistant's name
+        currently_selected_assistants = self.get_selected_assistants()
+
+        # Clear and repopulate the list
         self.assistantList.clear()
         for name in assistant_names:
             item = QListWidgetItem(self.assistantList)
@@ -318,6 +322,15 @@ class ConversationSidebar(QWidget):
             item.setSizeHint(widget.sizeHint())
             self.assistantList.addItem(item)
             self.assistantList.setItemWidget(item, widget)
+
+        # Restore selection if the assistant is still in the list
+        for i in range(self.assistantList.count()):
+            item = self.assistantList.item(i)
+            widget : AssistantItemWidget = self.assistantList.itemWidget(item)
+            if widget.label.text() in currently_selected_assistants:  # Assuming the label's text stores the assistant's name
+                # self.assistantList.setCurrentItem(item)
+                # check the checkbox
+                widget.checkbox.setChecked(True)
 
     def get_selected_assistants(self):
         """Return a list of names of the selected assistants."""
@@ -380,17 +393,23 @@ class ConversationSidebar(QWidget):
         if not selected_assistants:
             QMessageBox.warning(self, "Error", "Please select an assistant first.")
             return
-        threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        thread_name = self.create_conversation_thread(threads_client)
-        self._select_thread(thread_name)
+        try:
+            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.thread_timeout)
+            self._select_thread(thread_name)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"An error occurred while creating a new thread: {e}")
 
     def on_cancel_run_button_clicked(self):
         """Handle clicks on the cancel run button."""
         self.main_window.on_cancel_run_button_clicked()
 
-    def create_conversation_thread(self, threads_client : ConversationThreadClient, is_scheduled_task=False):
+    def create_conversation_thread(self, threads_client : ConversationThreadClient, is_scheduled_task=False, timeout: float=None):
         try:
-            unique_thread_name = threads_client.create_conversation_thread()
+            start_time = time.time()
+            unique_thread_name = threads_client.create_conversation_thread(timeout=timeout)
+            end_time = time.time()
+            logger.debug(f"Total time taken to create a new conversation thread: {end_time - start_time} seconds")
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
 
@@ -431,11 +450,11 @@ class ConversationSidebar(QWidget):
     def _select_thread(self, unique_thread_name):
         # Select the thread item in the sidebar
         self._select_threadlist_item(unique_thread_name)
-        threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        #TODO separate threads per ai_client_type in the json file
-        threads_client.set_current_conversation_thread(unique_thread_name)
-        self.main_window.conversation_view.conversationView.clear()
         try:
+            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            #TODO separate threads per ai_client_type in the json file
+            threads_client.set_current_conversation_thread(unique_thread_name)
+            self.main_window.conversation_view.conversationView.clear()
             # Retrieve the messages for the selected thread
             conversation = threads_client.retrieve_conversation(unique_thread_name)
             if conversation.messages is not None:

@@ -4,12 +4,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&ensp;
 ![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
-
 </div>
 <div align="center">
-⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡  
-</div>  
-
+⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
+</div>
+<br>
 
   **Azure AI Assistants tool** is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
 
@@ -21,12 +20,13 @@
 
 🌟**Assistants**, a new API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and Retrieval. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
 
-**Features** include:  
+**Features** include:
 
-💬 Inbuilt thread and memory management  
-📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**  
-🚀 Build your own tools or call external tools and APIs with **Function Calling**  
-📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)  
+💬 Inbuilt thread and memory management <br>
+📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
+🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
+📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
+📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
 
 **Learn more** about Assistants on Azure OpenAI Service:  
 
@@ -77,33 +77,36 @@ Build the wheel using the following instructions, or use the wheel package provi
 - Visit the`sdk/azure-ai-assistant` folder and ensure wheel is installed: `pip install wheel` (or pip3 e.g. in Mac)
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.3a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl`
 
 ### Step 5: Install dependencies
 
 #### ⌨️ Command Line (CLI)
+
+Create virtual environment (not mandatory but recommended) for Python, see [instructions](https://docs.python.org/3/library/venv.html).
+
 ```
-# Install pyside6 in Windows or use pip3 in Linux/Mac
+# Install specific libraries needed for the Azure AI Assistant tool
 pip install PySide6 
 pip install openai
 pip install python-Levenshtein
 pip install fuzzywuzzy
 pip install Pillow
 
-# Install Azure Cognitive Search Service to add speech in and out (microphone) functionality
+# Install optionally Azure Cognitive Search Service to add speech transcription and synthesis functionality using the microphone and speaker
 pip install azure-cognitiveservices-speech
 
 # Install the latest release of the tool
 # Find the latest .whl file under the release tags in this repo and download and save in the main ai-assistant-studio folder
-pip install --force-reinstall --no-deps azure_ai_assistant-0.2.3a1-py3-none-any.whl
+pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl
 ```
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
 To successfully make a call against the Azure OpenAI service, you'll need the following:
 
-**- ENDPOINT:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. Alternatively, you can find the value in Azure OpenAI Studio > Playground > View code. An example endpoint is: https://docs-test-001.openai.azure.com/.  
+**- ENDPOINT:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. Alternatively, you can find the value in Azure OpenAI Studio > Playground > View code. An example endpoint is: https://docs-test-001.openai.azure.com/.
 
-**- API-KEY:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. You can use either KEY1 or KEY2.  
+**- API-KEY:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. You can use either KEY1 or KEY2.
 
 **- DEPLOYMENT-NAME:**	This value will correspond to the custom name you chose for your deployment when you deployed a model. This value can be found under Resource Management > Model Deployments in the Azure portal or alternatively under Management > Deployments in Azure OpenAI Studio.
 
@@ -114,7 +117,7 @@ Next, go to your resource in the [Azure portal](https://ms.portal.azure.com/#hom
 Create and assign persistent environment variables for your key and endpoint.
 
 #### ⌨️ Command Line (CLI)
-1. Set the Azure OpenAI Service key, endpoint and version (optional)  
+1. Set the Azure OpenAI Service key, endpoint and version (optional)
 
 **Windows:**
 ```
@@ -132,7 +135,7 @@ export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
 export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
 ```
 
-2. Set Cognitive Services Speech key (if you want to use speech input)  
+2. Set Cognitive Services Speech key (if you want to use speech input)
 
 **Windows:**
 ```
@@ -164,6 +167,6 @@ This will start the Azure AI Assistant Tool and you can interact with it through
 The Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
 ### 📣 Notice Regarding PySide6
-The Azure AI Assistant Tool uses PySide6, which is licensed under the GNU Lesser General Public License (LGPL). 
-By using PySide6, you are able to modify and redistribute the library under the same license. 
+The Azure AI Assistant Tool uses PySide6, which is licensed under the GNU Lesser General Public License (LGPL).
+By using PySide6, you are able to modify and redistribute the library under the same license.
 For more information on PySide6's license, please visit [Qt Licensing](https://www.qt.io/licensing/).

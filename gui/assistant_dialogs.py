@@ -260,12 +260,15 @@ class AssistantConfigDialog(QDialog):
         self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
         self.modelComboBox.clear()
-        ai_client = AIClientFactory.get_instance().get_client(self.ai_client_type)
-        if self.ai_client_type == AIClientType.OPEN_AI:
-            if ai_client:
-                models = ai_client.models.list().data
-                for model in models:
-                    self.modelComboBox.addItem(model.id)
+        try:
+            ai_client = AIClientFactory.get_instance().get_client(self.ai_client_type)
+            if self.ai_client_type == AIClientType.OPEN_AI:
+                if ai_client:
+                    models = ai_client.models.list().data
+                    for model in models:
+                        self.modelComboBox.addItem(model.id)
+        except Exception as e:
+            logger.error(f"Error getting models from AI client: {e}")
 
     def assistant_selection_changed(self):
         self.reset_fields()
@@ -387,6 +390,9 @@ class AssistantConfigDialog(QDialog):
     def check_instructions(self):
         # Combine instructions and check them
         instructions = self.newInstructionsEdit.toPlainText()
+        if not hasattr(self.main_window, 'instructions_checker') or self.main_window.instructions_checker is None:
+            QMessageBox.critical(self, "Instructions Checker Not Found", "Instructions checker not found. Check chat completion settings.")
+            return
         new_instructions = self.main_window.instructions_checker.check_instructions(instructions)
         # Open new dialog with the checked instructions
         contentDialog = ContentDisplayDialog(new_instructions, "AI Reviewed Instructions", self)
@@ -467,8 +473,8 @@ class AssistantConfigDialog(QDialog):
 
     def add_file(self):
         options = QFileDialog.Options()
-        filePath, _ = QFileDialog.getOpenFileName(self, "Select Knowledge File", "",
-                                                  "Knowledge Files (*.json *.pdf *.txt *.csv)", options=options)
+        filePath, _ = QFileDialog.getOpenFileName(self, "Select File", "",
+                                                "All Files (*)", options=options)
         if filePath:
             if filePath in self.knowledge_files_dict:
                 QMessageBox.warning(self, "File Already Added", f"The file '{filePath}' is already in the list.")

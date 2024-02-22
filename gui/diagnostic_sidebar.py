@@ -42,7 +42,7 @@ class DiagnosticsSidebar(QWidget):
             "  background-color: #e6e6e6;"
             "}"
         )
-        self.functionCallTree.setHeaderLabels(["Diagnostics"])
+        self.functionCallTree.setHeaderLabels(["Run View"])
         header_font = self.functionCallTree.header().font()
         header_font.setBold(True)
         self.functionCallTree.header().setFont(header_font)

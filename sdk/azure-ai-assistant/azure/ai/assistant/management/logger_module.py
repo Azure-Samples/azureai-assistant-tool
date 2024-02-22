@@ -4,6 +4,19 @@
 import logging
 import os
 
+
+class BroadcasterLoggingHandler(logging.Handler):
+    def __init__(self, broadcaster):
+        super().__init__()
+        self.broadcaster = broadcaster
+
+    def emit(self, record):
+        try:
+            message = self.format(record)
+            self.broadcaster.emit(message)
+        except Exception:
+            self.handleError(record)
+
 def setup_logger() -> logging.Logger:
     """
     Sets up a logger named 'assistant_logger' with INFO level. The logger configuration for console logging
@@ -24,9 +37,7 @@ def setup_logger() -> logging.Logger:
     log_to_console = os.getenv('ASSISTANT_LOG_TO_CONSOLE', 'false').lower() in ('true', '1', 't')
 
     # Default to file logging if ASSISTANT_LOG_TO_CONSOLE is not 'true'
-    log_to_file = not log_to_console
-
-    if log_to_file:
+    if not log_to_console:
         # Set the file handler with UTF-8 encoding for file output
         file_handler = logging.FileHandler('assistant.log', encoding='utf-8')
         file_handler.setFormatter(formatter)
@@ -39,6 +50,55 @@ def setup_logger() -> logging.Logger:
         logger.addHandler(stream_handler)
 
     return logger
+
+def add_broadcaster_to_logger(broadcaster) -> None:
+    """
+    Adds or updates the broadcaster in the global logger.
+
+    :param broadcaster: An instance of LogBroadcaster to broadcast log messages.
+    """
+    global logger
+
+    # Check if a BroadcasterLoggingHandler is already added and update it
+    for handler in logger.handlers:
+        if isinstance(handler, BroadcasterLoggingHandler):
+            handler.broadcaster = broadcaster
+            break
+    else:  # If no BroadcasterLoggingHandler is found, add a new one
+        broadcast_handler = BroadcasterLoggingHandler(broadcaster)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s')
+        broadcast_handler.setFormatter(formatter)
+        logger.addHandler(broadcast_handler)
+
+    # Function to add broadcaster to any logger
+    def add_broadcaster_to_specific_logger(target_logger):
+        # Check if a BroadcasterLoggingHandler is already added and update it
+        for handler in target_logger.handlers:
+            if isinstance(handler, BroadcasterLoggingHandler):
+                handler.broadcaster = broadcaster
+                return  # Exit if the broadcaster is already added
+        
+        # If no BroadcasterLoggingHandler is found, add a new one
+        broadcast_handler = BroadcasterLoggingHandler(broadcaster)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s')
+        broadcast_handler.setFormatter(formatter)
+        target_logger.addHandler(broadcast_handler)
+    
+    # Add broadcaster to the global logger
+    add_broadcaster_to_specific_logger(logger)
+    
+    #loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    #openai_loggers = [logger for logger in loggers if logger.name.startswith("openai")]
+    #print(openai_loggers)
+    # [<Logger openai._legacy_response (WARNING)>, <Logger openai (WARNING)>, <Logger openai._response (WARNING)>, <Logger openai._base_client (DEBUG)>]
+
+    # Add broadcaster to the OpenAI logger
+    #openai_logger = logging.getLogger("openai._base_client")
+    #add_broadcaster_to_specific_logger(openai_logger)
+
+    # Add broadcaster to the OpenAI logger
+    openai_logger = logging.getLogger("openai")
+    add_broadcaster_to_specific_logger(openai_logger)
 
 # Example usage:
 # To enable console logging, set the environment variable ASSISTANT_LOG_TO_CONSOLE=true before running the script.

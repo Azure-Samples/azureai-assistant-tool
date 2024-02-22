@@ -41,6 +41,10 @@ class ConversationInputView(QTextEdit):
             # Call on_user_input on the main window reference
             self.main_window.on_user_input_complete(self.toPlainText())
             self.clear()
+        elif event.key() == Qt.Key_Enter:
+            # Call on_user_input on the main window reference
+            self.main_window.on_user_input_complete(self.toPlainText())
+            self.clear()
         else:
             # Let the parent class handle all other key events
             super().keyPressEvent(event)
