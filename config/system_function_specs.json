@@ -81,10 +81,6 @@
                     "input_directory",
                     "filename"
                 ]
-            },
-            "returns": {
-                "type": "string",
-                "description": "A JSON string containing the file content or an empty JSON result if the content is not found."
             }
         }
     },
@@ -133,10 +129,6 @@
                 "type": "object",
                 "properties": {},
                 "required": []
-            },
-            "returns": {
-                "type": "string",
-                "description": "A JSON string containing information about directories and sub-directories in the current directory."
             }
         }
     },
@@ -157,10 +149,6 @@
                 "required": [
                     "folder_name"
                 ]
-            },
-            "returns": {
-                "type": "string",
-                "description": "A JSON string. If matching folders are found, it returns their paths. If no matching folders are found, it returns a JSON string with a 'function_error' key indicating that no folders with the given name were found."
             }
         }
     },
@@ -186,10 +174,6 @@
                     "directory",
                     "file_name_contains"
                 ]
-            },
-            "returns": {
-                "type": "list of string",
-                "description": "A list of file paths that match the specified name criteria."
             }
         }
     },
@@ -215,10 +199,6 @@
                     "directory",
                     "file_extension"
                 ]
-            },
-            "returns": {
-                "type": "list of string",
-                "description": "A list of file paths that match the specified extension criteria."
             }
         }
     },
@@ -232,10 +212,6 @@
                 "type": "object",
                 "properties": {},
                 "required": []
-            },
-            "returns": {
-                "type": "string",
-                "description": "The current time in JSON format (YYYY-MM-DD HH:MM:SS)."
             }
         }
     },
@@ -256,10 +232,6 @@
                 "required": [
                     "directory"
                 ]
-            },
-            "returns": {
-                "type": "string",
-                "description": "A JSON string containing file information. Each file is represented as a dictionary with keys 'filename', 'size_bytes', 'file_type', and 'last_updated'."
             }
         }
     }

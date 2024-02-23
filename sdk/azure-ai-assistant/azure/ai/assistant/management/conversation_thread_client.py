@@ -58,12 +58,12 @@ class ConversationThreadClient:
 
     def create_conversation_thread(
             self,
-            timeout: Optional[float] = None
+            timeout : Optional[float] = None
     ) -> str:
         """
         Creates a conversation thread.
 
-        :param timeout: The timeout for the request.
+        :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
 
         :return: The name of the created thread.
@@ -139,18 +139,6 @@ class ConversationThreadClient:
             thread_name : str,
             timeout : Optional[float] = None
     ) -> List[ThreadMessage]:
-        """
-        Retrieves the conversation thread messages.
-
-        :param thread_name: The name of the thread to retrieve the messages from.
-        :type thread_name: str
-
-        :param timeout: The timeout for the request.
-        :type timeout: float, optional
-
-        :return: The conversation thread messages.
-        :rtype: list
-        """
         try:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             messages = self._ai_client.beta.threads.messages.list(
@@ -164,15 +152,15 @@ class ConversationThreadClient:
 
     def retrieve_conversation(
             self,
-            thread_name: str,
-            timeout: Optional[float] = None
+            thread_name : str,
+            timeout : Optional[float] = None
     ) -> Conversation:
         """
         Retrieves the conversation from the given thread name.
 
         :param thread_name: The name of the thread to retrieve the conversation from.
         :type thread_name: str
-        :param timeout: The timeout for the request.
+        :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
 
         :return: The conversation.
@@ -237,7 +225,7 @@ class ConversationThreadClient:
         :type file_paths: list, optional
         :param additional_instructions: The additional instructions to add to the message.
         :type additional_instructions: str, optional
-        :param timeout: The timeout for the request.
+        :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
         """
         try:
@@ -314,20 +302,24 @@ class ConversationThreadClient:
 
     def delete_conversation_thread(
             self, 
-            thread_name : str
+            thread_name : str,
+            timeout : Optional[float] = None
     ) -> None:
         """
         Deletes the conversation thread with the given thread ID.
 
         :param thread_name: The unique name of the thread to delete.
         :type thread_name: str
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: float, optional
         """
         try:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             logger.info(f"Deleting thread with ID: {thread_id}, thread name: {thread_name}")
             self._thread_config.remove_thread_by_id(thread_id)
             self._ai_client.beta.threads.delete(
-                thread_id=thread_id
+                thread_id=thread_id,
+                timeout=timeout
             )
             logger.info(f"Deleted thread with ID: {thread_id}, thread name: {thread_name}")
         except Exception as e:

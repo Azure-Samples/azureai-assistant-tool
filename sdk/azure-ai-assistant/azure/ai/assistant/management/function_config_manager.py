@@ -25,10 +25,6 @@ function_spec_template = {
                 # ... other arguments ...
             },
             "required": ["argument_1 of function", "..."]
-        },
-        "returns": {
-            "type": "return type",
-            "description": "description of return value of function"
         }
     }
 }

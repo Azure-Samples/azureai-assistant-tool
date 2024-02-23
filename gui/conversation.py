@@ -5,7 +5,7 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent
+from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette
 from PySide6.QtCore import Qt, QUrl
 import html, os, re, subprocess, sys
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -196,25 +196,41 @@ class ConversationView(QWidget):
     def get_text_to_url_map(self):
         return self.text_to_url_map
 
+    def is_dark_mode(self):
+        app = QGuiApplication.instance()
+        if app is not None:
+            # Get the default window background color from the application palette
+            windowBackgroundColor = app.palette().color(QPalette.ColorRole.Window)
+            # Calculate the lightness (value between 0 for black and 255 for white)
+            lightness = windowBackgroundColor.lightness()
+            # Assuming dark mode if the lightness is below a certain threshold
+            # Here, 127 is used as a threshold, considering the scale is from 0 to 255
+            return lightness < 127
+        return False
+
     def append_messages(self, messages):
         self.text_to_url_map = {}
         for message in reversed(messages):
             if message.type == "text":
                 text_message : TextMessage = message
-                if text_message.role == "assistant":
-                    self.append_message(text_message.sender, text_message.content, color='black')
+                # Determine the color based on the role and the theme
+                if self.is_dark_mode():
+                    # Colors for dark mode
+                    color = '#ADD8E6' if text_message.role != "assistant" else '#D3D3D3'
                 else:
-                    self.append_message(text_message.sender, text_message.content, color='blue')
-                #print(f"{text_message.sender}: {text_message.content}")
+                    # Colors for light mode
+                    color = 'blue' if text_message.role != "assistant" else 'black'
+                if text_message.role == "assistant":
+                    self.append_message(text_message.sender, text_message.content, color=color)
+                else:
+                    self.append_message(text_message.sender, text_message.content, color=color)
             elif message.type == "file":
                 file_message : FileMessage = message
                 file_path = file_message.retrieve_file(self.file_path)
-                #print(f"{file_message.sender}: File downloaded to {file_path} in append_messages")
             elif message.type == "image_file":
                 image_message : ImageMessage = message
                 file_path = image_message.retrieve_image(self.file_path)
                 self.append_image(file_path, image_message.sender)
-                #print(f"{image_message.sender}: Image downloaded to {file_path} in append_messages")
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:

@@ -47,8 +47,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             'ai_client_type': '',
             'chat_completion': '',
         }
-        self.thread_timeout : float = 30.0
-        self.run_timeout : float = 30.0
+        self.connection_timeout : float = 30.0
         self.use_chat_completion_for_thread_name : bool = False
         self.user_text_summarization_in_synthesis : bool = False
         self.in_background = False
@@ -379,11 +378,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             raise ValueError(error_message)
         if is_scheduled_task:
             logger.debug(f"setup_conversation_thread for scheduled task")
-            return self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task, timeout=self.thread_timeout)
+            return self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task, timeout=self.connection_timeout)
         else:
             logger.debug(f"setup_conversation_thread for user input")
             if self.conversation_sidebar.threadList.count() == 0 or not self.conversation_sidebar.threadList.selectedItems():
-                thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task, timeout=self.thread_timeout)
+                thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, is_scheduled_task, timeout=self.connection_timeout)
                 self.conversation_sidebar.select_conversation_thread_by_name(thread_name)
                 return thread_name
             else:
@@ -394,7 +393,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
 
             # Create message to thread
-            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths, additional_instructions, timeout=self.thread_timeout)
+            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths, additional_instructions, timeout=self.connection_timeout)
 
             for assistant_name in assistants:
                 # Signal the start of processing
@@ -404,7 +403,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
                 if assistant_client is not None:
                     start_time = time.time()
-                    assistant_client.process_messages(thread_name, additional_instructions, timeout=self.run_timeout)
+                    assistant_client.process_messages(thread_name, additional_instructions, timeout=self.connection_timeout)
                     end_time = time.time()
                     logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
 
@@ -470,7 +469,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is not current assistant thread, conversation not updated")
             return
 
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.thread_timeout)
+        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         if run_status == "in_progress" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
             self.conversation_view_clear_signal.update_signal.emit()
@@ -490,7 +489,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, error_string)
 
         # failed state is terminal state, so update all messages in conversation view after the run has ended
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.thread_timeout)
+        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
 
         self.conversation_view_clear_signal.update_signal.emit()
         self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
@@ -502,7 +501,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
         logger.info(f"Run end for assistant {assistant_name} with run identifier {run_identifier} and thread name {thread_name}")
 
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.thread_timeout)
+        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         last_assistant_message = conversation.get_last_text_message(assistant_name)
         if self.conversation_sidebar.is_listening:
             # microphone needs to be stopped before speech synthesis otherwise synthesis output will be heard by the microphone

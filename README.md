@@ -4,6 +4,10 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&ensp;
 ![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
+![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
+![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 </div>
 <div align="center">
 ⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
@@ -26,7 +30,8 @@
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
-📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
+🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
+📤💾 Exporting the assistant configuration into simple CLI application
 
 **Learn more** about Assistants on Azure OpenAI Service:  
 
@@ -70,7 +75,7 @@ This tool depends on the PySide6 libraries for its graphical user interface. Sin
 
 ### Step 4: Build and install azure.ai.assistant Python library
 
-We have included the azure.ai.assistant library is included within this tool's repository as part of this tool's alpha, as it has not yet been released on PyPI. 
+We have included the `azure.ai.assistant` library is included within this tool's repository as part of this tool's alpha status, as it has not yet been released on PyPI. 
 Build the wheel using the following instructions, or use the wheel package provided under releases directly.
 
 - Ensure wheel is installed to build the library package. You can install it using the command: `pip install wheel`
@@ -92,8 +97,6 @@ pip install openai
 pip install python-Levenshtein
 pip install fuzzywuzzy
 pip install Pillow
-
-# Install optionally Azure Cognitive Search Service to add speech transcription and synthesis functionality using the microphone and speaker
 pip install azure-cognitiveservices-speech
 
 # Install the latest release of the tool

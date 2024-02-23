@@ -21,23 +21,14 @@ class GeneralSettingsDialog(QDialog):
     def setup_ui(self):
         self.layout = QVBoxLayout(self)
 
-        # Thread timeout configuration
-        self.threadTimeoutLayout = QHBoxLayout()
-        self.threadTimeoutLabel = QLabel("Thread Timeout (s):", self)
-        self.threadTimeoutEdit = QLineEdit(self)
-        self.threadTimeoutEdit.setText(str(self.main_window.thread_timeout))
-        self.threadTimeoutLayout.addWidget(self.threadTimeoutLabel)
-        self.threadTimeoutLayout.addWidget(self.threadTimeoutEdit)
+        # HTTP connection timeout configuration
+        self.connectionTimeoutLayout = QHBoxLayout()
+        self.connectionTimeoutLabel = QLabel("HTTP Connection Timeout (s):", self)
+        self.connectionTimeoutEdit = QLineEdit(self)
+        self.connectionTimeoutEdit.setText(str(self.main_window.connection_timeout))
+        self.connectionTimeoutLayout.addWidget(self.connectionTimeoutLabel)
+        self.connectionTimeoutLayout.addWidget(self.connectionTimeoutEdit)
         
-        # Run timeout configuration
-        self.runTimeoutLayout = QHBoxLayout()
-        self.runTimeoutLabel = QLabel("Run Timeout (s):", self)
-        self.runTimeoutEdit = QLineEdit(self)
-        # self.main_window.run_timeout is float, so we need to convert it to string
-        self.runTimeoutEdit.setText(str(self.main_window.run_timeout))
-        self.runTimeoutLayout.addWidget(self.runTimeoutLabel)
-        self.runTimeoutLayout.addWidget(self.runTimeoutEdit)
-
         # Chat completion for friendly conversation thread names
         self.useChatCompletionForThreadsCheckbox = QCheckBox("Enable chat completion for friendly conversation thread names", self)
         self.useChatCompletionForThreadsCheckbox.setChecked(self.main_window.use_chat_completion_for_thread_name)
@@ -54,8 +45,7 @@ class GeneralSettingsDialog(QDialog):
         self.buttonsLayout.addWidget(self.cancelButton)
 
         # Adding layouts to the main layout
-        self.layout.addLayout(self.threadTimeoutLayout)
-        self.layout.addLayout(self.runTimeoutLayout)
+        self.layout.addLayout(self.connectionTimeoutLayout)
         self.layout.addWidget(self.useChatCompletionForThreadsCheckbox)
         self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
@@ -66,10 +56,8 @@ class GeneralSettingsDialog(QDialog):
 
     def accept(self):
         try:
-            thread_timeout = float(self.threadTimeoutEdit.text())
-            run_timeout = float(self.runTimeoutEdit.text())
-            self.main_window.thread_timeout = thread_timeout
-            self.main_window.run_timeout = run_timeout
+            connection_timeout = float(self.connectionTimeoutEdit.text())
+            self.main_window.connection_timeout = connection_timeout
             self.main_window.use_chat_completion_for_thread_name = self.useChatCompletionForThreadsCheckbox.isChecked()
             self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
