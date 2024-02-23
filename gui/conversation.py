@@ -216,7 +216,7 @@ class ConversationView(QWidget):
                 # Determine the color based on the role and the theme
                 if self.is_dark_mode():
                     # Colors for dark mode
-                    color = '#ADD8E6' if text_message.role != "assistant" else '#D3D3D3'
+                    color = 'blue' if text_message.role != "assistant" else '#D3D3D3'
                 else:
                     # Colors for light mode
                     color = 'blue' if text_message.role != "assistant" else 'black'
