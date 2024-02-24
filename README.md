@@ -4,6 +4,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&ensp;
 ![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
+![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
+<br>
+![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 </div>
 <div align="center">
 ⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
@@ -26,7 +31,8 @@
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
-📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
+🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
+📤💾 Exporting the assistant configuration into simple CLI application
 
 **Learn more** about Assistants on Azure OpenAI Service:  
 
@@ -70,14 +76,14 @@ This tool depends on the PySide6 libraries for its graphical user interface. Sin
 
 ### Step 4: Build and install azure.ai.assistant Python library
 
-We have included the azure.ai.assistant library is included within this tool's repository as part of this tool's alpha, as it has not yet been released on PyPI. 
+We have included the `azure.ai.assistant` library is included within this tool's repository as part of this tool's alpha status, as it has not yet been released on PyPI. 
 Build the wheel using the following instructions, or use the wheel package provided under releases directly.
 
 - Ensure wheel is installed to build the library package. You can install it using the command: `pip install wheel`
 - Visit the`sdk/azure-ai-assistant` folder and ensure wheel is installed: `pip install wheel` (or pip3 e.g. in Mac)
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.5a1-py3-none-any.whl`
 
 ### Step 5: Install dependencies
 
@@ -92,13 +98,11 @@ pip install openai
 pip install python-Levenshtein
 pip install fuzzywuzzy
 pip install Pillow
-
-# Install optionally Azure Cognitive Search Service to add speech transcription and synthesis functionality using the microphone and speaker
 pip install azure-cognitiveservices-speech
 
 # Install the latest release of the tool
 # Find the latest .whl file under the release tags in this repo and download and save in the main ai-assistant-studio folder
-pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl
+pip install --force-reinstall --no-deps azure_ai_assistant-0.2.5a1-py3-none-any.whl
 ```
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
@@ -117,25 +121,25 @@ Next, go to your resource in the [Azure portal](https://ms.portal.azure.com/#hom
 Create and assign persistent environment variables for your key and endpoint.
 
 #### ⌨️ Command Line (CLI)
-1. Set the Azure OpenAI Service key, endpoint and version (optional)
+1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-02-15-preview` for assistants.
 
 **Windows:**
 ```
-setx OPENAI_API_KEY "Your OpenAI Key"
 setx AZURE_OPENAI_API_KEY "Your Azure OpenAI Key"
 setx AZURE_OPENAI_ENDPOINT "Your OpenAI Endpoint"
 setx AZURE_OPENAI_API_VERSION "Azure OpenAI version"
+setx OPENAI_API_KEY "Your OpenAI Key"
 ```
 
 **Linux/Mac**
 ```
-export OPENAI_API_KEY="Your OpenAI Key"
 export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
 export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
 export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
+export OPENAI_API_KEY="Your OpenAI Key"
 ```
 
-2. Set Cognitive Services Speech key (if you want to use speech input)
+2. Set Cognitive Services Speech key (if you want to use speech input & output)
 
 **Windows:**
 ```

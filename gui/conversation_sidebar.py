@@ -141,6 +141,8 @@ class CustomListWidget(QListWidget):
         for thread in threads:
             item = QListWidgetItem(thread['thread_name'])
             self.addItem(item)
+            thread_tooltip_text = f"You can add/remove files and instructions by right-clicking this item."
+            item.setToolTip(thread_tooltip_text)
 
             # Get file paths and instructions from the thread data
             file_paths = thread.get('file_ids', [])
@@ -296,12 +298,14 @@ class ConversationSidebar(QWidget):
             widget = self.assistantList.itemWidget(item)
             assistant_name = widget.label.text()
             reply = QMessageBox.question(self, 'Confirm Delete',
-                                         f"Are you sure you want to delete '{current_item.text()}'?",
+                                         f"Are you sure you want to delete '{assistant_name}'?",
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             if reply == QMessageBox.Yes:
                 try:
-                    self.assistant_client_manager.get_client(assistant_name).purge()
+                    assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
+                    if assistant_client:
+                        assistant_client.purge(self.main_window.connection_timeout)
                     self.assistant_client_manager.remove_client(assistant_name)
                     self.main_window.conversation_view.conversationView.clear()
                     self.assistant_config_manager.load_configs()
@@ -355,7 +359,7 @@ class ConversationSidebar(QWidget):
             for name in assistant_names:
                 if not self.assistant_client_manager.get_client(name):
                     assistant_config = self.assistant_config_manager.get_config(name)
-                    assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window)
+                    assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
                     self.assistant_client_manager.register_client(name, assistant_client)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")
@@ -395,7 +399,7 @@ class ConversationSidebar(QWidget):
             return
         try:
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.thread_timeout)
+            thread_name = self.create_conversation_thread(threads_client, timeout=self.main_window.connection_timeout)
             self._select_thread(thread_name)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while creating a new thread: {e}")
@@ -412,6 +416,8 @@ class ConversationSidebar(QWidget):
             logger.debug(f"Total time taken to create a new conversation thread: {end_time - start_time} seconds")
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
+            thread_tooltip_text = f"You can add/remove files and instructions by right-clicking this item."
+            new_item.setToolTip(thread_tooltip_text)
 
             if not is_scheduled_task:
                 self.main_window.conversation_view.conversationView.clear()
@@ -456,7 +462,7 @@ class ConversationSidebar(QWidget):
             threads_client.set_current_conversation_thread(unique_thread_name)
             self.main_window.conversation_view.conversationView.clear()
             # Retrieve the messages for the selected thread
-            conversation = threads_client.retrieve_conversation(unique_thread_name)
+            conversation = threads_client.retrieve_conversation(unique_thread_name, timeout=self.main_window.connection_timeout)
             if conversation.messages is not None:
                 self.main_window.conversation_view.append_messages(conversation.messages)
         except Exception as e:

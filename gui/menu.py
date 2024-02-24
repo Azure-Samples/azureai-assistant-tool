@@ -46,7 +46,7 @@ class AssistantsMenu:
             try:
                 assistant_config_json = dialog.assistant_config_json
                 ai_client_type = dialog.ai_client_type
-                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window)
+                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
                 self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
                 self.main_window.conversation_sidebar.load_assistant_list(ai_client_type)
             except Exception as e:

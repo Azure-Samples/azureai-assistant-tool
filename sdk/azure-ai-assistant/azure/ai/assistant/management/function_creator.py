@@ -12,7 +12,8 @@ instructions_spec = [{
     "content": f"You are tasked to create function specification of given requirements. "
                f"The function specification shall follow this template: {FunctionConfigManager.get_function_spec_template()}."
                f"As seen in the template, the function spec must have 'type' & 'function' main blocks."
-               f"The 'function' must have 'name', 'module', 'description', 'parameters' and 'returns' fields."
+               f"The 'function' must have 'name', 'module', 'description', 'parameters' fields."
+               f"The module field value shall be 'functions.user_functions'."
                f"The function name must follow snake case format. The module value must not be changed what is in the template."
                f"Returned spec must be valid json string, otherwise it is considered as failure."
 }]

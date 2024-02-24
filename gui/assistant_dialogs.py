@@ -269,6 +269,11 @@ class AssistantConfigDialog(QDialog):
                         self.modelComboBox.addItem(model.id)
         except Exception as e:
             logger.error(f"Error getting models from AI client: {e}")
+        finally:
+            if self.ai_client_type == AIClientType.OPEN_AI:
+                self.modelComboBox.setToolTip("Select a model ID supported for assistant from the list")
+            elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
+                self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")
 
     def assistant_selection_changed(self):
         self.reset_fields()
@@ -504,6 +509,10 @@ class AssistantConfigDialog(QDialog):
             'output_folder_path': self.codeInterpreterFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText()
         }
+        # if name, instructions, and model are empty, show an error message
+        if not config['name'] or not config['instructions'] or not config['model']:
+            QMessageBox.information(self, "Missing Fields", "Name, Instructions, and Model are required fields.")
+            return
         self.assistant_config_json = json.dumps(config, indent=4)
         self.accept()
 
@@ -568,6 +577,7 @@ class ExportAssistantDialog(QDialog):
             return
 
         QMessageBox.information(self, "Export Successful", f"Assistant '{assistant_name}' exported successfully to '{export_path}'.")
+        self.accept()
 
 
 class ContentDisplayDialog(QDialog):

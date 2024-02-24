@@ -25,10 +25,6 @@ function_spec_template = {
                 # ... other arguments ...
             },
             "required": ["argument_1 of function", "..."]
-        },
-        "returns": {
-            "type": "return type",
-            "description": "description of return value of function"
         }
     }
 }
@@ -626,7 +622,7 @@ class FunctionConfigManager:
                 return False, f"Missing main block: {block}"
 
         # Validate the 'function' block
-        function_block_keys = ['name', 'module', 'description', 'parameters', 'returns']
+        function_block_keys = ['name', 'module', 'description', 'parameters']
         for key in function_block_keys:
             if key not in spec['function']:
                 return False, f"Missing key in 'function' block: {key}"

@@ -16,7 +16,7 @@ from openai import AzureOpenAI, OpenAI
 from typing import Union
 from datetime import datetime
 import json, time, importlib, sys, os
-
+import copy
 
 class AssistantClient:
     """
@@ -31,12 +31,15 @@ class AssistantClient:
     :type callbacks: Optional[AssistantClientCallbacks]
     :param is_create: A flag to indicate if the assistant client is being created.
     :type is_create: bool
+    :param timeout: The HTTP request timeout in seconds.
+    :type timeout: Optional[float]
     """
     def __init__(
             self, 
             config_json: str,
             callbacks: Optional[AssistantClientCallbacks] = None,
-            is_create: bool = True
+            is_create: bool = True,
+            timeout: Optional[float] = None
         ) -> None:
         try:
             # Parse the configuration data
@@ -73,7 +76,7 @@ class AssistantClient:
             self._user_input_processing_cancel_requested = False
 
             # Initialize the assistant client (create or update)
-            self._init_assistant_client(config_data, is_create)
+            self._init_assistant_client(config_data, is_create, timeout=timeout)
 
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
@@ -87,6 +90,7 @@ class AssistantClient:
         cls, 
         config_json : str,
         callbacks: Optional[AssistantClientCallbacks] = None,
+        timeout: Optional[float] = None
     ) -> "AssistantClient":
         """
         Creates a new assistant client from the given configuration data.
@@ -97,6 +101,8 @@ class AssistantClient:
         :type config_json: str
         :param callbacks: The callbacks to use for the assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
 
         :return: The new assistant client.
         :rtype: AssistantClient
@@ -105,9 +111,9 @@ class AssistantClient:
             # check if config_json contains assistant_id which is not null or empty, if so, set is_create to False
             config_data = json.loads(config_json)
             if "assistant_id" in config_data and config_data["assistant_id"]:
-                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=False)
+                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=False, timeout=timeout)
             else:
-                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=True)
+                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=True, timeout=timeout)
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -116,7 +122,8 @@ class AssistantClient:
     def from_config(
         cls, 
         config: AssistantConfig, 
-        callbacks: Optional[AssistantClientCallbacks] = None
+        callbacks: Optional[AssistantClientCallbacks] = None,
+        timeout: Optional[float] = None
     ) -> "AssistantClient":
         """
         Creates a new assistant client from the given configuration.
@@ -127,6 +134,8 @@ class AssistantClient:
         :type config: AssistantConfig
         :param callbacks: The callbacks to use for the assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
 
         :return: The new assistant client.
         :rtype: AssistantClient
@@ -134,16 +143,22 @@ class AssistantClient:
         try:
             # check if config contains assistant_id which is not null or empty, if so, set is_create to False
             if config.assistant_id:
-                return AssistantClient(config.to_json(), callbacks, is_create=False)
+                return AssistantClient(config.to_json(), callbacks, is_create=False, timeout=timeout)
             else:
-                return AssistantClient(config.to_json(), callbacks, is_create=True)
+                return AssistantClient(config.to_json(), callbacks, is_create=True, timeout=timeout)
         except Exception as e:
             logger.error(f"Failed to create assistant client from config: {e}")
             raise EngineError(f"Failed to create assistant client from config: {e}")
 
-    def sync_from_cloud(self) -> "AssistantClient":
+    def sync_from_cloud(
+            self,
+            timeout: Optional[float] = None
+    ) -> "AssistantClient":
         """
         Synchronizes the assistant client with the cloud service configuration.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
 
         :return: The assistant client with the given name.
         :rtype: AssistantClient
@@ -157,7 +172,7 @@ class AssistantClient:
                 raise EngineError(f"Assistant with name: {self.name} does not exist.")
 
             # Retrieve the assistant from the cloud service and update the local configuration
-            assistant = self._retrieve_assistant(assistant_config.assistant_id)
+            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
             assistant_config.model = assistant.model
             assistant_config.knowledge_files = {file_path: file_id for file_path, file_id in zip(assistant_config.knowledge_files.keys(), assistant.file_ids)}
@@ -176,14 +191,15 @@ class AssistantClient:
     def _init_assistant_client(
             self, 
             config_data: dict,
-            is_create: bool = True
+            is_create: bool = True,
+            timeout: Optional[float] = None
     ):
         try:
             # Create or update the assistant
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
                 start_time = time.time()
-                self._create_assistant(assistant_config)
+                self._create_assistant(assistant_config, timeout=timeout)
                 end_time = time.time()
                 logger.debug(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
             else:
@@ -193,7 +209,7 @@ class AssistantClient:
                 # check if the local configuration is different from the given configuration
                 if local_config and local_config != assistant_config:
                     logger.debug("Local config is different from the given configuration. Updating the assistant...")
-                    self._update_assistant(assistant_config)
+                    self._update_assistant(assistant_config, timeout=timeout)
                 else:
                     logger.debug("Local config is the same as the given configuration. No need to update the assistant.")
                 end_time = time.time()
@@ -216,12 +232,13 @@ class AssistantClient:
 
     def _create_assistant(
             self, 
-            assistant_config: AssistantConfig
+            assistant_config: AssistantConfig,
+            timeout: Optional[float] = None
     ):
         try:
             logger.info(f"Creating new assistant with name: {assistant_config.name}")
             # Upload the files for new assistant
-            self._upload_new_files(assistant_config)
+            self._upload_new_files(assistant_config, timeout=timeout)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
 
@@ -230,7 +247,8 @@ class AssistantClient:
                 instructions=assistant_config.instructions,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids
+                file_ids=file_ids,
+                timeout=timeout
             )
             # Update the assistant_id in the assistant_config
             assistant_config.assistant_id = assistant.id
@@ -239,9 +257,15 @@ class AssistantClient:
             logger.error(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
 
-    def purge(self)-> None:
+    def purge(
+            self,
+            timeout: Optional[float] = None
+    )-> None:
         """
         Purges the assistant from the cloud service and the local configuration.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
 
         :return: None
         :rtype: None
@@ -253,7 +277,7 @@ class AssistantClient:
             assistant_config = config_manager.get_config(self.name)
 
             # remove from the cloud service
-            self._delete_assistant(assistant_config)
+            self._delete_assistant(assistant_config, timeout=timeout)
 
             # remove from the local config
             config_manager.delete_config(assistant_config.name)
@@ -276,12 +300,14 @@ class AssistantClient:
 
     def _delete_assistant(
             self, 
-            assistant_config : AssistantConfig
+            assistant_config : AssistantConfig,
+            timeout : Optional[float] = None
     ):
         try:
             assistant_id = assistant_config.assistant_id
             self._ai_client.beta.assistants.delete(
-                assistant_id=assistant_id
+                assistant_id=assistant_id,
+                timeout=timeout
             )
             # delete threads associated with the assistant
             logger.info(f"Deleted assistant with ID: {assistant_id}")
@@ -292,14 +318,15 @@ class AssistantClient:
     def _update_files(
             self,
             assistant_config: AssistantConfig,
+            timeout: Optional[float] = None
     ) -> None:
 
         try:
             logger.info(f"Updating files for assistant: {assistant_config.name}")
-            assistant = self._retrieve_assistant(assistant_config.assistant_id)
+            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
             existing_file_ids = set(assistant.file_ids)
-            self._delete_old_files(assistant_config, existing_file_ids)
-            self._upload_new_files(assistant_config)
+            self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
+            self._upload_new_files(assistant_config, timeout=timeout)
 
         except Exception as e:
             logger.error(f"Failed to update files for assistant: {assistant_config.name}: {e}")
@@ -318,7 +345,7 @@ class AssistantClient:
         :type thread_name: str
         :param additional_instructions: Additional instructions to provide to the assistant.
         :type additional_instructions: Optional[str]
-        :param timeout: The timeout in seconds to wait for the processing to complete.
+        :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
 
         :return: None
@@ -414,7 +441,7 @@ class AssistantClient:
     def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
-            self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id)
+            self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
             return False
 
         tool_outputs = self._process_tool_calls(name, run_id, tool_calls)
@@ -559,12 +586,14 @@ class AssistantClient:
 
     def _retrieve_assistant(
             self, 
-            assistant_id : str
+            assistant_id : str,
+            timeout : Optional[float] = None
     ):
         try:
             logger.info(f"Retrieving assistant with ID: {assistant_id}")
             assistant = self._ai_client.beta.assistants.retrieve(
-                assistant_id=assistant_id
+                assistant_id=assistant_id,
+                timeout=timeout
             )
             return assistant
         except Exception as e:
@@ -574,7 +603,8 @@ class AssistantClient:
     def _delete_old_files(
             self,
             assistant_config : AssistantConfig,
-            existing_file_ids
+            existing_file_ids,
+            timeout : Optional[float] = None
     ):
         updated_file_ids = set(assistant_config.knowledge_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
@@ -582,12 +612,14 @@ class AssistantClient:
         for file_id in file_ids_to_delete:
             file_deletion_status = self._ai_client.beta.assistants.files.delete(
                 assistant_id=assistant_config.assistant_id,
-                file_id=file_id
+                file_id=file_id,
+                timeout=timeout
             )
 
     def _upload_new_files(
             self, 
-            assistant_config: AssistantConfig
+            assistant_config: AssistantConfig,
+            timeout : Optional[float] = None
     ):
         logger.info(f"Uploading new files for assistant: {assistant_config.name}")
         for file_path, file_id in assistant_config.knowledge_files.items():
@@ -595,13 +627,15 @@ class AssistantClient:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = self._ai_client.files.create(
                     file=open(file_path, "rb"),
-                    purpose='assistants'
+                    purpose='assistants',
+                    timeout=timeout
                 )
                 assistant_config.knowledge_files[file_path] = file.id
 
     def _update_assistant(
             self, 
-            assistant_config: AssistantConfig
+            assistant_config: AssistantConfig,
+            timeout : Optional[float] = None
     ):
         try:
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
@@ -616,24 +650,30 @@ class AssistantClient:
                 instructions=assistant_config.instructions,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids
+                file_ids=file_ids,
+                timeout=timeout
             )
         except Exception as e:
             logger.error(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
             raise EngineError(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
 
-    def _update_tools(
-            self, 
-            assistant_config: AssistantConfig
-    ):
+    def _update_tools(self, assistant_config: AssistantConfig):
         tools = []
         logger.info(f"Updating tools for assistant: {assistant_config.name}")
         # Add the retrieval tool to the tools list if there are knowledge files
         if assistant_config.knowledge_retrieval:
             tools.append({"type": "retrieval"})
-        # Add the functions to the tools list if there are functions
+        # Process and add the functions to the tools list if there are functions
         if assistant_config.selected_functions:
-            tools.extend(assistant_config.selected_functions)
+            modified_functions = []
+            for function in assistant_config.selected_functions:
+                # Create a copy of the function spec to avoid modifying the original
+                modified_function = copy.deepcopy(function)
+                # Remove the module field from the function spec
+                if "function" in modified_function and "module" in modified_function["function"]:
+                    del modified_function["function"]["module"]
+                modified_functions.append(modified_function)
+            tools.extend(modified_functions)
         # Add the code interpreter to the tools list if there is a code interpreter
         if assistant_config.code_interpreter:
             tools.append({"type": "code_interpreter"})
