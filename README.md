@@ -83,7 +83,7 @@ Build the wheel using the following instructions, or use the wheel package provi
 - Visit the`sdk/azure-ai-assistant` folder and ensure wheel is installed: `pip install wheel` (or pip3 e.g. in Mac)
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall --no-deps azure_ai_assistant-0.2.5a1-py3-none-any.whl`
 
 ### Step 5: Install dependencies
 
@@ -102,7 +102,7 @@ pip install azure-cognitiveservices-speech
 
 # Install the latest release of the tool
 # Find the latest .whl file under the release tags in this repo and download and save in the main ai-assistant-studio folder
-pip install --force-reinstall --no-deps azure_ai_assistant-0.2.4a1-py3-none-any.whl
+pip install --force-reinstall --no-deps azure_ai_assistant-0.2.5a1-py3-none-any.whl
 ```
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
