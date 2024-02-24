@@ -121,25 +121,25 @@ Next, go to your resource in the [Azure portal](https://ms.portal.azure.com/#hom
 Create and assign persistent environment variables for your key and endpoint.
 
 #### ⌨️ Command Line (CLI)
-1. Set the Azure OpenAI Service key, endpoint and version (optional)
+1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-02-15-preview` for assistants.
 
 **Windows:**
 ```
-setx OPENAI_API_KEY "Your OpenAI Key"
 setx AZURE_OPENAI_API_KEY "Your Azure OpenAI Key"
 setx AZURE_OPENAI_ENDPOINT "Your OpenAI Endpoint"
 setx AZURE_OPENAI_API_VERSION "Azure OpenAI version"
+setx OPENAI_API_KEY "Your OpenAI Key"
 ```
 
 **Linux/Mac**
 ```
-export OPENAI_API_KEY="Your OpenAI Key"
 export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
 export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
 export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
+export OPENAI_API_KEY="Your OpenAI Key"
 ```
 
-2. Set Cognitive Services Speech key (if you want to use speech input)
+2. Set Cognitive Services Speech key (if you want to use speech input & output)
 
 **Windows:**
 ```
