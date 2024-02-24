@@ -1,8 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import sys
-import os
+import sys, os
+
 from azure.ai.assistant.management.logger_module import logger
 
 

@@ -4,11 +4,11 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-import threading
 from PySide6.QtWidgets import QDialog, QComboBox, QFrame, QTabWidget, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QDateTimeEdit, QTextEdit, QMessageBox
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtGui import QColor, QPalette, QIntValidator
-import json, os
+
+import json, os, threading
 
 from azure.ai.assistant.management.task import BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.task_manager import TaskManager

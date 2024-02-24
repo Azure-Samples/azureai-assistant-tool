@@ -7,10 +7,12 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QTreeWidget, QTreeWidgetItem, QHeaderView, QAbstractItemView
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QBrush, QColor
+
+import os, json
+
+from azure.ai.assistant.management.logger_module import logger
 from gui.signals import DiagnosticAddFunctionCallSignal, DiagnosticEndRunSignal
 from gui.signals import DiagnosticStartRunSignal
-from azure.ai.assistant.management.logger_module import logger
-import os, json
 
 
 class DiagnosticsSidebar(QWidget):

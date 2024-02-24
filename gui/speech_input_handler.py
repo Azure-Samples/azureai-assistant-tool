@@ -5,10 +5,12 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QMessageBox
-from gui.status_bar import ActivityStatus
-from azure.ai.assistant.management.logger_module import logger
 import azure.cognitiveservices.speech as speechsdk
+
 import os, time
+
+from azure.ai.assistant.management.logger_module import logger
+from gui.status_bar import ActivityStatus
 
 
 class SpeechInputHandler:

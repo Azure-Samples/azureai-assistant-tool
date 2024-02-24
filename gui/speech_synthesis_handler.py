@@ -3,9 +3,11 @@
 
 import azure.cognitiveservices.speech as speechsdk
 from azure.cognitiveservices.speech import ResultFuture
-from azure.ai.assistant.management.logger_module import logger
 from openai import OpenAI
+
 import os, time
+
+from azure.ai.assistant.management.logger_module import logger
 
 
 MAX_SUMMARY_WORDS = 20

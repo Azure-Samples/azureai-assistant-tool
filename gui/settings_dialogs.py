@@ -5,8 +5,10 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QHBoxLayout, QCheckBox
-from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
+
 import os, json
+
+from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 
 
 class GeneralSettingsDialog(QDialog):

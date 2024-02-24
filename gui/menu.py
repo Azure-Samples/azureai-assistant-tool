@@ -6,6 +6,10 @@
 
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
+
+from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
+from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 from gui.directives_dialogs import DirectivesDialog
 from gui.debug_dialog import DebugViewDialog
 from gui.assistant_dialogs import AssistantConfigDialog, ExportAssistantDialog
@@ -14,10 +18,6 @@ from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog
 from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
-
-from azure.ai.assistant.management.assistant_client import AssistantClient
-from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
-from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 
 
 class AssistantsMenu:
