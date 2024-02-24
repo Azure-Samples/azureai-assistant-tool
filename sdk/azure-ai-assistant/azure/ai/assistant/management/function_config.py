@@ -21,7 +21,6 @@ class FunctionConfig:
         self._module = self._function_data.get('module', '')
         self._description = self._function_data.get('description', '')
         self._parameters = self._function_data.get('parameters', {})
-        self._returns = self._function_data.get('returns', {})
 
     def get_full_spec(self) -> dict:
         """
@@ -36,8 +35,7 @@ class FunctionConfig:
                 "name": self._name,
                 "module": self._module,
                 "description": self._description,
-                "parameters": self._parameters,
-                "returns": self._returns
+                "parameters": self._parameters
             }
         }
 
