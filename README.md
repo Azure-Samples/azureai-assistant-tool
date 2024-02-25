@@ -150,7 +150,7 @@ python main.py
 
 This command will start the Azure AI Assistant Tool and you can interact with it through its user interface which looks something like this:
 
-![Ai-Assistant-Tool-screenshot](https://github.com/Azure-Samples/azureai-assistant-tool/assets/118226126/41a5506e-e8fd-4633-8e00-d533577f8290)
+![Ai-Assistant-Tool-screenshot](/assets/AzureAIAssistantTool2.png)
 
 ## 📖 License
 The Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
