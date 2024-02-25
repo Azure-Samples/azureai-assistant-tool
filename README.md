@@ -5,10 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&ensp;
 ![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
 ![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
-<br>
-![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 </div>
 <div align="center">
 ⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
@@ -32,13 +28,13 @@
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
 🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
-📤💾 Exporting the assistant configuration into simple CLI application
+📤 Exporting the assistant configuration into simple CLI application
 
-**Learn more** about Assistants on Azure OpenAI Service:  
+**Learn more** about Assistants on Azure OpenAI Service:
 
-  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants  
-  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)  
-  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)  
+  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
+  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
+  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
 
 
 ## 🚀 How does this Tool help?
@@ -68,14 +64,24 @@
 - Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availabaility for Assistants.
 - Create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region
 
-### Step 2: Install Python 3.8 or newer version
+### Step 2: Install Python
 
 Azure AI Assistant tool requires Python > = 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
 Latest stable Python version is recommended.
 
-### Step 3: Build and install azure.ai.assistant Python library
+Create a new Python virtual environment where we can safely install the SDK packages:
+ * On MacOS and Linux run:
+   ```
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+* On Windows run:
+   ```
+   py -3 -m venv .venv
+   .venv\scripts\activate
+   ```
 
-Create virtual Python environment (not mandatory but recommended), see [instructions](https://docs.python.org/3/library/venv.html).
+### Step 3: Build and install azure.ai.assistant Python library
 
 We have included the `azure.ai.assistant` library currently within this repository as part of the alpha status of the project. 
 The plan is to release library on PyPI for more convenience installation in future.
@@ -87,7 +93,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
 - Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.5a1-py3-none-any.whl`
-  - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
+  - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests, azure-identity, azure-mgmt-cognitiveservices)
 
 ### Step 4: Install Python UI libraries
 
@@ -99,60 +105,40 @@ pip install azure-cognitiveservices-speech
 
 ```
 
-### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
+### Step 5: Configure Azure resources using Azure AI CLI
 
-To successfully make a call against the Azure OpenAI service, you'll need the following:
+#### Install Azure AI CLI
 
-**- ENDPOINT:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. Alternatively, you can find the value in Azure OpenAI Studio > Playground > View code. An example endpoint is: https://docs-test-001.openai.azure.com/.
+With Azure AI CLI you can create all resources needed for the Azure OpenAI assistants and configure the environment variables for the SDK and tool.
 
-**- API-KEY:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. You can use either KEY1 or KEY2.
-
-**- MODEL DEPLOYMENT-NAME:**	This value will correspond to the custom name you chose for your deployment when you deployed a model. This value can be found under Resource Management > Model Deployments in the Azure portal or alternatively under Management > Deployments in Azure OpenAI Studio.
-
-Next, go to your resource in the [Azure portal](https://ms.portal.azure.com/#home). The Keys and Endpoint can be found in the Resource Management section (see image below). Copy your endpoint and access key as you'll need both for authenticating your API calls. You can use either KEY1 or KEY2. Always having two keys allows you to securely rotate and regenerate keys without causing a service disruption.
-![portal keys and endpoint](https://github.com/Azure-Samples/azureai-assistant-tool/assets/118226126/b4ddbbba-1b91-4525-b05d-b9673dd6e143)
-
-### Step 6: Setup Environment Variables
-
-Create and assign persistent environment variables for your key and endpoint.
-
-#### ⌨️ Command Line (CLI)
-
-1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-02-15-preview` for assistants.
-
-**Windows:**
-Use setx or set command depending on your preference.
-
+On Ubuntu you can use this all-in-one installer command:
 ```
-setx AZURE_OPENAI_API_KEY "Your Azure OpenAI Key"
-setx AZURE_OPENAI_ENDPOINT "Your OpenAI Endpoint"
-setx AZURE_OPENAI_API_VERSION "Azure OpenAI version"
-setx OPENAI_API_KEY "Your OpenAI Key"
+curl -sL https://aka.ms/InstallAzureAICLIDeb | sudo bash
 ```
 
-**Linux/Mac**
+On Windows and MacOS, follow the instructions [here](https://aka.ms/aistudio/docs/cli).
+
+#### Create or connect to your Azure Resources
+
+1. Run the `ai init` command.
 ```
-export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
-export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
-export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
-export OPENAI_API_KEY="Your OpenAI Key"
+ai init
+```
+2. You will be prompted to log in to Azure.
+3. After logging in, you will be asked to select or create resources. [Check the available regions and models for assistants](https://learn.microsoft.com/azure/ai-services/openai/concepts/models#assistants-preview).
+4. Choose the option for a `New Azure AI Project` and follow the prompts to create:
+- An Azure AI resource using your subscription
+- An Azure AI project
+- Azure OpenAI Service model deployments
+- You can skip the resources related to Embeddings, Search and Deployments as they are not required for assistants.
+5. After you have created a model deployment for your resource, run `ai dev shell` command which opens a new shell with all required environment variables configured.
+```
+ai dev shell
 ```
 
-2. Set Cognitive Services Speech key (this is optional and if you want to use speech input & output).
+For more information about Azure resources configuration inside Azure Portal and detailed information about required environment variables, see [resources] page.
 
-**Windows:**
-```
-setx SPEECH_KEY "Your Speech Key"
-setx SPEECH_REGION "Your Speech Region"
-```
-
-**Linux/Mac**
-``` 
-export SPEECH_KEY="Your Speech Key"
-export SPEECH_REGION="Your Speech Region"
-```
-
-### Step 7: Launch the application
+### Step 6: Launch the application
 
 #### ⌨️ Command Line (CLI)
 
@@ -196,4 +182,5 @@ If there's an feature that you'd like to see added, feel free to file a [Feature
 If you'd like to implement it yourself, please refer to our [contributing guidelines].
 
 [contributing guidelines]: ./CONTRIBUTING.md
+[resources]: ./RESOURCES.md
 [new issue page]: https://github.com/Azure-Samples/azureai-assistant-tool/issues/new/choose
