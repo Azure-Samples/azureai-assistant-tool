@@ -124,8 +124,9 @@ curl -sL https://aka.ms/InstallAzureAICLIDeb | sudo bash
 ai init
 ```
 2. You will be prompted to log in to Azure.
-3. After logging in, you will be asked to select or create resources. [Check the available regions and models for assistants](https://learn.microsoft.com/azure/ai-services/openai/concepts/models#assistants-preview).
-4. Choose the option for a `New Azure AI Project` and follow the prompts to create:
+3. After logging in, you will be asked to select or create resources. 
+- [Check the available regions and models for assistants](https://learn.microsoft.com/azure/ai-services/openai/concepts/models#assistants-preview).
+4. Choose the option for a `New AI Project` and follow the prompts to create:
 - An Azure AI resource using your subscription
 - An Azure AI project
 - Azure OpenAI Service model deployments
