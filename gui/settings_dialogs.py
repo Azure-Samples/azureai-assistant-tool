@@ -148,7 +148,7 @@ class ClientSettingsDialog(QDialog):
 
     def set_initial_states(self):
         ai_client_type = self.settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
-        api_version = self.settings.get("api_version", "2023-09-01-preview")
+        api_version = self.settings.get("api_version", "2024-02-15-preview")
         self.azure_api_version_input.setText(api_version)
 
         if ai_client_type == AIClientType.OPEN_AI.name:
@@ -182,16 +182,12 @@ class ClientSettingsDialog(QDialog):
         self.model_selection.clear()
 
         try:
-            if ai_client_type == AIClientType.OPEN_AI:
-                # Get the AI client instance, pass the api_version if it's set
-                ai_client = AIClientFactory.get_instance().get_client(ai_client_type, api_version)
-                # Fetch and add new models to the model_selection
-                if ai_client:
-                    models = ai_client.models.list().data
-                    for model in models:
-                        self.model_selection.addItem(model.id)
-            elif ai_client_type == AIClientType.AZURE_OPEN_AI:
-                models = []
+            models = AIClientFactory.get_instance().get_models_list(ai_client_type)
+            for model in models:
+                if ai_client_type == AIClientType.OPEN_AI:
+                    self.model_selection.addItem(model.id)
+                elif ai_client_type == AIClientType.AZURE_OPEN_AI:
+                    self.model_selection.addItem(model)
 
             # Set the default model
             default_model = self.settings.get("model", "")
@@ -208,7 +204,7 @@ class ClientSettingsDialog(QDialog):
         # Determine the API version for Azure OpenAI, if needed
         api_version = None
         if ai_client_type == AIClientType.AZURE_OPEN_AI:
-            api_version = self.azure_api_version_input.text().strip() or "2023-09-01-preview"
+            api_version = self.azure_api_version_input.text().strip() or "2024-02-15-preview"
 
         # Call fill_model_selection with the selected AI client type and API version
         self.fill_client_model_selection(ai_client_type, api_version)

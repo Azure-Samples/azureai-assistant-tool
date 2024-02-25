@@ -262,12 +262,12 @@ class AssistantConfigDialog(QDialog):
 
         self.modelComboBox.clear()
         try:
-            ai_client = AIClientFactory.get_instance().get_client(self.ai_client_type)
-            if self.ai_client_type == AIClientType.OPEN_AI:
-                if ai_client:
-                    models = ai_client.models.list().data
-                    for model in models:
-                        self.modelComboBox.addItem(model.id)
+            models = AIClientFactory.get_instance().get_models_list(self.ai_client_type)
+            for model in models:
+                if self.ai_client_type == AIClientType.OPEN_AI:
+                    self.modelComboBox.addItem(model.id)
+                elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
+                    self.modelComboBox.addItem(model)
         except Exception as e:
             logger.error(f"Error getting models from AI client: {e}")
         finally:
