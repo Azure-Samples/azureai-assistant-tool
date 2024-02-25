@@ -37,10 +37,6 @@ class AIClientFactory:
             raise Exception("AIClientFactory is a singleton class")
         else:
             AIClientFactory._instance = self
-            # Read environment variables
-            self.azure_subscription_id = os.environ["AZURE_SUBSCRIPTION_ID"]
-            self.azure_openai_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
-            self.azure_resource_group = os.environ["AZURE_RESOURCE_GROUP"]
 
     @classmethod
     def get_instance(cls) -> "AIClientFactory":
@@ -161,8 +157,14 @@ class AIClientFactory:
         if self._azure_deployment_names is not None:
             return self._azure_deployment_names
 
+        # Read environment variables
+        azure_subscription_id = os.environ["AZURE_SUBSCRIPTION_ID"]
+        azure_openai_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
+        azure_resource_group = os.environ["AZURE_RESOURCE_GROUP"]
+
         # return empty list if the subscription id is not set or the endpoint is not set or the resource group is not set
-        if not self.azure_subscription_id or not self.azure_openai_endpoint or not self.azure_resource_group:
+        if not azure_subscription_id or not azure_openai_endpoint or not azure_resource_group:
+            logger.error("Azure environment variables for fetching models list are not set.")
             return []
 
         deployment_names = []
@@ -170,16 +172,16 @@ class AIClientFactory:
         # Initialize the Cognitive Services management client
         cogs_mgmt_client = CognitiveServicesManagementClient(
             credential=DefaultAzureCredential(),
-            subscription_id=self.azure_subscription_id,
+            subscription_id=azure_subscription_id,
         )
 
         # List all cognitive services accounts in the specified resource group
         try:
-            accounts = cogs_mgmt_client.accounts.list_by_resource_group(self.azure_resource_group)
+            accounts = cogs_mgmt_client.accounts.list_by_resource_group(azure_resource_group)
             for account in accounts:
-                if account.name in self.azure_openai_endpoint:
+                if account.name in azure_openai_endpoint:
                     # List all model deployment names in the resource group and account
-                    deployments = cogs_mgmt_client.deployments.list(self.azure_resource_group, account.name)
+                    deployments = cogs_mgmt_client.deployments.list(azure_resource_group, account.name)
                     for deployment in deployments:
                         deployment_names.append(deployment.name)
                     break  # Assuming only one account matches the endpoint criteria
