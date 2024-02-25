@@ -61,15 +61,14 @@
 
 - Create an Azure Subscription for [free](https://azure.microsoft.com/en-us/free/ai-services/), if you don't have one already
 - [Apply for access](https://aka.ms/oai/access) to Azure OpenAI Service in this Azure Subscription. Azure OpenAI Service is currently a limited access service so access is granted through an application process. Most applications are processed within a day of applying.
-- Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availabaility for Assistants.
-- Create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region
+- Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availability for Assistants.
 
 ### Step 2: Install Python
 
-Azure AI Assistant tool requires Python > = 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
+Azure AI Assistant tool requires Python >= 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
 Latest stable Python version is recommended.
 
-Create a new Python virtual environment where we can safely install the SDK packages:
+Create a new Python virtual environment. Virtual environment is recommended for safe install the SDK packages:
  * On MacOS and Linux run:
    ```
    python3 -m venv .venv
@@ -109,14 +108,14 @@ pip install azure-cognitiveservices-speech
 
 #### Install Azure AI CLI
 
-With Azure AI CLI you can create all resources needed for the Azure OpenAI assistants and configure the environment variables for the SDK and tool.
+With Azure AI CLI you can create all resources needed for the Azure OpenAI assistants in your dev environment and configure the environment variables for the SDK and tool.
 
-On Ubuntu you can use this all-in-one installer command:
+**On Ubuntu**, you can use this all-in-one installer command:
 ```
 curl -sL https://aka.ms/InstallAzureAICLIDeb | sudo bash
 ```
 
-On Windows and MacOS, follow the instructions [here](https://aka.ms/aistudio/docs/cli).
+**On Windows and MacOS**, follow the instructions [here](https://aka.ms/aistudio/docs/cli).
 
 #### Create or connect to your Azure Resources
 
@@ -136,7 +135,7 @@ ai init
 ai dev shell
 ```
 
-For more information about Azure resources configuration inside Azure Portal and detailed information about required environment variables, see [resources] page.
+For more information about Azure resources and configuration inside Azure Portal and detailed information about required environment variables, see [resources] page.
 
 ### Step 6: Launch the application
 

@@ -1,6 +1,8 @@
 
 ## Azure OpenAI Service Configuration in Azure Portal
 
+You can create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region.
+
 ### Azure OpenAI Service API key, endpoint and model deployment version
 
 To successfully make a call against the Azure OpenAI service, you'll need the following:
