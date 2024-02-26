@@ -45,11 +45,11 @@ class SpeechSynthesisHandler:
         self.model = main_window.chat_completion_model
         self.complete_signal = complete_signal
         self.is_initialized = False
-        speech_key = os.environ.get('SPEECH_KEY')
-        speech_region = os.environ.get('SPEECH_REGION')
+        speech_key = os.environ.get('AZURE_AI_SPEECH_KEY')
+        speech_region = os.environ.get('AZURE_AI_SPEECH_REGION')
 
         if not speech_key or not speech_region:
-            logger.error("SPEECH_KEY or SPEECH_REGION environment variables not found.")
+            logger.error("AZURE_AI_SPEECH_KEY or AZURE_AI_SPEECH_REGION environment variables not found.")
             return
 
         try:

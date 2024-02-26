@@ -112,7 +112,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         ai_client_type = self.chat_completion_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.chat_completion_model = self.chat_completion_settings.get("model", "gpt-4-1106-preview")
-        api_version = self.chat_completion_settings.get("api_version", "2023-09-01-preview")
+        api_version = self.chat_completion_settings.get("api_version", "2024-02-15-preview")
         if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
             self.chat_client = AIClientFactory.get_instance().get_client(
                 AIClientType.AZURE_OPEN_AI,
@@ -432,7 +432,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def on_listening_started(self):
         logger.debug("on_listening_started on main_window")
         if not self.speech_input_handler.is_initialized:
-            QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the SPEECH_KEY and SPEECH_REGION environment variables are set correctly.")
+            QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the AZURE_AI_SPEECH_KEY and AZURE_AI_SPEECH_REGION environment variables are set correctly.")
             return False
         return self.speech_input_handler.start_listening_from_mic()
 

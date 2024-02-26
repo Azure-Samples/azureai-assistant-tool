@@ -3,12 +3,8 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&ensp;
-![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
+![Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)&ensp;
 ![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
-<br>
-![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 </div>
 <div align="center">
 ⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
@@ -32,13 +28,13 @@
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
 🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
-📤💾 Exporting the assistant configuration into simple CLI application
+📤 Exporting the assistant configuration into simple CLI application
 
-**Learn more** about Assistants on Azure OpenAI Service:  
+**Learn more** about Assistants on Azure OpenAI Service:
 
-  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants  
-  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)  
-  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)  
+  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
+  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
+  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
 
 
 ## 🚀 How does this Tool help?
@@ -65,17 +61,27 @@
 
 - Create an Azure Subscription for [free](https://azure.microsoft.com/en-us/free/ai-services/), if you don't have one already
 - [Apply for access](https://aka.ms/oai/access) to Azure OpenAI Service in this Azure Subscription. Azure OpenAI Service is currently a limited access service so access is granted through an application process. Most applications are processed within a day of applying.
-- Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availabaility for Assistants.
+- Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availability for Assistants.
 - Create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region
 
-### Step 2: Install Python 3.8 or newer version
+### Step 2: Install Python
 
-Azure AI Assistant tool requires Python > = 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
+Azure AI Assistant tool requires Python >= 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
 Latest stable Python version is recommended.
 
-### Step 3: Build and install azure.ai.assistant Python library
+Create a new Python virtual environment. Virtual environment is recommended for safe install the SDK packages:
+ * On MacOS and Linux run:
+   ```
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+* On Windows run:
+   ```
+   py -3 -m venv .venv
+   .venv\scripts\activate
+   ```
 
-Create virtual Python environment (not mandatory but recommended), see [instructions](https://docs.python.org/3/library/venv.html).
+### Step 3: Build and install azure.ai.assistant Python library
 
 We have included the `azure.ai.assistant` library currently within this repository as part of the alpha status of the project. 
 The plan is to release library on PyPI for more convenience installation in future.
@@ -86,7 +92,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Go to the`sdk/azure-ai-assistant` folder
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.5a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.6a1-py3-none-any.whl`
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
 ### Step 4: Install Python UI libraries
@@ -96,7 +102,6 @@ Install following specific libraries needed for the Azure AI Assistant Tool GUI
 ```
 pip install PySide6
 pip install azure-cognitiveservices-speech
-
 ```
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
@@ -142,14 +147,14 @@ export OPENAI_API_KEY="Your OpenAI Key"
 
 **Windows:**
 ```
-setx SPEECH_KEY "Your Speech Key"
-setx SPEECH_REGION "Your Speech Region"
+setx AZURE_AI_SPEECH_KEY "Your Speech Key"
+setx AZURE_AI_SPEECH_REGION "Your Speech Region"
 ```
 
 **Linux/Mac**
 ``` 
-export SPEECH_KEY="Your Speech Key"
-export SPEECH_REGION="Your Speech Region"
+export AZURE_AI_SPEECH_KEY="Your Speech Key"
+export AZURE_AI_SPEECH_REGION="Your Speech Region"
 ```
 
 ### Step 7: Launch the application
@@ -164,7 +169,7 @@ python main.py
 
 This command will start the Azure AI Assistant Tool and you can interact with it through its user interface which looks something like this:
 
-![Ai-Assistant-Tool-screenshot](https://github.com/Azure-Samples/azureai-assistant-tool/assets/118226126/41a5506e-e8fd-4633-8e00-d533577f8290)
+![Ai-Assistant-Tool-screenshot](/assets/AzureAIAssistantTool2.png)
 
 ## 📖 License
 The Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
