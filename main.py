@@ -4,9 +4,12 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-import sys
 from PySide6.QtWidgets import QApplication
+
+import sys
+
 from gui.main_window import MainWindow
+
 
 def main():
     # Create an instance of QApplication

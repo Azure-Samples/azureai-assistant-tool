@@ -8,10 +8,10 @@ from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMes
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
+
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import os, time
-import traceback
+import os, time, json
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.task_manager import TaskManager
@@ -32,11 +32,10 @@ from gui.status_bar import ActivityStatus, StatusBar
 from gui.speech_input_handler import SpeechInputHandler
 from gui.speech_synthesis_handler import SpeechSynthesisHandler
 from gui.assistant_client_manager import AssistantClientManager
-from .conversation_sidebar import ConversationSidebar
-from .diagnostic_sidebar import DiagnosticsSidebar
-from .conversation import ConversationView
-from .signals import AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
-import json
+from gui.conversation_sidebar import ConversationSidebar
+from gui.diagnostic_sidebar import DiagnosticsSidebar
+from gui.conversation import ConversationView
+from gui.signals import AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
 
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -113,7 +112,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         ai_client_type = self.chat_completion_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.chat_completion_model = self.chat_completion_settings.get("model", "gpt-4-1106-preview")
-        api_version = self.chat_completion_settings.get("api_version", "2023-09-01-preview")
+        api_version = self.chat_completion_settings.get("api_version", "2024-02-15-preview")
         if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
             self.chat_client = AIClientFactory.get_instance().get_client(
                 AIClientType.AZURE_OPEN_AI,
@@ -410,7 +409,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
 
         except Exception as e:
-            error_message = f"An error occurred while processing the input: {e}\n\nTraceback:\n{traceback.format_exc()}"
+            error_message = f"An error occurred while processing the input: {e}"
             self.error_signal.error_signal.emit(error_message)
             self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
             logger.error(error_message)
@@ -433,7 +432,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def on_listening_started(self):
         logger.debug("on_listening_started on main_window")
         if not self.speech_input_handler.is_initialized:
-            QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the SPEECH_KEY and SPEECH_REGION environment variables are set correctly.")
+            QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the AZURE_AI_SPEECH_KEY and AZURE_AI_SPEECH_REGION environment variables are set correctly.")
             return False
         return self.speech_input_handler.start_listening_from_mic()
 

@@ -5,8 +5,10 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QMessageBox, QHBoxLayout, QCheckBox
-from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
+
 import os, json
+
+from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 
 
 class GeneralSettingsDialog(QDialog):
@@ -146,7 +148,7 @@ class ClientSettingsDialog(QDialog):
 
     def set_initial_states(self):
         ai_client_type = self.settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
-        api_version = self.settings.get("api_version", "2023-09-01-preview")
+        api_version = self.settings.get("api_version", "2024-02-15-preview")
         self.azure_api_version_input.setText(api_version)
 
         if ai_client_type == AIClientType.OPEN_AI.name:
@@ -206,7 +208,7 @@ class ClientSettingsDialog(QDialog):
         # Determine the API version for Azure OpenAI, if needed
         api_version = None
         if ai_client_type == AIClientType.AZURE_OPEN_AI:
-            api_version = self.azure_api_version_input.text().strip() or "2023-09-01-preview"
+            api_version = self.azure_api_version_input.text().strip() or "2024-02-15-preview"
 
         # Call fill_model_selection with the selected AI client type and API version
         self.fill_client_model_selection(ai_client_type, api_version)

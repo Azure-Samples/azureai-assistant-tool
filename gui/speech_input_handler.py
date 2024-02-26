@@ -5,10 +5,12 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6.QtWidgets import QMessageBox
-from gui.status_bar import ActivityStatus
-from azure.ai.assistant.management.logger_module import logger
 import azure.cognitiveservices.speech as speechsdk
+
 import os, time
+
+from azure.ai.assistant.management.logger_module import logger
+from gui.status_bar import ActivityStatus
 
 
 class SpeechInputHandler:
@@ -19,14 +21,11 @@ class SpeechInputHandler:
         self.is_initialized = False
         self.is_listening = False
 
-        speech_key = os.environ.get('SPEECH_KEY')
-        speech_region = os.environ.get('SPEECH_REGION')
+        speech_key = os.environ.get('AZURE_AI_SPEECH_KEY')
+        speech_region = os.environ.get('AZURE_AI_SPEECH_REGION')
 
-        if not os.environ.get('SPEECH_KEY'):
-            logger.error("No SPEECH_KEY environment variable found.")
-            return
-        if not os.environ.get('SPEECH_REGION'):
-            logger.error("No SPEECH_REGION environment variable found.")
+        if not speech_key or not speech_region:
+            logger.error("AZURE_AI_SPEECH_KEY or AZURE_AI_SPEECH_REGION environment variables not found.")
             return
 
         try:

@@ -7,13 +7,14 @@
 from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QInputDialog, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon, QAction
+
+import os, time
+
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
-import os, time
-
 from gui.assistant_client_manager import AssistantClientManager
 from gui.utils import resource_path
 
