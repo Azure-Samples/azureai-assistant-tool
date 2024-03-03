@@ -212,7 +212,8 @@ class ConversationThreadClient:
             thread_name : str,
             file_paths : Optional[list] = None,
             additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None
+            timeout : Optional[float] = None,
+            metadata : Optional[dict] = None
     ) -> None:
         """
         Creates a new assistant thread message.
@@ -243,6 +244,7 @@ class ConversationThreadClient:
             self._ai_client.beta.threads.messages.create(
                 thread_id,
                 role="user",
+                metadata=metadata,
                 content=message,
                 file_ids=file_ids,
                 timeout=timeout
