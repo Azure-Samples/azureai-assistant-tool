@@ -187,8 +187,11 @@ class ConversationThreadClient:
                 sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
                 if sender_name is None:
                     sender_name = "assistant"
-            else:
-                sender_name = "user"
+            if message.role == "user":
+                if message.metadata:
+                    sender_name = message.metadata.get("chat_assistant", "assistant")
+                else:
+                    sender_name = "user"
 
             for content_item in message.content:
                 if isinstance(content_item, MessageContentText):
