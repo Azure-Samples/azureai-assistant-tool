@@ -214,7 +214,8 @@ class ChatAssistantClient:
             self, 
             thread_name : str,
             additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None
+            timeout : Optional[float] = None,
+            stream: Optional[bool] = False
     ) -> None:
         """
         Process the messages in given thread.
@@ -256,73 +257,15 @@ class ChatAssistantClient:
                 messages=self._messages,
                 tools=self._tools,
                 tool_choice=None if self._tools is None else "auto",
-                stream=True,
+                stream=stream,
                 timeout=timeout
             )
 
-            if response:
-                collected_chunks = []
-                collected_messages = []
-                is_first_message = True
-                tool_calls = [ ]
-                index = 0
-                for chunk in response:
-                    if not chunk.choices:
-                        continue
-                    collected_chunks.append(chunk)
-                    delta = chunk.choices[0].delta
-                    if delta.tool_calls != None:
-                        tool_call = delta.tool_calls[0]
-                        index = tool_call.index
-                        if index == len(tool_calls):
-                            tool_calls.append(defaultdict(str))
-                        if tool_call.id:
-                            tool_calls[index]['id'] = tool_call.id
-                        if tool_call.function:
-                            if tool_call.function.name:
-                                tool_calls[index]['name'] = tool_call.function.name
-                            if tool_call.function.arguments:
-                                tool_calls[index]['arguments'] += (tool_call.function.arguments)
-                    if delta.content:
-                        chunk_message = delta.content
-                        collected_messages.append(chunk_message)
-                        self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, chunk_message)
-                        is_first_message = False
+            if response and stream:
+                self._handle_streaming_response(response, conversation_thread_client, thread_name, run_id)
+            elif response:
+                self._handle_non_streaming_response(response, conversation_thread_client, thread_name, run_id)
 
-                for tool_call in tool_calls:
-                    function_response = self._handle_function_call(tool_call)
-                    self._callbacks.on_function_call_processed(self._name, run_id, tool_call['name'], tool_call['arguments'], str(function_response))
-                    conversation_thread_client.create_conversation_thread_message(
-                        function_response,
-                        thread_name,
-                        metadata={"chat_assistant": self._name}
-                    )
-
-                # clean None in collected_messages
-                collected_messages = [m for m in collected_messages if m is not None]
-                full_response = ''.join([m for m in collected_messages])
-
-                # extend conversation with assistant's reply
-                if full_response:
-                    conversation_thread_client.create_conversation_thread_message(
-                        full_response,
-                        thread_name,
-                        metadata={"chat_assistant": self._name}
-                    )
-
-            """
-            response_message = response.choices[0].message
-            tool_calls = response_message.tool_calls
-            if tool_calls != None:
-                for tool_call in tool_calls:
-                    function_response = self._handle_function_call(tool_call.function)
-                    self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
-                    conversation_thread_client.create_conversation_thread_message(
-                        function_response,
-                        thread_name,
-                        metadata={"chat_assistant": self._name}
-                    )
-            """
             self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
 
             run_end_time = str(datetime.now())
@@ -335,6 +278,77 @@ class ChatAssistantClient:
             logger.error(f"Error occurred during processing run: {e}")
             raise EngineError(f"Error occurred during processing run: {e}")
 
+    def _handle_non_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
+        response_message = response.choices[0].message
+        if response_message.content:
+            # extend conversation with assistant's reply
+            conversation_thread_client.create_conversation_thread_message(
+                response_message.content,
+                thread_name,
+                metadata={"chat_assistant": self._name}
+            )
+
+        tool_calls = response_message.tool_calls
+        if tool_calls != None:
+            for tool_call in tool_calls:
+                function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
+                self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
+                conversation_thread_client.create_conversation_thread_message(
+                    function_response,
+                    thread_name,
+                    metadata={"chat_assistant": self._name}
+                )
+
+    def _handle_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
+        collected_chunks = []
+        collected_messages = []
+        is_first_message = True
+        tool_calls = [ ]
+        index = 0
+        for chunk in response:
+            if not chunk.choices:
+                continue
+            collected_chunks.append(chunk)
+            delta = chunk.choices[0].delta
+            if delta.tool_calls != None:
+                tool_call = delta.tool_calls[0]
+                index = tool_call.index
+                if index == len(tool_calls):
+                    tool_calls.append(defaultdict(str))
+                if tool_call.id:
+                    tool_calls[index]['id'] = tool_call.id
+                if tool_call.function:
+                    if tool_call.function.name:
+                        tool_calls[index]['name'] = tool_call.function.name
+                    if tool_call.function.arguments:
+                        tool_calls[index]['arguments'] += (tool_call.function.arguments)
+            if delta.content:
+                chunk_message = delta.content
+                collected_messages.append(chunk_message)
+                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, chunk_message)
+                is_first_message = False
+
+        for tool_call in tool_calls:
+            function_response = self._handle_function_call(tool_call['name'], tool_call['arguments'])
+            self._callbacks.on_function_call_processed(self._name, run_id, tool_call['name'], tool_call['arguments'], str(function_response))
+            # extend conversation with assistant's reply for each tool call
+            conversation_thread_client.create_conversation_thread_message(
+                function_response,
+                thread_name,
+                metadata={"chat_assistant": self._name}
+            )
+
+        collected_messages = [m for m in collected_messages if m is not None]
+        full_response = ''.join([m for m in collected_messages])
+
+        # extend conversation with assistant's reply for the full response
+        if full_response:
+            conversation_thread_client.create_conversation_thread_message(
+                full_response,
+                thread_name,
+                metadata={"chat_assistant": self._name}
+            )
+
     def cancel_processing(self) -> None:
         """
         Cancels the processing of the user input.
@@ -344,42 +358,6 @@ class ChatAssistantClient:
         """
         logger.info("User processing run cancellation requested.")
         self._user_input_processing_cancel_requested = True
-
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
-        if tool_calls is None:
-            logger.error("Processing run requires tool call action but no tool calls provided.")
-            self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
-            return False
-
-        tool_outputs = self._process_tool_calls(name, run_id, tool_calls)
-        if not tool_outputs:
-            return False
-
-        self._ai_client.beta.threads.runs.submit_tool_outputs(
-            thread_id=thread_id,
-            run_id=run_id,
-            tool_outputs=tool_outputs,
-            timeout=timeout
-        )
-        return True
-
-    def _process_tool_calls(self, name, run_id, tool_calls):
-        tool_outputs = []
-        for tool_call in tool_calls:
-            start_time = time.time()
-            function_response = self._handle_function_call(tool_call)
-            end_time = time.time()
-            logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
-            logger.info(f"Function response: {function_response}")
-            # call the on_function_call_processed callback
-            self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
-            tool_output = {
-                "tool_call_id": tool_call.id,
-                "output": function_response,
-            }
-            tool_outputs.append(tool_output)
-
-        return tool_outputs
 
     def _update_arguments(self, args):
         """
@@ -398,14 +376,13 @@ class ChatAssistantClient:
                 updated_args[key] = value
         return updated_args
 
-    def _handle_function_call(self, tool_call):
-        logger.info(f"Handling function call: {tool_call['name']} with arguments: {tool_call['arguments']}")
+    def _handle_function_call(self, function_name, function_arguments):
+        logger.info(f"Handling function call: {function_name} with arguments: {function_arguments}")
 
-        function_name = tool_call['name']
         function_to_call = self._functions.get(function_name)
         if function_to_call:
             try:
-                function_args = json.loads(tool_call['arguments'])
+                function_args = json.loads(function_arguments)
             except json.JSONDecodeError:
                 logger.error(f"Function {function_name} has invalid arguments.")
                 return json.dumps({"function_error": function_name, "error": "Invalid JSON arguments."})
@@ -415,27 +392,6 @@ class ChatAssistantClient:
 
             logger.info(f"Calling function: {function_name} with arguments: {function_args}")
             try:
-                function_response = function_to_call(**function_args)
-                return function_response
-            except Exception as e:
-                logger.error(f"Error in function call: {function_name}. Error: {str(e)}")
-                return json.dumps({"function_error": function_name, "error": str(e)})
-        else:
-            logger.error(f"Function: {function_name} is not available.")
-            return json.dumps({"function_error": function_name, "error": "Function is not available."})
-
-    def _call_function(self, function_name, function_args):
-        print(f"Handling function call: {function_name} with arguments: {function_args}")
-        function_to_call = self._functions.get(function_name)
-        if function_to_call:
-            try:
-                # Convert function_args from string to dict if necessary
-                if isinstance(function_args, str):
-                    function_args = json.loads(function_args)
-                
-                # Update the arguments if necessary
-                function_args = self._update_arguments(function_args)
-                print(f"Calling function: {function_name} with arguments: {function_args}")
                 function_response = function_to_call(**function_args)
                 return function_response
             except Exception as e:
