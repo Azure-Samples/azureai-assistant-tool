@@ -260,12 +260,13 @@ class ChatAssistantClient:
 
             response_message = response.choices[0].message
 
-            # extend conversation with assistant's reply
-            conversation_thread_client.create_conversation_thread_message(
-                response_message.content,
-                thread_name,
-                metadata={"chat_assistant": self._name}
-            )
+            if response_message.content:
+                # extend conversation with assistant's reply
+                conversation_thread_client.create_conversation_thread_message(
+                    response_message.content,
+                    thread_name,
+                    metadata={"chat_assistant": self._name}
+                )
 
             tool_calls = response_message.tool_calls
             if tool_calls != None:
@@ -449,6 +450,7 @@ class ChatAssistantClient:
     def _update_tools(self, assistant_config: AssistantConfig):
         logger.info(f"Updating tools for assistant: {assistant_config.name}")
         if assistant_config.selected_functions:
+            self._tools = []
             modified_functions = []
             for function in assistant_config.selected_functions:
                 # Create a copy of the function spec to avoid modifying the original
