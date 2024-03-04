@@ -35,7 +35,7 @@ from gui.assistant_client_manager import AssistantClientManager
 from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
 from gui.conversation import ConversationView
-from gui.signals import AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
+from gui.signals import ConversationAppendChunkSignal, AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
 
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -166,6 +166,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal = ErrorSignal()
         self.conversation_view_clear_signal = ConversationViewClear()
         self.conversation_append_messages_signal = ConversationAppendMessagesSignal()
+        self.conversation_append_chunk_signal = ConversationAppendChunkSignal()
 
         # Connect the signals to slots (methods)
         self.append_conversation_signal.update_signal.connect(self.append_conversation_message)
@@ -180,6 +181,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
         self.conversation_view_clear_signal.update_signal.connect(self.conversation_view.conversationView.clear)
         self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_messages)
+        self.conversation_append_chunk_signal.append_signal.connect(self.conversation_view.append_message_chunk)
 
     def initialize_ui_layout(self):
         # Create a splitter for sidebar and main content
@@ -460,12 +462,17 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             assistant_name, run_identifier, function_name, arguments, response
         )
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message = False, message=None):
         logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier}, status {run_status}, and thread name {thread_name}")
 
         is_current_thread = self.conversation_thread_clients[self.active_ai_client_type].is_current_conversation_thread(thread_name)
         if not is_current_thread:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is not current assistant thread, conversation not updated")
+            return
+
+        if run_status == "streaming":
+            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming, conversation not updated")
+            self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message, is_first_message)
             return
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)

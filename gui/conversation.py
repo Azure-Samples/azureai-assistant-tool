@@ -284,6 +284,27 @@ class ConversationView(QWidget):
         scrollbar.setValue(scrollbar.maximum())
         self.conversationView.update()  # Force the widget to update and redraw
 
+    def append_message_chunk(self, sender, message_chunk, is_start_of_message):
+        # Move cursor to the end for each insertion
+        cursor = self.conversationView.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.conversationView.setTextCursor(cursor)
+
+        # If this is the start of a new message, insert the sender's name in bold
+        if is_start_of_message:
+            cursor.insertHtml(f"<b style='color:black;'>{html.escape(sender)}:</b> ")
+
+        # Insert the message chunk as plain text.
+        escaped_text = html.escape(message_chunk)
+        #print(escaped_text)
+        formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{escaped_text}</span>"
+        cursor.insertHtml(formatted_text)
+
+        # Scroll to the latest update without adding new lines after each chunk.
+        scrollbar = self.conversationView.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        self.conversationView.update()
+
     def format_urls(self, text):
         # Regular expression to match URLs
         url_pattern = r'(https?://\S+)'

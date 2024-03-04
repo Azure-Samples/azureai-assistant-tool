@@ -20,7 +20,7 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.
