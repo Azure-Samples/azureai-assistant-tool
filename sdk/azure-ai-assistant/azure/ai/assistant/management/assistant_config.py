@@ -42,6 +42,7 @@ class AssistantConfig:
         # set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
+        self._assistant_type = config_data.get('assistant_type', 'assistant')
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -269,3 +270,12 @@ class AssistantConfig:
         :type value: str
         """
         self._output_folder_path = value
+
+    @property
+    def assistant_type(self) -> str:
+        """Get the assistant type.
+        
+        :return: The assistant type.
+        :rtype: str
+        """
+        return self._assistant_type

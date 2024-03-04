@@ -25,10 +25,12 @@ class AssistantConfigDialog(QDialog):
     def __init__(
             self, 
             parent=None, 
+            assistant_type : str = "assistant",
             function_config_manager : FunctionConfigManager = None
     ):
         super().__init__(parent)
         self.main_window = parent
+        self.assistant_type = assistant_type
         self.function_config_manager = function_config_manager
 
         self.init_variables()
@@ -216,9 +218,10 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.knowledgeRetrievalCheckBox)
 
         # Enable Code Interpreter checkbox
-        self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
-        self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
-        configLayout.addWidget(self.codeInterpreterCheckBox)
+        if self.assistant_type == "assistant":
+            self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
+            self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
+            configLayout.addWidget(self.codeInterpreterCheckBox)
 
         # Create as new assistant checkbox
         self.createAsNewCheckBox = QCheckBox("Create as New Assistant")
@@ -226,20 +229,20 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.createAsNewCheckBox)
 
         # Code Interpreter Output Folder Path
-        self.codeInterpreterFolderPathLabel = QLabel('Output Folder Path For Files')
-        self.codeInterpreterFolderPathEdit = QLineEdit()
+        self.outputFolderPathLabel = QLabel('Output Folder Path For Files')
+        self.outputFolderPathEdit = QLineEdit()
         
-        self.codeInterpreterFolderPathEdit.setText(self.default_output_folder_path)
-        self.codeInterpreterFolderPathButton = QPushButton('Select Folder...')
-        self.codeInterpreterFolderPathButton.clicked.connect(self.select_output_folder_path)
+        self.outputFolderPathEdit.setText(self.default_output_folder_path)
+        self.outputFolderPathButton = QPushButton('Select Folder...')
+        self.outputFolderPathButton.clicked.connect(self.select_output_folder_path)
 
         # Adding the output folder path widgets to the layout
-        codeInterpreterFolderPathLayout = QHBoxLayout()
-        codeInterpreterFolderPathLayout.addWidget(self.codeInterpreterFolderPathEdit)
-        codeInterpreterFolderPathLayout.addWidget(self.codeInterpreterFolderPathButton)
+        outputFolderPathLayout = QHBoxLayout()
+        outputFolderPathLayout.addWidget(self.outputFolderPathEdit)
+        outputFolderPathLayout.addWidget(self.outputFolderPathButton)
         
-        configLayout.addWidget(self.codeInterpreterFolderPathLabel)
-        configLayout.addLayout(codeInterpreterFolderPathLayout)
+        configLayout.addWidget(self.outputFolderPathLabel)
+        configLayout.addLayout(outputFolderPathLayout)
 
         # Save Button
         self.saveButton = QPushButton('Save Configuration')
@@ -283,7 +286,7 @@ class AssistantConfigDialog(QDialog):
             self.is_create = True
             self.nameEdit.setEnabled(True)
             self.createAsNewCheckBox.setEnabled(False)
-            self.codeInterpreterFolderPathEdit.setText(self.default_output_folder_path)
+            self.outputFolderPathEdit.setText(self.default_output_folder_path)
         # if selected_assistant is not empty string, load the assistant config
         elif selected_assistant != "":
             self.is_create = False
@@ -308,8 +311,9 @@ class AssistantConfigDialog(QDialog):
         self.selected_functions = []
         self.knowledge_retrieval = False
         self.code_interpreter = False
-        self.codeInterpreterCheckBox.setChecked(False)
-        self.codeInterpreterFolderPathEdit.clear()
+        if self.assistant_type == "assistant":
+            self.codeInterpreterCheckBox.setChecked(False)
+        self.outputFolderPathEdit.clear()
         self.assistant_config = None
 
     def create_instructions_tab(self):
@@ -356,7 +360,7 @@ class AssistantConfigDialog(QDialog):
         options = QFileDialog.Options()
         folderPath = QFileDialog.getExistingDirectory(self, "Select Output Folder", "", options=options)
         if folderPath:
-            self.codeInterpreterFolderPathEdit.setText(folderPath)
+            self.outputFolderPathEdit.setText(folderPath)
 
     def toggle_mic(self):
         if self.is_mic_on:
@@ -437,12 +441,13 @@ class AssistantConfigDialog(QDialog):
             self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
-            # enable code interpreter checkbox
-            self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
+            if self.assistant_type == "assistant":
+                # enable code interpreter checkbox
+                self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
-                self.codeInterpreterFolderPathEdit.setText(output_folder_path)
+                self.outputFolderPathEdit.setText(output_folder_path)
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -507,8 +512,9 @@ class AssistantConfigDialog(QDialog):
             'selected_functions': self.selected_functions,
             'knowledge_retrieval': self.knowledge_retrieval,
             'code_interpreter': self.code_interpreter,
-            'output_folder_path': self.codeInterpreterFolderPathEdit.text(),
-            'ai_client_type': self.aiClientComboBox.currentText()
+            'output_folder_path': self.outputFolderPathEdit.text(),
+            'ai_client_type': self.aiClientComboBox.currentText(),
+            'assistant_type': self.assistant_type
         }
         # if name, instructions, and model are empty, show an error message
         if not config['name'] or not config['instructions'] or not config['model']:

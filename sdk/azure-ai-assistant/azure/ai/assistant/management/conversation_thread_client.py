@@ -190,6 +190,7 @@ class ConversationThreadClient:
             if message.role == "user":
                 if message.metadata:
                     sender_name = message.metadata.get("chat_assistant", "assistant")
+                    message.role = "assistant"
                 else:
                     sender_name = "user"
 

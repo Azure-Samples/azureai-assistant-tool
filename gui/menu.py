@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 from gui.directives_dialogs import DirectivesDialog
@@ -31,9 +32,13 @@ class AssistantsMenu:
     def create_assistants_menu(self):
         self.assistantActions = {}
         
-        createAction = QAction('Create New / Edit', self.main_window)
-        createAction.triggered.connect(self.create_new_edit_assistant)
-        self.assistants_menu.addAction(createAction)
+        createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
+        createAssistantAction.triggered.connect(self.create_new_edit_assistant)
+        self.assistants_menu.addAction(createAssistantAction)
+
+        createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
+        createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
+        self.assistants_menu.addAction(createChatAssistantAction)
 
         # Add an action for exporting an assistant
         exportAction = QAction('Export', self.main_window)
@@ -41,12 +46,24 @@ class AssistantsMenu:
         self.assistants_menu.addAction(exportAction)
 
     def create_new_edit_assistant(self):
-        dialog = AssistantConfigDialog(self.main_window, self.function_config_manager)
+        dialog = AssistantConfigDialog(parent=self.main_window, function_config_manager=self.function_config_manager)
         if dialog.exec_() == QDialog.Accepted:
             try:
                 assistant_config_json = dialog.assistant_config_json
                 ai_client_type = dialog.ai_client_type
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+                self.main_window.conversation_sidebar.load_assistant_list(ai_client_type)
+            except Exception as e:
+                QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating the assistant: {e}")
+
+    def create_new_edit_chat_assistant(self):
+        dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", function_config_manager=self.function_config_manager)
+        if dialog.exec_() == QDialog.Accepted:
+            try:
+                assistant_config_json = dialog.assistant_config_json
+                ai_client_type = dialog.ai_client_type
+                assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
                 self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
                 self.main_window.conversation_sidebar.load_assistant_list(ai_client_type)
             except Exception as e:

@@ -399,7 +399,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
 
                 # Send the user input to the assistant client
-                assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
+                assistant_client = self.assistant_client_manager.get_client(assistant_name)
                 if assistant_client is not None:
                     start_time = time.time()
                     assistant_client.process_messages(thread_name, additional_instructions, timeout=self.connection_timeout)

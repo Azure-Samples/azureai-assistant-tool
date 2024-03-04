@@ -3,6 +3,7 @@
 
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -24,6 +25,8 @@ class ChatAssistantClient:
 
     :param config_json: The configuration data to use to create the chat client.
     :type config_json: str
+    :param callbacks: The callbacks to use for the assistant client.
+    :type callbacks: Optional[AssistantClientCallbacks]
     :param is_create: A flag to indicate if the assistant client is being created.
     :type is_create: bool
     :param timeout: The HTTP request timeout in seconds.
@@ -32,6 +35,7 @@ class ChatAssistantClient:
     def __init__(
             self, 
             config_json: str,
+            callbacks: Optional[AssistantClientCallbacks] = None,
             is_create: bool = True,
             timeout: Optional[float] = None
         ) -> None:
@@ -65,9 +69,10 @@ class ChatAssistantClient:
             self._name = config_data["name"]
             client_factory = AIClientFactory.get_instance()
             self._ai_client: Union[OpenAI, AzureOpenAI] = client_factory.get_client(self._ai_client_type)
+            self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
             self._functions = {}
             self._user_input_processing_cancel_requested = False
-            self._tools = []
+            self._tools = None
             self._messages = []
 
             # Initialize the assistant client (create or update)
@@ -84,6 +89,7 @@ class ChatAssistantClient:
     def from_json(
         cls, 
         config_json : str,
+        callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "ChatAssistantClient":
         """
@@ -91,6 +97,8 @@ class ChatAssistantClient:
 
         :param config_json: The configuration data to use to create the chat client.
         :type config_json: str
+        :param callbacks: The callbacks to use for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
 
@@ -101,9 +109,9 @@ class ChatAssistantClient:
             # check if config_json contains assistant_id which is not null or empty, if so, set is_create to False
             config_data = json.loads(config_json)
             if "assistant_id" in config_data and config_data["assistant_id"]:
-                return ChatAssistantClient(config_json=config_json, is_create=False, timeout=timeout)
+                return ChatAssistantClient(config_json=config_json, callbacks=callbacks, is_create=False, timeout=timeout)
             else:
-                return ChatAssistantClient(config_json=config_json, is_create=True, timeout=timeout)
+                return ChatAssistantClient(config_json=config_json, callbacks=callbacks, is_create=True, timeout=timeout)
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -112,6 +120,7 @@ class ChatAssistantClient:
     def from_config(
         cls, 
         config: AssistantConfig, 
+        callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "ChatAssistantClient":
         """
@@ -119,6 +128,8 @@ class ChatAssistantClient:
 
         :param config: The configuration to use to create the assistant client.
         :type config: AssistantConfig
+        :param callbacks: The callbacks to use for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
 
@@ -128,9 +139,9 @@ class ChatAssistantClient:
         try:
             # check if config contains assistant_id which is not null or empty, if so, set is_create to False
             if config.assistant_id:
-                return ChatAssistantClient(config.to_json(), is_create=False, timeout=timeout)
+                return ChatAssistantClient(config.to_json(), callbacks, is_create=False, timeout=timeout)
             else:
-                return ChatAssistantClient(config.to_json(), is_create=True, timeout=timeout)
+                return ChatAssistantClient(config.to_json(), callbacks, is_create=True, timeout=timeout)
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")
@@ -144,6 +155,8 @@ class ChatAssistantClient:
         try:
             # Create or update the assistant
             assistant_config = AssistantConfig.from_dict(config_data)
+            if is_create:
+                assistant_config.assistant_id = str(uuid.uuid4())
             self._messages = [{"role": "system", "content": assistant_config.instructions}]
             self._update_tools(assistant_config)
             self._load_selected_functions(assistant_config)
@@ -194,7 +207,7 @@ class ChatAssistantClient:
         self._user_input_processing_cancel_requested = False
         self._ai_client_type = None
         self._name = None
-        self._tools = []
+        self._tools = None
 
     def process_messages(
             self, 
@@ -231,17 +244,18 @@ class ChatAssistantClient:
             self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
 
             conversation = conversation_thread_client.retrieve_conversation(thread_name)
-            for message in conversation.text_messages:
+            for message in reversed(conversation.text_messages):
                 if message.role == "user":
                     self._messages.append({"role": "user", "content": message.content})
                 if message.role == "assistant":
                     self._messages.append({"role": "assistant", "content": message.content})
 
             response = self._ai_client.chat.completions.create(
-                model="gpt-4-1106-preview",
+                model=assistant_config.model,
                 messages=self._messages,
                 tools=self._tools,
-                tool_choice="auto"
+                tool_choice=None if self._tools is None else "auto",
+                timeout=timeout
             )
 
             response_message = response.choices[0].message
@@ -253,20 +267,24 @@ class ChatAssistantClient:
                 metadata={"chat_assistant": self._name}
             )
 
-            """
             tool_calls = response_message.tool_calls
             if tool_calls != None:
                 for tool_call in tool_calls:
                     function_response = self._handle_function_call(tool_call)
-                    self._messages.append(
-                        {
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": tool_call.function.name,
-                            "content": function_response,
-                        }
+                    self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
+                    conversation_thread_client.create_conversation_thread_message(
+                        function_response,
+                        thread_name,
+                        metadata={"chat_assistant": self._name}
                     )
-            """
+
+            self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
+
+            run_end_time = str(datetime.now())
+            self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
+
+            # clear the messages for other than system messages
+            self._messages = [{"role": "system", "content": assistant_config.instructions}]
 
         except Exception as e:
             logger.error(f"Error occurred during processing run: {e}")
@@ -440,6 +458,8 @@ class ChatAssistantClient:
                     del modified_function["function"]["module"]
                 modified_functions.append(modified_function)
             self._tools.extend(modified_functions)
+        else:
+            self._tools = None
 
     @property
     def name(self) -> str:
