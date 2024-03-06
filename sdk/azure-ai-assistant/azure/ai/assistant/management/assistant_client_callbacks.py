@@ -31,6 +31,10 @@ class AssistantClientCallbacks:
         :type run_status: str
         :param thread_name: The name of the thread.
         :type thread_name: str
+        :param is_first_message: Whether the message is the first message, defaults to False, used when status is "streaming"
+        :type is_first_message: bool, optional
+        :param message: The partial message during the run, defaults to None. Used when status is "streaming"
+        :type message: str, optional
 
         :return: None
         :rtype: None

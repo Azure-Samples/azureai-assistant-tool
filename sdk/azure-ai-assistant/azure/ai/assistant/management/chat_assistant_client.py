@@ -226,6 +226,8 @@ class ChatAssistantClient:
         :type additional_instructions: Optional[str]
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
+        :param stream: A flag to indicate if the response should be streamed.
+        :type stream: Optional[bool]
 
         :return: None
         :rtype: None
@@ -239,6 +241,9 @@ class ChatAssistantClient:
 
         try:
             logger.info(f"Process messages for chat assistant: {assistant_id} and thread: {thread_id}")
+
+            if additional_instructions:
+                self._messages.append({"role": "system", "content": additional_instructions})
 
             # call the start_run callback
             run_start_time = str(datetime.now())

@@ -471,7 +471,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return
 
         if run_status == "streaming":
-            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming, conversation not updated")
+            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
             self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message, is_first_message)
             return
 
