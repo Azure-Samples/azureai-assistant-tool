@@ -255,12 +255,15 @@ class AssistantConfigDialog(QDialog):
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
-        assistant_names = AssistantConfigManager.get_instance().get_assistant_names_by_client_type(self.ai_client_type.name)
+        assistant_config_manager = AssistantConfigManager.get_instance()
+        assistant_names = assistant_config_manager.get_assistant_names_by_client_type(self.ai_client_type.name)
 
         self.assistantComboBox.clear()
         self.assistantComboBox.insertItem(0, "New Assistant")
         for assistant_name in assistant_names:
-            self.assistantComboBox.addItem(assistant_name)
+            assistant_config = assistant_config_manager.get_config(assistant_name)
+            if assistant_config.assistant_type == self.assistant_type:
+                self.assistantComboBox.addItem(assistant_name)
         self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
         self.modelComboBox.clear()
