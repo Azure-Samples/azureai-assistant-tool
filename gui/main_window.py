@@ -46,7 +46,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             'ai_client_type': '',
             'chat_completion': '',
         }
-        self.connection_timeout : float = 30.0
+        self.connection_timeout : float = 90.0
         self.use_chat_completion_for_thread_name : bool = False
         self.user_text_summarization_in_synthesis : bool = False
         self.in_background = False

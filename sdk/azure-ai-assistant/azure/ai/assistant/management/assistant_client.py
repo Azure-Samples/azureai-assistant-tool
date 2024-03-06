@@ -379,6 +379,7 @@ class AssistantClient:
             # call the start_run callback
             run_start_time = str(datetime.now())
             self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
+            self._user_input_processing_cancel_requested = False
 
             while True:
                 time.sleep(0.5)

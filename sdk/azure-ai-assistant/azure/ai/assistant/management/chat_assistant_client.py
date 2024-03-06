@@ -252,8 +252,16 @@ class ChatAssistantClient:
                 if message.role == "assistant":
                     self._messages.append({"role": "assistant", "content": message.content})
 
-            continue_loop = True
-            while continue_loop:
+            continue_processing = True
+            self._user_input_processing_cancel_requested = False
+
+            while continue_processing:
+
+                if self._user_input_processing_cancel_requested:
+                    logger.info("User input processing cancellation requested.")
+                    self._user_input_processing_cancel_requested = False
+                    break
+
                 response = self._ai_client.chat.completions.create(
                     model=assistant_config.model,
                     messages=self._messages,
@@ -264,12 +272,12 @@ class ChatAssistantClient:
                 )
 
                 if response and stream:
-                    continue_loop = self._handle_streaming_response(response, conversation_thread_client, thread_name, run_id)
+                    continue_processing = self._handle_streaming_response(response, conversation_thread_client, thread_name, run_id)
                 elif response:
-                    continue_loop = self._handle_non_streaming_response(response, conversation_thread_client, thread_name, run_id)
+                    continue_processing = self._handle_non_streaming_response(response, conversation_thread_client, thread_name, run_id)
                 else:
                     # If there's no response, stop the loop
-                    continue_loop = False
+                    continue_processing = False
 
             self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
 
@@ -285,6 +293,8 @@ class ChatAssistantClient:
 
     def _handle_non_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
         response_message = response.choices[0].message
+        self._messages.append(response_message)
+
         if response_message.content:
             # extend conversation with assistant's reply
             conversation_thread_client.create_conversation_thread_message(
@@ -292,17 +302,22 @@ class ChatAssistantClient:
                 thread_name,
                 metadata={"chat_assistant": self._name}
             )
+            return False
 
         tool_calls = response_message.tool_calls
         if tool_calls != None:
             for tool_call in tool_calls:
                 function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
                 self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
-                conversation_thread_client.create_conversation_thread_message(
-                    function_response,
-                    thread_name,
-                    metadata={"chat_assistant": self._name}
+                self._messages.append(
+                    {
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": tool_call.function.name,
+                        "content": function_response,
+                    }
                 )
+            return True
 
     def _handle_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
         tool_calls = []
@@ -314,8 +329,6 @@ class ChatAssistantClient:
                 continue
 
             delta = chunk.choices[0].delta
-            print(f"Delta: {delta}")
-
             if delta and delta.content:
                 chunk_message = delta.content
                 collected_messages.append(chunk_message)
@@ -337,7 +350,7 @@ class ChatAssistantClient:
                         tc["function"]["arguments"] += tcchunk.function.arguments
 
         if tool_calls:
-            print(f"Tool calls: {tool_calls}")
+            logger.info(f"Tool calls: {tool_calls}")
             self._messages.append(
                 {
                     "tool_calls": tool_calls,
@@ -359,7 +372,7 @@ class ChatAssistantClient:
             )
 
         if tool_calls:
-            print("Do new chat completion request with function responses")
+            logger.info("Tool calls processed, return True and continue the loop")
             return True
 
         collected_messages = [m for m in collected_messages if m is not None]
@@ -372,60 +385,8 @@ class ChatAssistantClient:
                 thread_name,
                 metadata={"chat_assistant": self._name}
             )
-        print("No more tool calls, return False and exit the loop")
+        logger.info("No tool calls, return False and stop the loop")
         return False
-
-    """
-    def _handle_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
-        collected_chunks = []
-        collected_messages = []
-        is_first_message = True
-        tool_calls = [ ]
-        index = 0
-        for chunk in response:
-            if not chunk.choices:
-                continue
-            collected_chunks.append(chunk)
-            delta = chunk.choices[0].delta
-            if delta.tool_calls != None:
-                tool_call = delta.tool_calls[0]
-                index = tool_call.index
-                if index == len(tool_calls):
-                    tool_calls.append(defaultdict(str))
-                if tool_call.id:
-                    tool_calls[index]['id'] = tool_call.id
-                if tool_call.function:
-                    if tool_call.function.name:
-                        tool_calls[index]['name'] = tool_call.function.name
-                    if tool_call.function.arguments:
-                        tool_calls[index]['arguments'] += (tool_call.function.arguments)
-            if delta.content:
-                chunk_message = delta.content
-                collected_messages.append(chunk_message)
-                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, chunk_message)
-                is_first_message = False
-
-        for tool_call in tool_calls:
-            function_response = self._handle_function_call(tool_call['name'], tool_call['arguments'])
-            self._callbacks.on_function_call_processed(self._name, run_id, tool_call['name'], tool_call['arguments'], str(function_response))
-            # extend conversation with assistant's reply for each tool call
-            conversation_thread_client.create_conversation_thread_message(
-                function_response,
-                thread_name,
-                metadata={"chat_assistant": self._name}
-            )
-
-        collected_messages = [m for m in collected_messages if m is not None]
-        full_response = ''.join([m for m in collected_messages])
-
-        # extend conversation with assistant's reply for the full response
-        if full_response:
-            conversation_thread_client.create_conversation_thread_message(
-                full_response,
-                thread_name,
-                metadata={"chat_assistant": self._name}
-            )
-    """
 
     def cancel_processing(self) -> None:
         """
