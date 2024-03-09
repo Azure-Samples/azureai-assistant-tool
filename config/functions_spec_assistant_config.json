@@ -1,0 +1,15 @@
+{
+    "name": "FunctionSpecAssistant",
+    "instructions": "",
+    "instructions_file": "instructions/function_spec.md",
+    "model": "",
+    "assistant_id": "",
+    "knowledge_files": {},
+    "selected_functions": [],
+    "knowledge_retrieval": false,
+    "code_interpreter": false,
+    "output_folder_path": "",
+    "ai_client_type": "AZURE_OPEN_AI",
+    "assistant_type": "chat_assistant",
+    "assistant_role": "system"
+}

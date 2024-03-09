@@ -27,7 +27,7 @@ from azure.ai.assistant.management.instructions_checker import InstructionsCheck
 from azure.ai.assistant.management.function_creator import FunctionCreator
 from azure.ai.assistant.management.task_request_creator import TaskRequestCreator
 from azure.ai.assistant.management.logger_module import logger
-from gui.menu import AssistantsMenu, FunctionsMenu, GuidelinesMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
+from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.speech_input_handler import SpeechInputHandler
 from gui.speech_synthesis_handler import SpeechSynthesisHandler
@@ -143,7 +143,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.assistants_menu = AssistantsMenu(self)
         self.functions_menu = FunctionsMenu(self)
         self.tasks_menu = TasksMenu(self)
-        self.guidelines_menu = GuidelinesMenu(self)
         self.diagnostics_menu = DiagnosticsMenu(self)
         self.settings_menu = SettingsMenu(self)
 
