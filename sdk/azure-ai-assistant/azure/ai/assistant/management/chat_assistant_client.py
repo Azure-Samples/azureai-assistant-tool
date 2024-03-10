@@ -212,16 +212,19 @@ class ChatAssistantClient:
 
     def process_messages(
             self, 
-            thread_name : str,
-            additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None,
+            thread_name: Optional[str] = None,
+            user_request: Optional[str] = None,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None,
             stream: Optional[bool] = True
-    ) -> None:
+    ) -> Optional[str]:
         """
         Process the messages in given thread.
 
         :param thread_name: The name of the thread to process.
-        :type thread_name: str
+        :type thread_name: Optional[str]
+        :param user_request: The user request to process.
+        :type user_request: Optional[str]
         :param additional_instructions: Additional instructions to provide to the assistant.
         :type additional_instructions: Optional[str]
         :param timeout: The HTTP request timeout in seconds.
@@ -229,18 +232,23 @@ class ChatAssistantClient:
         :param stream: A flag to indicate if the response should be streamed.
         :type stream: Optional[bool]
 
-        :return: None
-        :rtype: None
+        :return: The response from the assistant.
+        :rtype: Optional[str]
         """
+        # Ensure at least one of thread_name or user_request is provided
+        if thread_name is None and user_request is None:
+            raise ValueError("Either thread_name or user_request must be provided.")
+
         assistant_config_manager = AssistantConfigManager.get_instance()
         assistant_config = assistant_config_manager.get_config(self._name)
         assistant_id = assistant_config.assistant_id
-        conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-        threads_config : ConversationThreadConfig = conversation_thread_client.get_config()
-        thread_id = threads_config.get_thread_id_by_name(thread_name)
+        if thread_name:
+            conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            threads_config : ConversationThreadConfig = conversation_thread_client.get_config()
+            thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
-            logger.info(f"Process messages for chat assistant: {assistant_id} and thread: {thread_id}")
+            logger.info(f"Process messages for chat assistant: {assistant_id}")
 
             if additional_instructions:
                 self._messages.append({"role": "system", "content": additional_instructions})
@@ -250,16 +258,20 @@ class ChatAssistantClient:
             run_id = str(uuid.uuid4())
             self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
 
-            conversation = conversation_thread_client.retrieve_conversation(thread_name)
-            for message in reversed(conversation.text_messages):
-                if message.role == "user":
-                    self._messages.append({"role": "user", "content": message.content})
-                if message.role == "assistant":
-                    self._messages.append({"role": "assistant", "content": message.content})
+            if thread_name:
+                conversation = conversation_thread_client.retrieve_conversation(thread_name)
+                for message in reversed(conversation.text_messages):
+                    if message.role == "user":
+                        self._messages.append({"role": "user", "content": message.content})
+                    if message.role == "assistant":
+                        self._messages.append({"role": "assistant", "content": message.content})
+            elif user_request:
+                self._messages.append({"role": "user", "content": user_request})
 
             continue_processing = True
             self._user_input_processing_cancel_requested = False
 
+            response = None
             while continue_processing:
 
                 if self._user_input_processing_cancel_requested:
@@ -277,9 +289,9 @@ class ChatAssistantClient:
                 )
 
                 if response and stream:
-                    continue_processing = self._handle_streaming_response(response, conversation_thread_client, thread_name, run_id)
+                    continue_processing = self._handle_streaming_response(response, thread_name, run_id)
                 elif response:
-                    continue_processing = self._handle_non_streaming_response(response, conversation_thread_client, thread_name, run_id)
+                    continue_processing = self._handle_non_streaming_response(response, thread_name, run_id)
                 else:
                     # If there's no response, stop the loop
                     continue_processing = False
@@ -292,21 +304,26 @@ class ChatAssistantClient:
             # clear the messages for other than system messages
             self._messages = [{"role": "system", "content": assistant_config.instructions}]
 
+            if not stream:
+                return response.choices[0].message.content
+
         except Exception as e:
             logger.error(f"Error occurred during processing run: {e}")
             raise EngineError(f"Error occurred during processing run: {e}")
 
-    def _handle_non_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
+    def _handle_non_streaming_response(self, response, thread_name, run_id):
         response_message = response.choices[0].message
         self._messages.append(response_message)
 
         if response_message.content:
             # extend conversation with assistant's reply
-            conversation_thread_client.create_conversation_thread_message(
-                response_message.content,
-                thread_name,
-                metadata={"chat_assistant": self._name}
-            )
+            if thread_name:
+                conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
+                conversation_thread_client.create_conversation_thread_message(
+                    response_message.content,
+                    thread_name,
+                    metadata={"chat_assistant": self._name}
+                )
             return False
 
         tool_calls = response_message.tool_calls
@@ -324,7 +341,7 @@ class ChatAssistantClient:
                 )
             return True
 
-    def _handle_streaming_response(self, response, conversation_thread_client, thread_name, run_id):
+    def _handle_streaming_response(self, response, thread_name, run_id):
         tool_calls = []
         collected_messages = []
         is_first_message = True
@@ -384,7 +401,8 @@ class ChatAssistantClient:
         full_response = ''.join([m for m in collected_messages])
 
         # extend conversation with assistant's reply for the full response
-        if full_response:
+        if full_response and thread_name:
+            conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
             conversation_thread_client.create_conversation_thread_message(
                 full_response,
                 thread_name,

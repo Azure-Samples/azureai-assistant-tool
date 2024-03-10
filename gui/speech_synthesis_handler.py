@@ -42,7 +42,7 @@ class SpeechSynthesisHandler:
     ):
         self.main_window = main_window
         self.client : OpenAI = main_window.chat_client
-        self.model = main_window.chat_completion_model
+        self.model = main_window.system_assistant_model
         self.complete_signal = complete_signal
         self.is_initialized = False
         speech_key = os.environ.get('AZURE_AI_SPEECH_KEY')

@@ -107,8 +107,8 @@ class AssistantConfigDialog(QDialog):
         ai_client_type_names = [client_type.name for client_type in AIClientType]
         self.aiClientComboBox.addItems(ai_client_type_names)
         # Set the default to what is selected in the main window
-        active_ai_client_type = self.main_window.get_active_ai_client_type()
-        self.aiClientComboBox.setCurrentIndex(ai_client_type_names.index(active_ai_client_type))
+        active_ai_client_type = self.main_window.active_ai_client_type
+        self.aiClientComboBox.setCurrentIndex(ai_client_type_names.index(active_ai_client_type.name))
         # Connect the client selection change signal to the slot
         self.aiClientComboBox.currentIndexChanged.connect(self.ai_client_selection_changed)
         configLayout.addWidget(self.aiClientLabel)

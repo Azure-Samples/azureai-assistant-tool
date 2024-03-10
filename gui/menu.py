@@ -11,7 +11,6 @@ from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
-from gui.directives_dialogs import DirectivesDialog
 from gui.debug_dialog import DebugViewDialog
 from gui.assistant_dialogs import AssistantConfigDialog, ExportAssistantDialog
 from gui.function_dialogs import CreateFunctionDialog, FunctionErrorsDialog
@@ -78,7 +77,6 @@ class FunctionsMenu:
     def __init__(self, main_window):
         self.main_window = main_window
         self.funtionsMenu = self.main_window.menuBar().addMenu('&Functions')
-        self.function_config_manager = FunctionConfigManager.get_instance()
         self.setup_functions_menu()
 
     def setup_functions_menu(self):
@@ -90,11 +88,11 @@ class FunctionsMenu:
         self.funtionsMenu.addAction(editErrorMessagesAction)
 
     def edit_error_messages(self):
-        editor = FunctionErrorsDialog(self.main_window, self.function_config_manager)
+        editor = FunctionErrorsDialog(self.main_window)
         editor.show()
 
     def create_function(self):
-        dialog = CreateFunctionDialog(self.main_window, self.function_config_manager)
+        dialog = CreateFunctionDialog(self.main_window)
         dialog.show()
 
 
@@ -138,7 +136,7 @@ class SettingsMenu:
         self.setup_menu()
 
     def setup_menu(self):
-        chatSettingsAction = QAction("Chat Completion", self.main_window)
+        chatSettingsAction = QAction("System Assistants", self.main_window)
         chatSettingsAction.triggered.connect(lambda: self.show_client_settings())
         self.settingsMenu.addAction(chatSettingsAction)
 
@@ -151,7 +149,7 @@ class SettingsMenu:
         dialog = ClientSettingsDialog(self.main_window)
         if dialog.exec_() == QDialog.Accepted:
             try:
-                self.main_window.initialize_chat_components()
+                self.main_window.init_system_assistants()
             except Exception as e:
                 QMessageBox.warning(self.main_window, "Error", f"An error occurred while updating the settings: {e}")
 

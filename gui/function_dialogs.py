@@ -10,19 +10,54 @@ from PySide6.QtCore import Qt
 import json, re
 import threading
 
+from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
+from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
 
 
 class CreateFunctionDialog(QDialog):
-    def __init__(self, main_window, function_config_manager : FunctionConfigManager):
+    def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.function_config_manager = function_config_manager
+        self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
+        self.assistant_config_manager : AssistantConfigManager = main_window.assistant_config_manager
         self.initUI()
+        self.initFunctionAssistants()
         self.previousSize = self.size()
+
+    def initFunctionAssistants(self):
+        # Load the configs for the function assistants
+        function_spec_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionSpecAssistant")
+        function_impl_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionImplAssistant")
+
+        try:
+            ai_client_type : AIClientType = self.main_window.active_ai_client_type
+            if ai_client_type is None:
+                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, function generation may not work as expected.")
+            else:
+                # update the ai_client_type in the config_json
+                function_spec_config.ai_client_type = ai_client_type.name
+                function_impl_config.ai_client_type = ai_client_type.name
+
+            model = function_spec_config.model
+            if not model:
+                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
+                model = self.main_window.system_assistant_model
+                function_spec_config.model = model
+                function_impl_config.model = model
+            if not model:
+                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
+                return
+
+            self.function_spec_creator = ChatAssistantClient.from_config(function_spec_config)
+            self.function_impl_creator = ChatAssistantClient.from_config(function_impl_config)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
     def initUI(self):
         self.setWindowTitle("Create/Edit Functions")
@@ -230,10 +265,18 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionSpec(self, user_request):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
-                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-                return
-            self.spec_json = self.main_window.function_creator.get_function_spec(user_request)
+            #if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
+            #    self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
+            #    return
+            response = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
+            if response.strip().startswith("```") and response.strip().endswith("```"):
+                # Split the string into lines, remove the first and last line
+                lines = response.strip().split("\n")
+                # Rejoin the lines without the first and last one (which are the backticks)
+                self.spec_json = "\n".join(lines[1:-1])
+            else:
+                # If no triple backticks are found, the response is unchanged
+                self.spec_json = response
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
         finally:
@@ -247,10 +290,12 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionImpl(self, user_request, spec_json):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
-                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-                return
-            func_impl = self.main_window.function_creator.get_function_impl(user_request, spec_json)
+            #if not hasattr(self.main_window, 'function _creator') or self.main_window.function_creator is None:
+            #    self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
+            #    return
+            #func_impl = self.main_window.function_creator.get_function_impl(user_request, spec_json)
+            request = user_request + " that follows the following spec: " + spec_json
+            func_impl = self.function_impl_creator.process_messages(user_request=request, stream=False)
             self.code = self.extract_python_code(func_impl)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function implementation: {e}")
@@ -346,10 +391,10 @@ class CreateFunctionDialog(QDialog):
 
 
 class FunctionErrorsDialog(QDialog):
-    def __init__(self, main_window, function_config_manager : FunctionConfigManager):
+    def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.function_config_manager = function_config_manager
+        self.function_config_manager = main_window.function_config_manager
         self.error_specs = {}
         self.loadErrorSpecs()
         self.initUI()

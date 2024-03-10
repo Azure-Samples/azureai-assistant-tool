@@ -565,8 +565,8 @@ class ScheduleTaskDialog(QDialog):
 
         # Assistant selection
         self.assistant_selection = QComboBox()
-        ai_client_type = self.main_window.get_active_ai_client_type()
-        assistants = self.main_window.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type)
+        ai_client_type = self.main_window.active_ai_client_type
+        assistants = self.main_window.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
         self.assistant_selection.addItems(assistants)
         layout.addWidget(QLabel("Select Assistant:"))
         layout.addWidget(self.assistant_selection)
