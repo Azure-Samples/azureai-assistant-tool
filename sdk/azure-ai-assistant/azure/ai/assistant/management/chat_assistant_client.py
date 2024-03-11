@@ -216,7 +216,9 @@ class ChatAssistantClient:
             user_request: Optional[str] = None,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = True
+            stream: Optional[bool] = True,
+            temperature: Optional[float] = None,
+            seed: Optional[int] = None
     ) -> Optional[str]:
         """
         Process the messages in given thread.
@@ -285,6 +287,8 @@ class ChatAssistantClient:
                     tools=self._tools,
                     tool_choice=None if self._tools is None else "auto",
                     stream=stream,
+                    temperature=temperature,
+                    seed=seed,
                     timeout=timeout
                 )
 

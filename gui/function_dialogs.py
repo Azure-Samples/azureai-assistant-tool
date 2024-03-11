@@ -26,14 +26,13 @@ class CreateFunctionDialog(QDialog):
         self.main_window = main_window
         self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
         self.assistant_config_manager : AssistantConfigManager = main_window.assistant_config_manager
-        self.initUI()
-        self.initFunctionAssistants()
+        self.init_UI()
+        self.init_function_assistants()
         self.previousSize = self.size()
 
-    def initFunctionAssistants(self):
-        # Load the configs for the function assistants
-        function_spec_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionSpecAssistant")
-        function_impl_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionImplAssistant")
+    def init_function_assistants(self):
+        function_spec_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionSpecCreator")
+        function_impl_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionImplCreator")
 
         try:
             ai_client_type : AIClientType = self.main_window.active_ai_client_type
@@ -59,7 +58,7 @@ class CreateFunctionDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
-    def initUI(self):
+    def init_UI(self):
         self.setWindowTitle("Create/Edit Functions")
         self.resize(800, 900)
 

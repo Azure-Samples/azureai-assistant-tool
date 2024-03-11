@@ -23,8 +23,6 @@ from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCall
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.conversation_title_creator import ConversationTitleCreator
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
-from azure.ai.assistant.management.instructions_checker import InstructionsChecker
-from azure.ai.assistant.management.task_request_creator import TaskRequestCreator
 from azure.ai.assistant.management.logger_module import logger
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
@@ -73,8 +71,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def initialize_system_components(self):
         try:
             self.conversation_title_creator = ConversationTitleCreator(self.system_client, self.system_assistant_model)
-            self.instructions_checker = InstructionsChecker(self.system_client, self.system_assistant_model)
-            self.task_request_creator = TaskRequestCreator(self.system_client, self.system_assistant_model)
             self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
         except Exception as e:
             error_message = f"An error occurred while initializing the chat components: {e}"

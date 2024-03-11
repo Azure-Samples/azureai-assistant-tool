@@ -8,8 +8,11 @@ from PySide6.QtWidgets import QDialog, QComboBox, QFrame, QTabWidget, QScrollAre
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtGui import QColor, QPalette, QIntValidator
 
-import json, os, threading
+import json, os, threading, ast
 
+from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.task import BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.logger_module import logger
@@ -22,6 +25,7 @@ class CreateTaskDialog(QDialog):
         super().__init__(main_window)
 
         self.main_window = main_window
+        self.assistant_config_manager = main_window.assistant_config_manager
         self.task_manager = task_manager
         self.config_folder = config_folder
         self.request_list = []
@@ -78,6 +82,31 @@ class CreateTaskDialog(QDialog):
         self.basic_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.basic_task_selector))
         self.batch_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.batch_task_selector))
         self.multi_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.multi_task_selector))
+        self.init_task_assistant()
+
+    def init_task_assistant(self):
+        task_request_config : AssistantConfig = self.assistant_config_manager.get_config("TaskRequestsCreator")
+
+        try:
+            ai_client_type : AIClientType = self.main_window.active_ai_client_type
+            if ai_client_type is None:
+                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, task request generation may not work as expected.")
+            else:
+                # update the ai_client_type in the config_json
+                task_request_config.ai_client_type = ai_client_type.name
+
+            model = task_request_config.model
+            if not model:
+                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
+                model = self.main_window.system_assistant_model
+                task_request_config.model = model
+            if not model:
+                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
+                return
+
+            self.task_requests_creator = ChatAssistantClient.from_config(task_request_config)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
     def start_processing(self, status):
         self.status_bar.start_animation(status)
@@ -85,7 +114,14 @@ class CreateTaskDialog(QDialog):
     def stop_processing(self, status):
         self.status_bar.stop_animation(status)
         self.requests_list.clear()
-        self.requests_list.setText('\n'.join(self.request_list))
+        try:
+            # Convert the string representation of the list back to a list
+            actual_list = ast.literal_eval(self.request_list)
+            # Join the list items into a single string with each item on a new line
+            requests_text = "\n".join(actual_list)
+            self.requests_list.setText(requests_text)
+        except Exception as e:
+            self.requests_list.setText(self.request_list)
         
     def on_tab_changed(self, index):
         # Update dropdowns based on the selected tab
@@ -373,33 +409,14 @@ class CreateTaskDialog(QDialog):
                 error_message = "Please add at least one source folder."
                 raise Exception(error_message)
 
-            if not self.user_request_batch.toPlainText():
+            user_request = self.user_request_batch.toPlainText()
+            if not user_request:
                 error_message = "Please enter a request."
                 raise Exception(error_message)
 
-            if not hasattr(self.main_window, 'task_request_creator') or self.main_window.task_request_creator is None:
-                self.error_signal.error_signal.emit("Task request creator not initialized, please check chat completion settings.")
-                return
-            input_file_type = self.main_window.task_request_creator.get_input_file_type(self.user_request_batch.toPlainText())
-            # remove single quotes from input file type if there is any
-            input_file_type = input_file_type.replace("'", "")
-            if input_file_type.startswith("Error"):
-                error_message = f"An error occurred while getting input file type: {input_file_type}"
-                raise Exception(error_message)
-
-            # create list of files from given input folders and input file type
-            input_files = []
-            for folder in [self.src_folders_list.item(i).text() for i in range(self.src_folders_list.count())]:
-                for file_name in os.listdir(folder):
-                    if file_name.endswith(f".{input_file_type}"):
-                        input_files.append(os.path.join(folder, file_name))
-
-            # validate input files contains valid file paths
-            if not input_files:
-                error_message = "No valid input files found. Please check the source folders and input file type."
-                raise Exception(error_message)
-
-            self.request_list = self.main_window.task_request_creator.create_request_list(self.user_request_batch.toPlainText(), input_files)
+            folders_list = [self.src_folders_list.item(i).text() for i in range(self.src_folders_list.count())]
+            user_request = user_request + " Input folders:" + " ".join(folders_list)
+            self.request_list = self.task_requests_creator.process_messages(user_request=user_request, stream=False, temperature=0.2)
 
         except Exception as e:
             self.error_signal.error_signal.emit(str(e))
