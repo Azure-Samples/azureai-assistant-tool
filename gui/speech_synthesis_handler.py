@@ -41,7 +41,7 @@ class SpeechSynthesisHandler:
                  complete_signal=None
     ):
         self.main_window = main_window
-        self.client : OpenAI = main_window.chat_client
+        self.client : OpenAI = main_window.system_client
         self.model = main_window.system_assistant_model
         self.complete_signal = complete_signal
         self.is_initialized = False

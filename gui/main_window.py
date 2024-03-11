@@ -24,7 +24,6 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.conversation_title_creator import ConversationTitleCreator
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.instructions_checker import InstructionsChecker
-#from azure.ai.assistant.management.function_creator import FunctionCreator
 from azure.ai.assistant.management.task_request_creator import TaskRequestCreator
 from azure.ai.assistant.management.logger_module import logger
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
@@ -63,6 +62,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def deferred_init(self):
         try:
             self.init_system_assistants()
+            self.initialize_system_components()
             self.initialize_assistant_components()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
         except Exception as e:
@@ -70,13 +70,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
-    def initialize_chat_components(self):
+    def initialize_system_components(self):
         try:
-            self.init_system_assistants()
-            self.conversation_title_creator = ConversationTitleCreator(self.chat_client, self.system_assistant_model)
-            self.instructions_checker = InstructionsChecker(self.chat_client, self.system_assistant_model)
-            #self.function_creator = FunctionCreator(self.chat_client, self.system_assistant_model)
-            self.task_request_creator = TaskRequestCreator(self.chat_client, self.system_assistant_model)
+            self.conversation_title_creator = ConversationTitleCreator(self.system_client, self.system_assistant_model)
+            self.instructions_checker = InstructionsChecker(self.system_client, self.system_assistant_model)
+            self.task_request_creator = TaskRequestCreator(self.system_client, self.system_assistant_model)
             self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
         except Exception as e:
             error_message = f"An error occurred while initializing the chat components: {e}"
@@ -114,12 +112,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.system_assistant_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
         api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
         if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
-            self.chat_client = AIClientFactory.get_instance().get_client(
+            self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.AZURE_OPEN_AI,
                 api_version=api_version
             )
         elif ai_client_type == AIClientType.OPEN_AI.name:
-            self.chat_client = AIClientFactory.get_instance().get_client(
+            self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.OPEN_AI
             )
 

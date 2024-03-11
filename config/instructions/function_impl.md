@@ -29,3 +29,4 @@ def new_user_function(directory):
 ```
 6. Ensure your function handles errors gracefully and returns a clear error message in case of exceptions.
 7. Ensure function returns result using json.dumps() and where 'result' is key and its value is the result.
+8. The end result must be only code and must not contain triple backtics, otherwise, it is considered a failure.

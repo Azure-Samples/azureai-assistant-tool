@@ -265,18 +265,7 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionSpec(self, user_request):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            #if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
-            #    self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-            #    return
-            response = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
-            if response.strip().startswith("```") and response.strip().endswith("```"):
-                # Split the string into lines, remove the first and last line
-                lines = response.strip().split("\n")
-                # Rejoin the lines without the first and last one (which are the backticks)
-                self.spec_json = "\n".join(lines[1:-1])
-            else:
-                # If no triple backticks are found, the response is unchanged
-                self.spec_json = response
+            self.spec_json = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
         finally:
@@ -290,26 +279,12 @@ class CreateFunctionDialog(QDialog):
     def _generateFunctionImpl(self, user_request, spec_json):
         try:
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            #if not hasattr(self.main_window, 'function _creator') or self.main_window.function_creator is None:
-            #    self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-            #    return
-            #func_impl = self.main_window.function_creator.get_function_impl(user_request, spec_json)
             request = user_request + " that follows the following spec: " + spec_json
-            func_impl = self.function_impl_creator.process_messages(user_request=request, stream=False)
-            self.code = self.extract_python_code(func_impl)
+            self.code = self.function_impl_creator.process_messages(user_request=request, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function implementation: {e}")
         finally:
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
-
-    def extract_python_code(self, text):
-        # Regular expression pattern to find code blocks
-        pattern = r"```python\s+(.*?)```"
-        # Use re.DOTALL to match across multiple lines
-        matches = re.findall(pattern, text, re.DOTALL)
-        # Join all matches (if there are multiple code blocks)
-        extracted_code = "\n\n".join(matches)
-        return extracted_code
 
     def saveFunction(self):
         current_tab = self.tabs.currentIndex()
