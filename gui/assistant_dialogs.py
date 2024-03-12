@@ -267,12 +267,14 @@ class AssistantConfigDialog(QDialog):
         self.knowledgeRetrievalCheckBox.stateChanged.connect(lambda state: setattr(self, 'knowledge_retrieval', state == Qt.CheckState.Checked.value))
         toolsLayout.addWidget(self.knowledgeRetrievalCheckBox)
 
-        # Enable Code Interpreter checkbox
         if self.assistant_type == "assistant":
             self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
             self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
             toolsLayout.addWidget(self.codeInterpreterCheckBox)
-
+        elif self.assistant_type == "chat_assistant":
+            self.knowledgeFileButton.setEnabled(False)
+            self.knowledgeFileRemoveButton.setEnabled(False)
+            self.knowledgeRetrievalCheckBox.setEnabled(False)
         return toolsTab
 
     def ai_client_selection_changed(self):
@@ -328,7 +330,6 @@ class AssistantConfigDialog(QDialog):
         self.instructionsEdit.clear()
         self.modelComboBox.setCurrentIndex(0)
         self.knowledge_files_dict = {}
-        self.knowledgeFileList.clear()
         # Reset all checkboxes in the function sections
         for function_type, checkBoxes in self.checkBoxes.items():
             for checkBox in checkBoxes:
@@ -336,6 +337,8 @@ class AssistantConfigDialog(QDialog):
         self.selected_functions = []
         self.knowledge_retrieval = False
         self.code_interpreter = False
+        self.knowledgeFileList.clear()
+        self.knowledgeRetrievalCheckBox.setChecked(False)
         if self.assistant_type == "assistant":
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
@@ -468,19 +471,19 @@ class AssistantConfigDialog(QDialog):
                 self.modelComboBox.addItem(self.assistant_config.model)
                 # Set the current index of the combo box to the last index
                 self.modelComboBox.setCurrentIndex(self.modelComboBox.count() - 1)
-            # Pre-fill knowledge files
-            for file_path, file_id in self.assistant_config.knowledge_files.items():
-                self.knowledge_files_dict[file_path] = file_id
-                self.knowledgeFileList.addItem(file_path)
             # Pre-select functions
             self.pre_select_functions()
             # Pre-select knowledge retrieval
             self.knowledge_retrieval = self.assistant_config.knowledge_retrieval
-            # enable knowledge retrieval checkbox
-            self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
             if self.assistant_type == "assistant":
+                # Pre-fill knowledge files
+                for file_path, file_id in self.assistant_config.knowledge_files.items():
+                    self.knowledge_files_dict[file_path] = file_id
+                    self.knowledgeFileList.addItem(file_path)
+                # enable knowledge retrieval checkbox
+                self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
                 # enable code interpreter checkbox
                 self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
             # Set the output folder path if it's in the configuration
@@ -566,6 +569,7 @@ class AssistantConfigDialog(QDialog):
 class ExportAssistantDialog(QDialog):
     def __init__(self):
         super().__init__()
+        self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.setWindowTitle("Export Assistant")
         self.setLayout(QVBoxLayout())
 
@@ -583,11 +587,12 @@ class ExportAssistantDialog(QDialog):
         self.resize(400, 100)
 
     def get_assistant_names(self):
-        assistant_names = AssistantConfigManager.get_instance().get_all_assistant_names()
+        assistant_names = self.assistant_config_manager.get_all_assistant_names()
         return assistant_names
 
     def export_assistant(self):
         assistant_name = self.assistant_combo.currentText()
+        assistant_config = self.assistant_config_manager.get_config(assistant_name)
         export_path = os.path.join("export", assistant_name)
         config_path = os.path.join(export_path, "config")
         functions_path = os.path.join(export_path, "functions")
@@ -614,8 +619,12 @@ class ExportAssistantDialog(QDialog):
         try:
             with open(template_path, "r") as template_file:
                 template_content = template_file.read()
+
             main_content = template_content.replace("ASSISTANT_NAME", assistant_name)
-            
+            if assistant_config.assistant_type == "chat_assistant":
+                main_content = main_content.replace("assistant_client", "chat_assistant_client")
+                main_content = main_content.replace("AssistantClient", "ChatAssistantClient")
+
             with open(os.path.join(export_path, "main.py"), "w") as main_file:
                 main_file.write(main_content)
         except Exception as e:

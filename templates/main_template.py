@@ -38,7 +38,7 @@ while True:
     conversation_thread_client.create_conversation_thread_message(user_message, thread_name)
 
     # Process the user messages
-    assistant_client.process_messages(thread_name)
+    assistant_client.process_messages(thread_name=thread_name)
 
     # Retrieve the conversation
     conversation = conversation_thread_client.retrieve_conversation(thread_name)
