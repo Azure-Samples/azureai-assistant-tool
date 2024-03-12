@@ -199,13 +199,13 @@ class AssistantConfigManager:
 
     def get_all_assistant_names(self) -> list:
         """
-        Gets the names of all assistants in local configuration.
+        Gets the names of all user assistants in local configuration.
 
         :return: A list of all assistant names.
         :rtype: list
         """
-        # Return the names of all assistant configurations
-        return [assistant_name for assistant_name, assistant_config in self._configs.items()]
+        # Return the names of all assistant configurations and where "assistant_role" is not "system"
+        return [assistant_name for assistant_name, assistant_config in self._configs.items() if assistant_config.assistant_role != "system"]
 
     def get_assistant_names_by_client_type(
             self,
@@ -221,7 +221,7 @@ class AssistantConfigManager:
         :rtype: list
         """
         # Return the names of all assistant configurations
-        return [assistant_name for assistant_name, assistant_config in self._configs.items() if assistant_config.ai_client_type == ai_client_type]
+        return [assistant_name for assistant_name, assistant_config in self._configs.items() if (assistant_config.ai_client_type == ai_client_type and assistant_config.assistant_role != "system")]
 
     def get_assistant_name_by_assistant_id(
             self,
@@ -265,6 +265,9 @@ class AssistantConfigManager:
     def _save_config(self, assistant_name, config_data):
         if not assistant_name:
             raise ConfigError("Assistant name is required")
+
+        if not config_data:
+            raise ConfigError("Assistant configuration data is required")
 
         logger.info(f"Checking for updates in assistant configuration for '{assistant_name}'")
 

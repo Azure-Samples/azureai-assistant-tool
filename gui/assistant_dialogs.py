@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QDialog, QComboBox, QTabWidget, QSizePolicy, QScro
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QTextOption
 
-import json, os, shutil
+import json, os, shutil, threading
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
@@ -17,7 +17,8 @@ from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClie
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import UserInputSendSignal, UserInputSignal
 from gui.speech_input_handler import SpeechInputHandler
-#from gui.status_bar import ActivityStatus, StatusBar
+from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
+from gui.status_bar import ActivityStatus, StatusBar
 from gui.utils import resource_path
 
 
@@ -25,10 +26,15 @@ class AssistantConfigDialog(QDialog):
     def __init__(
             self, 
             parent=None, 
+            assistant_type : str = "assistant",
             function_config_manager : FunctionConfigManager = None
     ):
         super().__init__(parent)
         self.main_window = parent
+        if hasattr(self.main_window, 'instructions_reviewer'):
+            self.instructions_reviewer = self.main_window.instructions_reviewer
+        self.assistant_config_manager = self.main_window.assistant_config_manager
+        self.assistant_type = assistant_type
         self.function_config_manager = function_config_manager
 
         self.init_variables()
@@ -65,7 +71,7 @@ class AssistantConfigDialog(QDialog):
             self.toggle_mic()
 
         # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
-        if index == 1:
+        if index == 2:
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
 
     def closeEvent(self, event):
@@ -79,9 +85,13 @@ class AssistantConfigDialog(QDialog):
         tabWidget = QTabWidget(self)
         tabWidget.currentChanged.connect(self.on_tab_changed)
 
-        # Create Configuration tab
+        # Create General Configuration tab
         configTab = self.create_config_tab()
-        tabWidget.addTab(configTab, "Configuration")
+        tabWidget.addTab(configTab, "General")
+
+        # Create Tools tab
+        toolsTab = self.create_tools_tab()
+        tabWidget.addTab(toolsTab, "Tools")
 
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
@@ -90,10 +100,25 @@ class AssistantConfigDialog(QDialog):
         # Set the main layout
         mainLayout = QVBoxLayout(self)
         mainLayout.addWidget(tabWidget)
+
+        # setup status bar
+        self.status_bar = StatusBar(self)
+        mainLayout.addWidget(self.status_bar.get_widget())
+
+        # Set the main layout
         self.setLayout(mainLayout)
 
+        self.start_processing_signal = StartStatusAnimationSignal()
+        self.stop_processing_signal = StopStatusAnimationSignal()
+        self.error_signal = ErrorSignal()
+        self.start_processing_signal.start_signal.connect(self.start_processing)
+        self.stop_processing_signal.stop_signal.connect(self.stop_processing)
+        self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
+
+        self.ai_client_selection_changed()
+
         # Set the initial size of the dialog to make it wider
-        self.resize(600, 900)
+        self.resize(600, 600)  # Adjusted to a more standard size, you can change it back to 600x900 if needed
 
     def create_config_tab(self):
         configTab = QWidget()  # Configuration tab
@@ -104,10 +129,8 @@ class AssistantConfigDialog(QDialog):
         self.aiClientComboBox = QComboBox()
         ai_client_type_names = [client_type.name for client_type in AIClientType]
         self.aiClientComboBox.addItems(ai_client_type_names)
-        # Set the default to what is selected in the main window
-        active_ai_client_type = self.main_window.get_active_ai_client_type()
-        self.aiClientComboBox.setCurrentIndex(ai_client_type_names.index(active_ai_client_type))
-        # Connect the client selection change signal to the slot
+        active_ai_client_type = self.main_window.active_ai_client_type
+        self.aiClientComboBox.setCurrentIndex(ai_client_type_names.index(active_ai_client_type.name))
         self.aiClientComboBox.currentIndexChanged.connect(self.ai_client_selection_changed)
         configLayout.addWidget(self.aiClientLabel)
         configLayout.addWidget(self.aiClientComboBox)
@@ -119,34 +142,34 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.assistantLabel)
         configLayout.addWidget(self.assistantComboBox)
 
+        # Name input field
         self.nameLabel = QLabel('Name:')
         self.nameEdit = QLineEdit()
         self.nameEdit.setStyleSheet(
             "QLineEdit {"
             "  border-style: solid;"
             "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "  padding: 1px;"
             "}"
         )
         configLayout.addWidget(self.nameLabel)
         configLayout.addWidget(self.nameEdit)
 
-       # Instructions - using QTextEdit for multi-line input
+        # Instructions - using QTextEdit for multi-line input
         self.instructionsLabel = QLabel('Instructions:')
-        self.instructionsEdit = QTextEdit()  # Changed from QLineEdit to QTextEdit
+        self.instructionsEdit = QTextEdit()
         self.instructionsEdit.setStyleSheet(
             "QTextEdit {"
             "  border-style: solid;"
             "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "  padding: 1px;"
             "}"
         )
-        self.instructionsEdit.setAcceptRichText(False)  # Optional: Only accept plain text
+        self.instructionsEdit.setAcceptRichText(False)
         self.instructionsEdit.setWordWrapMode(QTextOption.WordWrap)
-        self.instructionsEdit.setMinimumHeight(100)  # Set a minimum height for a bigger text box
-
+        self.instructionsEdit.setMinimumHeight(100)
         configLayout.addWidget(self.instructionsLabel)
         configLayout.addWidget(self.instructionsEdit)
 
@@ -158,12 +181,42 @@ class AssistantConfigDialog(QDialog):
             "QLineEdit {"
             "  border-style: solid;"
             "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "  padding: 1px;"
             "}"
         )
         configLayout.addWidget(self.modelLabel)
         configLayout.addWidget(self.modelComboBox)
+
+        # Create as new assistant checkbox
+        self.createAsNewCheckBox = QCheckBox("Create as New Assistant")
+        self.createAsNewCheckBox.stateChanged.connect(lambda state: setattr(self, 'is_create', state == Qt.CheckState.Checked.value))
+        configLayout.addWidget(self.createAsNewCheckBox)
+
+        # Output Folder Path
+        self.outputFolderPathLabel = QLabel('Output Folder Path For Files')
+        self.outputFolderPathEdit = QLineEdit()
+        self.outputFolderPathEdit.setText(self.default_output_folder_path)
+        self.outputFolderPathButton = QPushButton('Select Folder...')
+        self.outputFolderPathButton.clicked.connect(self.select_output_folder_path)
+
+        outputFolderPathLayout = QHBoxLayout()
+        outputFolderPathLayout.addWidget(self.outputFolderPathEdit)
+        outputFolderPathLayout.addWidget(self.outputFolderPathButton)
+
+        configLayout.addWidget(self.outputFolderPathLabel)
+        configLayout.addLayout(outputFolderPathLayout)
+
+        # Save Button
+        self.saveButton = QPushButton('Save Configuration')
+        self.saveButton.clicked.connect(self.save_configuration)
+        configLayout.addWidget(self.saveButton)
+
+        return configTab
+
+    def create_tools_tab(self):
+        toolsTab = QWidget()
+        toolsLayout = QVBoxLayout(toolsTab)
 
         # Scroll Area for functions
         self.scrollArea = QScrollArea(self)
@@ -182,82 +235,60 @@ class AssistantConfigDialog(QDialog):
             "QScrollArea {"
             "  border-style: solid;"
             "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "}"
         )
-        configLayout.addWidget(self.scrollArea)
+        toolsLayout.addWidget(self.scrollArea)
 
-        # Knowledge Files
+        # Knowledge Files, Add File, and Remove File buttons
         self.knowledgeFileLabel = QLabel('Knowledge Files:')
-        self.knowledgeFileList = QListWidget()  # List widget to display file paths
+        self.knowledgeFileList = QListWidget()
         self.knowledgeFileList.setStyleSheet(
             "QListWidget {"
             "  border-style: solid;"
             "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "}"
         )
         self.knowledgeFileButton = QPushButton('Add File...')
         self.knowledgeFileButton.clicked.connect(self.add_file)
         self.knowledgeFileRemoveButton = QPushButton('Remove File')
         self.knowledgeFileRemoveButton.clicked.connect(self.remove_file)
-        
+
         fileButtonLayout = QHBoxLayout()
         fileButtonLayout.addWidget(self.knowledgeFileButton)
         fileButtonLayout.addWidget(self.knowledgeFileRemoveButton)
 
-        configLayout.addWidget(self.knowledgeFileLabel)
-        configLayout.addWidget(self.knowledgeFileList)
-        configLayout.addLayout(fileButtonLayout)
+        toolsLayout.addWidget(self.knowledgeFileLabel)
+        toolsLayout.addWidget(self.knowledgeFileList)
+        toolsLayout.addLayout(fileButtonLayout)
 
         # Enable Knowledge Retrieval checkbox
         self.knowledgeRetrievalCheckBox = QCheckBox("Enable Knowledge Retrieval")
         self.knowledgeRetrievalCheckBox.stateChanged.connect(lambda state: setattr(self, 'knowledge_retrieval', state == Qt.CheckState.Checked.value))
-        configLayout.addWidget(self.knowledgeRetrievalCheckBox)
+        toolsLayout.addWidget(self.knowledgeRetrievalCheckBox)
 
-        # Enable Code Interpreter checkbox
-        self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
-        self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
-        configLayout.addWidget(self.codeInterpreterCheckBox)
-
-        # Create as new assistant checkbox
-        self.createAsNewCheckBox = QCheckBox("Create as New Assistant")
-        self.createAsNewCheckBox.stateChanged.connect(lambda state: setattr(self, 'is_create', state == Qt.CheckState.Checked.value))
-        configLayout.addWidget(self.createAsNewCheckBox)
-
-        # Code Interpreter Output Folder Path
-        self.codeInterpreterFolderPathLabel = QLabel('Output Folder Path For Files')
-        self.codeInterpreterFolderPathEdit = QLineEdit()
-        
-        self.codeInterpreterFolderPathEdit.setText(self.default_output_folder_path)
-        self.codeInterpreterFolderPathButton = QPushButton('Select Folder...')
-        self.codeInterpreterFolderPathButton.clicked.connect(self.select_output_folder_path)
-
-        # Adding the output folder path widgets to the layout
-        codeInterpreterFolderPathLayout = QHBoxLayout()
-        codeInterpreterFolderPathLayout.addWidget(self.codeInterpreterFolderPathEdit)
-        codeInterpreterFolderPathLayout.addWidget(self.codeInterpreterFolderPathButton)
-        
-        configLayout.addWidget(self.codeInterpreterFolderPathLabel)
-        configLayout.addLayout(codeInterpreterFolderPathLayout)
-
-        # Save Button
-        self.saveButton = QPushButton('Save Configuration')
-        self.saveButton.clicked.connect(self.save_configuration)
-        configLayout.addWidget(self.saveButton)
-
-        self.ai_client_selection_changed()
-
-        return configTab
+        if self.assistant_type == "assistant":
+            self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
+            self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
+            toolsLayout.addWidget(self.codeInterpreterCheckBox)
+        elif self.assistant_type == "chat_assistant":
+            self.knowledgeFileButton.setEnabled(False)
+            self.knowledgeFileRemoveButton.setEnabled(False)
+            self.knowledgeRetrievalCheckBox.setEnabled(False)
+        return toolsTab
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
-        assistant_names = AssistantConfigManager.get_instance().get_assistant_names_by_client_type(self.ai_client_type.name)
+        assistant_config_manager = AssistantConfigManager.get_instance()
+        assistant_names = assistant_config_manager.get_assistant_names_by_client_type(self.ai_client_type.name)
 
         self.assistantComboBox.clear()
         self.assistantComboBox.insertItem(0, "New Assistant")
         for assistant_name in assistant_names:
-            self.assistantComboBox.addItem(assistant_name)
+            assistant_config = assistant_config_manager.get_config(assistant_name)
+            if assistant_config.assistant_type == self.assistant_type:
+                self.assistantComboBox.addItem(assistant_name)
         self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
         self.modelComboBox.clear()
@@ -283,7 +314,7 @@ class AssistantConfigDialog(QDialog):
             self.is_create = True
             self.nameEdit.setEnabled(True)
             self.createAsNewCheckBox.setEnabled(False)
-            self.codeInterpreterFolderPathEdit.setText(self.default_output_folder_path)
+            self.outputFolderPathEdit.setText(self.default_output_folder_path)
         # if selected_assistant is not empty string, load the assistant config
         elif selected_assistant != "":
             self.is_create = False
@@ -300,7 +331,6 @@ class AssistantConfigDialog(QDialog):
         self.instructionsEdit.clear()
         self.modelComboBox.setCurrentIndex(0)
         self.knowledge_files_dict = {}
-        self.knowledgeFileList.clear()
         # Reset all checkboxes in the function sections
         for function_type, checkBoxes in self.checkBoxes.items():
             for checkBox in checkBoxes:
@@ -308,8 +338,11 @@ class AssistantConfigDialog(QDialog):
         self.selected_functions = []
         self.knowledge_retrieval = False
         self.code_interpreter = False
-        self.codeInterpreterCheckBox.setChecked(False)
-        self.codeInterpreterFolderPathEdit.clear()
+        self.knowledgeFileList.clear()
+        self.knowledgeRetrievalCheckBox.setChecked(False)
+        if self.assistant_type == "assistant":
+            self.codeInterpreterCheckBox.setChecked(False)
+        self.outputFolderPathEdit.clear()
         self.assistant_config = None
 
     def create_instructions_tab(self):
@@ -337,12 +370,11 @@ class AssistantConfigDialog(QDialog):
 
         # QTextEdit for entering instructions
         self.newInstructionsEdit = QTextEdit()
-        #self.newInstructionsEdit.setFont(QtGui.QFont("Arial", 14))
         self.newInstructionsEdit.setText("1. Write Your Instructions Here")
         instructionsEditorLayout.addWidget(self.newInstructionsEdit)
 
         # 'Check Instructions' button
-        checkInstructionsButton = QPushButton('Review with AI...')
+        checkInstructionsButton = QPushButton('Review Instructions with AI...')
         checkInstructionsButton.clicked.connect(self.check_instructions)
         instructionsEditorLayout.addWidget(checkInstructionsButton)
 
@@ -356,7 +388,7 @@ class AssistantConfigDialog(QDialog):
         options = QFileDialog.Options()
         folderPath = QFileDialog.getExistingDirectory(self, "Select Output Folder", "", options=options)
         if folderPath:
-            self.codeInterpreterFolderPathEdit.setText(folderPath)
+            self.outputFolderPathEdit.setText(folderPath)
 
     def toggle_mic(self):
         if self.is_mic_on:
@@ -394,15 +426,32 @@ class AssistantConfigDialog(QDialog):
         self.newInstructionsEdit.moveCursor(QtGui.QTextCursor.End)
 
     def check_instructions(self):
-        # Combine instructions and check them
-        instructions = self.newInstructionsEdit.toPlainText()
-        if not hasattr(self.main_window, 'instructions_checker') or self.main_window.instructions_checker is None:
-            QMessageBox.critical(self, "Instructions Checker Not Found", "Instructions checker not found. Check chat completion settings.")
-            return
-        new_instructions = self.main_window.instructions_checker.check_instructions(instructions)
-        # Open new dialog with the checked instructions
-        contentDialog = ContentDisplayDialog(new_instructions, "AI Reviewed Instructions", self)
-        contentDialog.show()
+        threading.Thread(target=self._check_instructions, args=()).start()
+
+    def _check_instructions(self):
+        try:
+            if not hasattr(self, 'instructions_reviewer'):
+                raise Exception("Instruction reviewer is not available, check the system assistant settings")
+            self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
+            # Combine instructions and check them
+            instructions = self.newInstructionsEdit.toPlainText()
+            self.reviewed_instructions = self.instructions_reviewer.process_messages(user_request=instructions, stream=False)
+        except Exception as e:
+            self.error_signal.error_signal.emit(str(e))
+        finally:
+            self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
+
+    def start_processing(self, status):
+        self.status_bar.start_animation(status)
+
+    def stop_processing(self, status):
+        self.status_bar.stop_animation(status)
+        try:
+            # Open new dialog with the checked instructions
+            contentDialog = ContentDisplayDialog(self.reviewed_instructions, "AI Reviewed Instructions", self)
+            contentDialog.show()
+        except Exception as e:
+            logger.error(f"Error displaying reviewed instructions: {e}")
 
     def save_instructions(self):
         # Get instructions and set them to the instructionsEdit in the Configuration tab
@@ -425,24 +474,25 @@ class AssistantConfigDialog(QDialog):
                 self.modelComboBox.addItem(self.assistant_config.model)
                 # Set the current index of the combo box to the last index
                 self.modelComboBox.setCurrentIndex(self.modelComboBox.count() - 1)
-            # Pre-fill knowledge files
-            for file_path, file_id in self.assistant_config.knowledge_files.items():
-                self.knowledge_files_dict[file_path] = file_id
-                self.knowledgeFileList.addItem(file_path)
             # Pre-select functions
             self.pre_select_functions()
             # Pre-select knowledge retrieval
             self.knowledge_retrieval = self.assistant_config.knowledge_retrieval
-            # enable knowledge retrieval checkbox
-            self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
-            # enable code interpreter checkbox
-            self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
+            if self.assistant_type == "assistant":
+                # Pre-fill knowledge files
+                for file_path, file_id in self.assistant_config.knowledge_files.items():
+                    self.knowledge_files_dict[file_path] = file_id
+                    self.knowledgeFileList.addItem(file_path)
+                # enable knowledge retrieval checkbox
+                self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
+                # enable code interpreter checkbox
+                self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
-                self.codeInterpreterFolderPathEdit.setText(output_folder_path)
+                self.outputFolderPathEdit.setText(output_folder_path)
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -507,8 +557,9 @@ class AssistantConfigDialog(QDialog):
             'selected_functions': self.selected_functions,
             'knowledge_retrieval': self.knowledge_retrieval,
             'code_interpreter': self.code_interpreter,
-            'output_folder_path': self.codeInterpreterFolderPathEdit.text(),
-            'ai_client_type': self.aiClientComboBox.currentText()
+            'output_folder_path': self.outputFolderPathEdit.text(),
+            'ai_client_type': self.aiClientComboBox.currentText(),
+            'assistant_type': self.assistant_type
         }
         # if name, instructions, and model are empty, show an error message
         if not config['name'] or not config['instructions'] or not config['model']:
@@ -521,6 +572,7 @@ class AssistantConfigDialog(QDialog):
 class ExportAssistantDialog(QDialog):
     def __init__(self):
         super().__init__()
+        self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.setWindowTitle("Export Assistant")
         self.setLayout(QVBoxLayout())
 
@@ -538,11 +590,12 @@ class ExportAssistantDialog(QDialog):
         self.resize(400, 100)
 
     def get_assistant_names(self):
-        assistant_names = AssistantConfigManager.get_instance().get_all_assistant_names()
+        assistant_names = self.assistant_config_manager.get_all_assistant_names()
         return assistant_names
 
     def export_assistant(self):
         assistant_name = self.assistant_combo.currentText()
+        assistant_config = self.assistant_config_manager.get_config(assistant_name)
         export_path = os.path.join("export", assistant_name)
         config_path = os.path.join(export_path, "config")
         functions_path = os.path.join(export_path, "functions")
@@ -569,8 +622,12 @@ class ExportAssistantDialog(QDialog):
         try:
             with open(template_path, "r") as template_file:
                 template_content = template_file.read()
+
             main_content = template_content.replace("ASSISTANT_NAME", assistant_name)
-            
+            if assistant_config.assistant_type == "chat_assistant":
+                main_content = main_content.replace("assistant_client", "chat_assistant_client")
+                main_content = main_content.replace("AssistantClient", "ChatAssistantClient")
+
             with open(os.path.join(export_path, "main.py"), "w") as main_file:
                 main_file.write(main_content)
         except Exception as e:

@@ -17,14 +17,17 @@ from gui.status_bar import ActivityStatus, StatusBar
 
 
 class CreateFunctionDialog(QDialog):
-    def __init__(self, main_window, function_config_manager : FunctionConfigManager):
+    def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.function_config_manager = function_config_manager
-        self.initUI()
+        if hasattr(main_window, 'function_spec_creator') and hasattr(main_window, 'function_impl_creator'):
+            self.function_spec_creator = main_window.function_spec_creator
+            self.function_impl_creator = main_window.function_impl_creator
+        self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
+        self.init_UI()
         self.previousSize = self.size()
 
-    def initUI(self):
+    def init_UI(self):
         self.setWindowTitle("Create/Edit Functions")
         self.resize(800, 900)
 
@@ -229,11 +232,10 @@ class CreateFunctionDialog(QDialog):
 
     def _generateFunctionSpec(self, user_request):
         try:
+            if not hasattr(self, 'function_spec_creator'):
+                raise Exception("Function spec creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
-                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-                return
-            self.spec_json = self.main_window.function_creator.get_function_spec(user_request)
+            self.spec_json = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
         finally:
@@ -246,25 +248,15 @@ class CreateFunctionDialog(QDialog):
 
     def _generateFunctionImpl(self, user_request, spec_json):
         try:
+            if not hasattr(self, 'function_impl_creator'):
+                raise Exception("Function impl creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            if not hasattr(self.main_window, 'function_creator') or self.main_window.function_creator is None:
-                self.error_signal.error_signal.emit("Function creator not initialized, please check chat completion settings.")
-                return
-            func_impl = self.main_window.function_creator.get_function_impl(user_request, spec_json)
-            self.code = self.extract_python_code(func_impl)
+            request = user_request + " that follows the following spec: " + spec_json
+            self.code = self.function_impl_creator.process_messages(user_request=request, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function implementation: {e}")
         finally:
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
-
-    def extract_python_code(self, text):
-        # Regular expression pattern to find code blocks
-        pattern = r"```python\s+(.*?)```"
-        # Use re.DOTALL to match across multiple lines
-        matches = re.findall(pattern, text, re.DOTALL)
-        # Join all matches (if there are multiple code blocks)
-        extracted_code = "\n\n".join(matches)
-        return extracted_code
 
     def saveFunction(self):
         current_tab = self.tabs.currentIndex()
@@ -346,10 +338,10 @@ class CreateFunctionDialog(QDialog):
 
 
 class FunctionErrorsDialog(QDialog):
-    def __init__(self, main_window, function_config_manager : FunctionConfigManager):
+    def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.function_config_manager = function_config_manager
+        self.function_config_manager = main_window.function_config_manager
         self.error_specs = {}
         self.loadErrorSpecs()
         self.initUI()

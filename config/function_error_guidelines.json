@@ -1,5 +1,0 @@
-{
-    "1": "Function errors shall be valid JSON string",
-    "2": "Function errors shall contain information what went wrong and guidance for assistant what to check next to help to recover from the error",
-    "3": "Avoid general error information as they are not detailed enough for reader to know what kind of error happened and how to possible recover from it."
-}

@@ -42,13 +42,15 @@ class AssistantConfig:
         # set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
+        self._assistant_type = config_data.get('assistant_type', 'assistant')
+        self._assistant_role = config_data.get('assistant_role', 'user')
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
             return NotImplemented
 
         return (self._name == other._name and
-                self._instructions == other._instructions and
+                self.instructions == other.instructions and
                 self._assistant_id == other._assistant_id and
                 self._ai_client_type == other._ai_client_type and
                 self._model == other._model and
@@ -92,6 +94,8 @@ class AssistantConfig:
         self._config_data['code_interpreter'] = self._code_interpreter
         self._config_data['selected_functions'] = self._selected_functions
         self._config_data['output_folder_path'] = self._output_folder_path
+        self._config_data['assistant_type'] = self._assistant_type
+        self._config_data['assistant_role'] = self._assistant_role
         return self._config_data
 
     def _get_function_configs(self):
@@ -136,7 +140,17 @@ class AssistantConfig:
         :rtype: str
         """
         return self._ai_client_type
-    
+
+    @ai_client_type.setter
+    def ai_client_type(self, value) -> None:
+        """
+        Set the AI client type.
+        
+        :param value: The AI client type.
+        :type value: str
+        """
+        self._ai_client_type = value
+
     @property
     def model(self) -> str:
         """Get the model.
@@ -239,8 +253,13 @@ class AssistantConfig:
         :return: The instructions.
         :rtype: str
         """
-        return self._instructions
-    
+        instructions = self._instructions
+        if os.path.isfile(instructions):
+            # If it's a file, open and read its content to use as instructions
+            with open(instructions, 'r') as file:
+                instructions = file.read()
+        return instructions
+
     @instructions.setter
     def instructions(self, value) -> None:
         """
@@ -269,3 +288,21 @@ class AssistantConfig:
         :type value: str
         """
         self._output_folder_path = value
+
+    @property
+    def assistant_type(self) -> str:
+        """Get the assistant type.
+        
+        :return: The assistant type.
+        :rtype: str
+        """
+        return self._assistant_type
+    
+    @property
+    def assistant_role(self) -> str:
+        """Get the assistant role.
+        
+        :return: The assistant role.
+        :rtype: str
+        """
+        return self._assistant_role

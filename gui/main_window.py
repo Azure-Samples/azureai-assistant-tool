@@ -4,7 +4,7 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout, QApplication
+from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
@@ -16,18 +16,15 @@ import os, time, json
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
-from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
-from azure.ai.assistant.management.conversation_title_creator import ConversationTitleCreator
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
-from azure.ai.assistant.management.instructions_checker import InstructionsChecker
-from azure.ai.assistant.management.function_creator import FunctionCreator
-from azure.ai.assistant.management.task_request_creator import TaskRequestCreator
 from azure.ai.assistant.management.logger_module import logger
-from gui.menu import AssistantsMenu, FunctionsMenu, GuidelinesMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
+from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.speech_input_handler import SpeechInputHandler
 from gui.speech_synthesis_handler import SpeechSynthesisHandler
@@ -35,20 +32,20 @@ from gui.assistant_client_manager import AssistantClientManager
 from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
 from gui.conversation import ConversationView
-from gui.signals import AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
-
+from gui.signals import ConversationAppendChunkSignal, AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
+from gui.utils import init_system_assistant
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def __init__(self):
         super().__init__()
         self.status_messages = {
-            'ai_client_type': '',
-            'chat_completion': '',
+            'ai_client_type': ''
         }
-        self.connection_timeout : float = 30.0
-        self.use_chat_completion_for_thread_name : bool = False
+        self.connection_timeout : float = 90.0
+        self.use_system_assistant_for_thread_name : bool = False
         self.user_text_summarization_in_synthesis : bool = False
+        self.active_ai_client_type = None
         self.in_background = False
         self.initialize_singletons()
         self.initialize_ui()
@@ -62,28 +59,24 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def deferred_init(self):
         try:
-            self.initialize_chat_components()
-            self.initialize_assistant_components()
+            self.initialize_variables()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
+            self.init_system_assistant_settings()
+            self.init_system_assistants()
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
-    def initialize_chat_components(self):
-        try:
-            self.init_chat_completion()
-            self.conversation_title_creator = ConversationTitleCreator(self.chat_client, self.chat_completion_model)
-            self.instructions_checker = InstructionsChecker(self.chat_client, self.chat_completion_model)
-            self.function_creator = FunctionCreator(self.chat_client, self.chat_completion_model)
-            self.task_request_creator = TaskRequestCreator(self.chat_client, self.chat_completion_model)
-            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
-        except Exception as e:
-            error_message = f"An error occurred while initializing the chat components: {e}"
-            self.error_signal.error_signal.emit(error_message)
-            logger.error(error_message)
+    def init_system_assistants(self):
+        init_system_assistant(self, "ConversationTitleCreator")
+        init_system_assistant(self, "SpeechTranscriptionSummarizer")
+        init_system_assistant(self, "FunctionSpecCreator")
+        init_system_assistant(self, "FunctionImplCreator")
+        init_system_assistant(self, "TaskRequestsCreator")
+        init_system_assistant(self, "InstructionsReviewer")
 
-    def initialize_assistant_components(self):
+    def initialize_variables(self):
         self.scheduled_task_threads = {}
         self.thread_lock = threading.Lock()
         self.assistants_processing = {}
@@ -97,29 +90,29 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 logger.error(f"Error initializing conversation thread client for ai_client_type {ai_client_type.name}: {e}")
         self.executor = ThreadPoolExecutor(max_workers=5)
 
-    def load_chat_completion_settings(self, settings_file_path = "config/chat_completion_settings.json"):
-        self.chat_completion_settings = {}
+    def load_system_assistant_settings(self, settings_file_path = "config/system_assistant_settings.json"):
+        self.system_assistant_settings = {}
         # ensure folder exists
         if not os.path.exists("config"):
             os.makedirs("config")
         if os.path.exists(settings_file_path):
             with open(settings_file_path, 'r') as file:
                 loaded_settings = json.load(file)
-                self.chat_completion_settings.update(loaded_settings)
+                self.system_assistant_settings.update(loaded_settings)
 
-    def init_chat_completion(self):
-        self.load_chat_completion_settings()
+    def init_system_assistant_settings(self):
+        self.load_system_assistant_settings()
 
-        ai_client_type = self.chat_completion_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
-        self.chat_completion_model = self.chat_completion_settings.get("model", "gpt-4-1106-preview")
-        api_version = self.chat_completion_settings.get("api_version", "2024-02-15-preview")
-        if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
-            self.chat_client = AIClientFactory.get_instance().get_client(
+        self.system_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
+        self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
+        self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
+        if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
+            self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.AZURE_OPEN_AI,
-                api_version=api_version
+                api_version=self.system_api_version
             )
-        elif ai_client_type == AIClientType.OPEN_AI.name:
-            self.chat_client = AIClientFactory.get_instance().get_client(
+        elif self.system_client_type == AIClientType.OPEN_AI.name:
+            self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.OPEN_AI
             )
 
@@ -127,7 +120,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.initialize_ui_components()
         self.initialize_signals()
         self.initialize_ui_layout()
-        self.initialize_speech_input()
+        self.initialize_speech()
 
     def initialize_ui_components(self):
         # Main window settings
@@ -143,7 +136,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.assistants_menu = AssistantsMenu(self)
         self.functions_menu = FunctionsMenu(self)
         self.tasks_menu = TasksMenu(self)
-        self.guidelines_menu = GuidelinesMenu(self)
         self.diagnostics_menu = DiagnosticsMenu(self)
         self.settings_menu = SettingsMenu(self)
 
@@ -166,6 +158,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal = ErrorSignal()
         self.conversation_view_clear_signal = ConversationViewClear()
         self.conversation_append_messages_signal = ConversationAppendMessagesSignal()
+        self.conversation_append_chunk_signal = ConversationAppendChunkSignal()
 
         # Connect the signals to slots (methods)
         self.append_conversation_signal.update_signal.connect(self.append_conversation_message)
@@ -180,6 +173,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
         self.conversation_view_clear_signal.update_signal.connect(self.conversation_view.conversationView.clear)
         self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_messages)
+        self.conversation_append_chunk_signal.append_signal.connect(self.conversation_view.append_message_chunk)
 
     def initialize_ui_layout(self):
         # Create a splitter for sidebar and main content
@@ -219,16 +213,17 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Set the main splitter as the central widget
         self.setCentralWidget(main_splitter)
 
-    def initialize_speech_input(self):
+    def initialize_speech(self):
         try:
             self.speech_input_handler = SpeechInputHandler(self, self.speech_hypothesis_signal.update_signal, self.speech_final_signal.send_signal)
+            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
         except ValueError as e:
             QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech input handler: {e}")
             logger.error(f"Error initializing speech input handler: {e}")
 
     def set_active_ai_client_type(self, ai_client_type : AIClientType):
         # If the active AI client type is not yet initialized, return and set the active AI client type in deferred_init
-        if not hasattr(self, 'active_ai_client_type'):
+        if not hasattr(self, 'conversation_thread_clients'):
             return
 
         # Save the conversation threads for the current active assistant
@@ -276,9 +271,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             # Set the label's text as HTML
             self.active_client_label.setText(label_html)
-
-    def get_active_ai_client_type(self) -> str:
-        return self.active_ai_client_type.name
 
     def on_cancel_run_button_clicked(self):
         logger.debug("on_cancel_run_button_clicked on main_window")
@@ -340,7 +332,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.append_conversation_message("user", user_input, color='blue')
 
             # Update the thread title based on the user's input
-            if self.use_chat_completion_for_thread_name:
+            if self.use_system_assistant_for_thread_name:
                 start_time = time.time()
                 updated_thread_name = self.update_conversation_title(user_input, thread_name, False)
                 end_time = time.time()
@@ -399,10 +391,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
 
                 # Send the user input to the assistant client
-                assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
+                assistant_client = self.assistant_client_manager.get_client(assistant_name)
                 if assistant_client is not None:
                     start_time = time.time()
-                    assistant_client.process_messages(thread_name, additional_instructions, timeout=self.connection_timeout)
+                    assistant_client.process_messages(thread_name=thread_name, additional_instructions=additional_instructions, timeout=self.connection_timeout)
                     end_time = time.time()
                     logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
 
@@ -415,14 +407,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_conversation_title(self, text, thread_name, is_scheduled_task):
-        if not hasattr(self, 'conversation_title_creator') or self.conversation_title_creator is None:
-            error_message = "Conversation title creator not initialized, cannot update conversation title, check the chat completion settings"
-            self.error_signal.error_signal.emit(error_message)
+        if not hasattr(self, 'conversation_title_creator'):
+            error_message = "Conversation title creator not initialized, check the system assistant settings"
             logger.error(error_message)
             return thread_name
-
         # Generate a new thread title based on the user's input text
-        new_thread_name = self.conversation_title_creator.get_thread_title(thread_name + " " + text)
+        user_request = thread_name + " " + text
+        new_thread_name = self.conversation_title_creator.process_messages(user_request=user_request, stream=False)
         if is_scheduled_task:
             new_thread_name = "Scheduled_" + new_thread_name
         unique_thread_title = self.conversation_thread_clients[self.active_ai_client_type].set_conversation_thread_name(new_thread_name, thread_name)
@@ -460,12 +451,17 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             assistant_name, run_identifier, function_name, arguments, response
         )
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message = False, message=None):
         logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier}, status {run_status}, and thread name {thread_name}")
 
         is_current_thread = self.conversation_thread_clients[self.active_ai_client_type].is_current_conversation_thread(thread_name)
         if not is_current_thread:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is not current assistant thread, conversation not updated")
+            return
+
+        if run_status == "streaming":
+            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
+            self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message, is_first_message)
             return
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
@@ -506,7 +502,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             # microphone needs to be stopped before speech synthesis otherwise synthesis output will be heard by the microphone
             self.speech_input_handler.stop_listening_from_mic()
             logger.debug(f"Start speech synthesis for last assistant message: {last_assistant_message.content}")
-            result_future = self.speech_synthesis_handler.synthesize_speech_async(last_assistant_message.content)
+            input_text = last_assistant_message.content
+            if self.user_text_summarization_in_synthesis and hasattr(self, 'speech_transcription_summarizer'):
+                input_text = self.speech_transcription_summarizer.process_messages(user_request=input_text, stream=False)
+            result_future = self.speech_synthesis_handler.synthesize_speech_async(input_text)
             logger.debug(f"Speech synthesis result_future: {result_future}")
             # when synthesis is complete, on_speech_synthesis_complete will be called and listening from microphone will be started again
 
@@ -561,7 +560,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 logger.info(f"Thread {thread_name} is selected, appending update to conversation")
                 self.append_conversation_signal.update_signal.emit("user", user_request, 'blue')
 
-            if self.use_chat_completion_for_thread_name:
+            if self.use_system_assistant_for_thread_name:
                 updated_thread_name = self.update_conversation_title(user_request, thread_name, True)
                 self.update_conversation_title_signal.update_signal.emit(thread_name, updated_thread_name)
                 thread_name = updated_thread_name

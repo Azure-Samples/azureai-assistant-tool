@@ -187,8 +187,12 @@ class ConversationThreadClient:
                 sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
                 if sender_name is None:
                     sender_name = "assistant"
-            else:
-                sender_name = "user"
+            if message.role == "user":
+                if message.metadata:
+                    sender_name = message.metadata.get("chat_assistant", "assistant")
+                    message.role = "assistant"
+                else:
+                    sender_name = "user"
 
             for content_item in message.content:
                 if isinstance(content_item, MessageContentText):
@@ -212,7 +216,8 @@ class ConversationThreadClient:
             thread_name : str,
             file_paths : Optional[list] = None,
             additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None
+            timeout : Optional[float] = None,
+            metadata : Optional[dict] = None
     ) -> None:
         """
         Creates a new assistant thread message.
@@ -243,6 +248,7 @@ class ConversationThreadClient:
             self._ai_client.beta.threads.messages.create(
                 thread_id,
                 role="user",
+                metadata=metadata,
                 content=message,
                 file_ids=file_ids,
                 timeout=timeout

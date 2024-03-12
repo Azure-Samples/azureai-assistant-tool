@@ -31,12 +31,12 @@ class GeneralSettingsDialog(QDialog):
         self.connectionTimeoutLayout.addWidget(self.connectionTimeoutLabel)
         self.connectionTimeoutLayout.addWidget(self.connectionTimeoutEdit)
         
-        # Chat completion for friendly conversation thread names
-        self.useChatCompletionForThreadsCheckbox = QCheckBox("Enable chat completion for friendly conversation thread names", self)
-        self.useChatCompletionForThreadsCheckbox.setChecked(self.main_window.use_chat_completion_for_thread_name)
+        # System assistant for friendly conversation thread names
+        self.useSystemAssistantForThreadsCheckbox = QCheckBox("Enable system assistant to generate friendly conversation thread names", self)
+        self.useSystemAssistantForThreadsCheckbox.setChecked(self.main_window.use_system_assistant_for_thread_name)
 
         # Text summarization checkbox for long messages for speech synthesis
-        self.useTextSummarizationCheckbox = QCheckBox("Enable text summarization for long messages for speech synthesis", self)
+        self.useTextSummarizationCheckbox = QCheckBox("Enable system assistant to summarize long messages for speech synthesis", self)
         self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
 
         # Buttons
@@ -48,7 +48,7 @@ class GeneralSettingsDialog(QDialog):
 
         # Adding layouts to the main layout
         self.layout.addLayout(self.connectionTimeoutLayout)
-        self.layout.addWidget(self.useChatCompletionForThreadsCheckbox)
+        self.layout.addWidget(self.useSystemAssistantForThreadsCheckbox)
         self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
 
@@ -60,7 +60,7 @@ class GeneralSettingsDialog(QDialog):
         try:
             connection_timeout = float(self.connectionTimeoutEdit.text())
             self.main_window.connection_timeout = connection_timeout
-            self.main_window.use_chat_completion_for_thread_name = self.useChatCompletionForThreadsCheckbox.isChecked()
+            self.main_window.use_system_assistant_for_thread_name = self.useSystemAssistantForThreadsCheckbox.isChecked()
             self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
             super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
@@ -77,19 +77,19 @@ class ClientSettingsDialog(QDialog):
 
     def init_settings(self):
         self.config_folder = "config"
-        self.file_name = "chat_completion_settings.json"
+        self.file_name = "system_assistant_settings.json"
         self.file_path = os.path.join(self.config_folder, self.file_name)
         os.makedirs(self.config_folder, exist_ok=True)
         self.settings = {}
         self.load_settings()
 
     def init_ui(self):
-        self.setWindowTitle("Settings")
+        self.setWindowTitle("System Assistants")
         self.resize(400, 400)
         self.layout = QVBoxLayout(self)
 
         # Client Selection Label
-        self.clientSelectionLabel = QLabel("Select AI client for Chat Completion:")
+        self.clientSelectionLabel = QLabel("Select AI client for System Assistants:")
         self.layout.addWidget(self.clientSelectionLabel)
 
         # Create combo box for client selection
@@ -127,8 +127,9 @@ class ClientSettingsDialog(QDialog):
         # Model selection
         self.model_selection = QComboBox()
         self.model_selection.setEditable(True)
+        self.model_selection.toolTip = "Select the model to use for the system assistant, e.g. for function generation"
         ai_client_type = AIClientType[self.clientSelection.currentText()]
-        self.layout.addWidget(QLabel("Model for Chat Completion:"))
+        self.layout.addWidget(QLabel("Model for System Assistants:"))
         self.layout.addWidget(self.model_selection)
 
         # Apply Button

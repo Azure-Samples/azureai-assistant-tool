@@ -12,7 +12,9 @@ import os, time
 
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
@@ -359,8 +361,11 @@ class ConversationSidebar(QWidget):
             #assistant_list = AssistantClient.get_assistant_list(ai_client_type)
             for name in assistant_names:
                 if not self.assistant_client_manager.get_client(name):
-                    assistant_config = self.assistant_config_manager.get_config(name)
-                    assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                    assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
+                    if assistant_config.assistant_type == "assistant":
+                        assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                    else:
+                        assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
                     self.assistant_client_manager.register_client(name, assistant_client)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")

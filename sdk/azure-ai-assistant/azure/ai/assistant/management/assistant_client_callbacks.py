@@ -20,7 +20,7 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.
@@ -31,6 +31,10 @@ class AssistantClientCallbacks:
         :type run_status: str
         :param thread_name: The name of the thread.
         :type thread_name: str
+        :param is_first_message: Whether the message is the first message, defaults to False, used when status is "streaming"
+        :type is_first_message: bool, optional
+        :param message: The partial message during the run, defaults to None. Used when status is "streaming"
+        :type message: str, optional
 
         :return: None
         :rtype: None

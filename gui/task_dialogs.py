@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialog, QComboBox, QFrame, QTabWidget, QScrollAre
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtGui import QColor, QPalette, QIntValidator
 
-import json, os, threading
+import json, os, threading, ast
 
 from azure.ai.assistant.management.task import BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.task_manager import TaskManager
@@ -22,6 +22,9 @@ class CreateTaskDialog(QDialog):
         super().__init__(main_window)
 
         self.main_window = main_window
+        if hasattr(main_window, 'task_requests_creator'):
+            self.task_requests_creator = main_window.task_requests_creator
+        self.assistant_config_manager = main_window.assistant_config_manager
         self.task_manager = task_manager
         self.config_folder = config_folder
         self.request_list = []
@@ -85,7 +88,14 @@ class CreateTaskDialog(QDialog):
     def stop_processing(self, status):
         self.status_bar.stop_animation(status)
         self.requests_list.clear()
-        self.requests_list.setText('\n'.join(self.request_list))
+        try:
+            # Convert the string representation of the list back to a list
+            actual_list = ast.literal_eval(self.request_list)
+            # Join the list items into a single string with each item on a new line
+            requests_text = "\n".join(actual_list)
+            self.requests_list.setText(requests_text)
+        except Exception as e:
+            self.requests_list.setText(self.request_list)
         
     def on_tab_changed(self, index):
         # Update dropdowns based on the selected tab
@@ -368,38 +378,21 @@ class CreateTaskDialog(QDialog):
     
     def _generate_requests(self):
         try:
+            if not hasattr(self, 'task_requests_creator'):
+                raise Exception("Task request creator is not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             if self.src_folders_list.count() == 0:
                 error_message = "Please add at least one source folder."
                 raise Exception(error_message)
 
-            if not self.user_request_batch.toPlainText():
+            user_request = self.user_request_batch.toPlainText()
+            if not user_request:
                 error_message = "Please enter a request."
                 raise Exception(error_message)
 
-            if not hasattr(self.main_window, 'task_request_creator') or self.main_window.task_request_creator is None:
-                self.error_signal.error_signal.emit("Task request creator not initialized, please check chat completion settings.")
-                return
-            input_file_type = self.main_window.task_request_creator.get_input_file_type(self.user_request_batch.toPlainText())
-            # remove single quotes from input file type if there is any
-            input_file_type = input_file_type.replace("'", "")
-            if input_file_type.startswith("Error"):
-                error_message = f"An error occurred while getting input file type: {input_file_type}"
-                raise Exception(error_message)
-
-            # create list of files from given input folders and input file type
-            input_files = []
-            for folder in [self.src_folders_list.item(i).text() for i in range(self.src_folders_list.count())]:
-                for file_name in os.listdir(folder):
-                    if file_name.endswith(f".{input_file_type}"):
-                        input_files.append(os.path.join(folder, file_name))
-
-            # validate input files contains valid file paths
-            if not input_files:
-                error_message = "No valid input files found. Please check the source folders and input file type."
-                raise Exception(error_message)
-
-            self.request_list = self.main_window.task_request_creator.create_request_list(self.user_request_batch.toPlainText(), input_files)
+            folders_list = [self.src_folders_list.item(i).text() for i in range(self.src_folders_list.count())]
+            user_request = user_request + " Input folders:" + " ".join(folders_list)
+            self.request_list = self.task_requests_creator.process_messages(user_request=user_request, stream=False, temperature=0.2)
 
         except Exception as e:
             self.error_signal.error_signal.emit(str(e))
@@ -565,8 +558,8 @@ class ScheduleTaskDialog(QDialog):
 
         # Assistant selection
         self.assistant_selection = QComboBox()
-        ai_client_type = self.main_window.get_active_ai_client_type()
-        assistants = self.main_window.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type)
+        ai_client_type = self.main_window.active_ai_client_type
+        assistants = self.main_window.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
         self.assistant_selection.addItems(assistants)
         layout.addWidget(QLabel("Select Assistant:"))
         layout.addWidget(self.assistant_selection)
