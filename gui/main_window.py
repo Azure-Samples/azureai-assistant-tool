@@ -16,12 +16,12 @@ import os, time, json
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
-from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
-from azure.ai.assistant.management.conversation_title_creator import ConversationTitleCreator
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
@@ -63,14 +63,38 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.initialize_system_components()
             self.initialize_assistant_components()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
+            self.initialize_title_creator()
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
+    def initialize_title_creator(self):
+        conversation_title_creator_config : AssistantConfig = self.assistant_config_manager.get_config("ConversationTitleCreator")
+        try:
+            ai_client_type : AIClientType = self.active_ai_client_type
+            if ai_client_type is None:
+                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, conversation title generation may not work as expected.")
+            else:
+                # update the ai_client_type in the config_json
+                conversation_title_creator_config.ai_client_type = ai_client_type.name
+
+            model = conversation_title_creator_config.model
+            if not model:
+                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
+                model = self.system_assistant_model
+                conversation_title_creator_config.model = model
+            if not model:
+                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
+                return
+
+            self.conversation_title_creator = ChatAssistantClient.from_config(conversation_title_creator_config)
+        except Exception as e:
+            error_message = f"An error occurred while initializing the title creator, check the system settings: {e}"
+            self.error_signal.error_signal.emit(error_message)
+
     def initialize_system_components(self):
         try:
-            self.conversation_title_creator = ConversationTitleCreator(self.system_client, self.system_assistant_model)
             self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
         except Exception as e:
             error_message = f"An error occurred while initializing the chat components: {e}"
@@ -408,14 +432,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_conversation_title(self, text, thread_name, is_scheduled_task):
-        if not hasattr(self, 'conversation_title_creator') or self.conversation_title_creator is None:
-            error_message = "Conversation title creator not initialized, cannot update conversation title, check the chat completion settings"
-            self.error_signal.error_signal.emit(error_message)
-            logger.error(error_message)
-            return thread_name
-
         # Generate a new thread title based on the user's input text
-        new_thread_name = self.conversation_title_creator.get_thread_title(thread_name + " " + text)
+        user_request = thread_name + " " + text
+        new_thread_name = self.conversation_title_creator.process_messages(user_request=user_request, stream=False)
         if is_scheduled_task:
             new_thread_name = "Scheduled_" + new_thread_name
         unique_thread_title = self.conversation_thread_clients[self.active_ai_client_type].set_conversation_thread_name(new_thread_name, thread_name)

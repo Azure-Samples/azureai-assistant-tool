@@ -1,0 +1,40 @@
+{
+    "name": "TaskRequestsCreator",
+    "instructions": "config/instructions/tasks_requests_creator.md",
+    "model": "",
+    "assistant_id": "",
+    "knowledge_files": {},
+    "selected_functions": [
+        {
+            "type": "function",
+            "function": {
+                "name": "find_files_by_extension_in_directory",
+                "module": "azure.ai.assistant.functions.file_functions",
+                "description": "Searches for files matching specific criteria by file extension in a directory and its sub-directories (case-insensitive).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": "The directory to search in."
+                        },
+                        "file_extension": {
+                            "type": "string",
+                            "description": "The file extension to filter by."
+                        }
+                    },
+                    "required": [
+                        "directory",
+                        "file_extension"
+                    ]
+                }
+            }
+        }
+    ],
+    "knowledge_retrieval": false,
+    "code_interpreter": false,
+    "output_folder_path": "",
+    "ai_client_type": "AZURE_OPEN_AI",
+    "assistant_type": "chat_assistant",
+    "assistant_role": "system"
+}
