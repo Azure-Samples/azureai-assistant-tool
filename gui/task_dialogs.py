@@ -22,7 +22,8 @@ class CreateTaskDialog(QDialog):
         super().__init__(main_window)
 
         self.main_window = main_window
-        self.task_requests_creator = main_window.task_requests_creator
+        if hasattr(main_window, 'task_requests_creator'):
+            self.task_requests_creator = main_window.task_requests_creator
         self.assistant_config_manager = main_window.assistant_config_manager
         self.task_manager = task_manager
         self.config_folder = config_folder
@@ -377,6 +378,8 @@ class CreateTaskDialog(QDialog):
     
     def _generate_requests(self):
         try:
+            if not hasattr(self, 'task_requests_creator'):
+                raise Exception("Task request creator is not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             if self.src_folders_list.count() == 0:
                 error_message = "Please add at least one source folder."

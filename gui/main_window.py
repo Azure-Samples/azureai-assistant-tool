@@ -59,9 +59,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def deferred_init(self):
         try:
-            self.init_system_assistant_settings()
             self.initialize_variables()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
+            self.init_system_assistant_settings()
             self.init_system_assistants()
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
@@ -244,7 +244,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 )
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
-            self.active_ai_client_type = None
 
         finally:
             if client is None:
@@ -408,6 +407,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_conversation_title(self, text, thread_name, is_scheduled_task):
+        if not hasattr(self, 'conversation_title_creator'):
+            error_message = "Conversation title creator not initialized, check the system assistant settings"
+            logger.error(error_message)
+            return thread_name
         # Generate a new thread title based on the user's input text
         user_request = thread_name + " " + text
         new_thread_name = self.conversation_title_creator.process_messages(user_request=user_request, stream=False)
@@ -500,7 +503,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.speech_input_handler.stop_listening_from_mic()
             logger.debug(f"Start speech synthesis for last assistant message: {last_assistant_message.content}")
             input_text = last_assistant_message.content
-            if self.user_text_summarization_in_synthesis:
+            if self.user_text_summarization_in_synthesis and hasattr(self, 'speech_transcription_summarizer'):
                 input_text = self.speech_transcription_summarizer.process_messages(user_request=input_text, stream=False)
             result_future = self.speech_synthesis_handler.synthesize_speech_async(input_text)
             logger.debug(f"Speech synthesis result_future: {result_future}")

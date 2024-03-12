@@ -20,8 +20,9 @@ class CreateFunctionDialog(QDialog):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.function_spec_creator = main_window.function_spec_creator
-        self.function_impl_creator = main_window.function_impl_creator
+        if hasattr(main_window, 'function_spec_creator') and hasattr(main_window, 'function_impl_creator'):
+            self.function_spec_creator = main_window.function_spec_creator
+            self.function_impl_creator = main_window.function_impl_creator
         self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
         self.init_UI()
         self.previousSize = self.size()
@@ -231,6 +232,8 @@ class CreateFunctionDialog(QDialog):
 
     def _generateFunctionSpec(self, user_request):
         try:
+            if not hasattr(self, 'function_spec_creator'):
+                raise Exception("Function spec creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             self.spec_json = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
         except Exception as e:
@@ -245,6 +248,8 @@ class CreateFunctionDialog(QDialog):
 
     def _generateFunctionImpl(self, user_request, spec_json):
         try:
+            if not hasattr(self, 'function_impl_creator'):
+                raise Exception("Function impl creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             request = user_request + " that follows the following spec: " + spec_json
             self.code = self.function_impl_creator.process_messages(user_request=request, stream=False)

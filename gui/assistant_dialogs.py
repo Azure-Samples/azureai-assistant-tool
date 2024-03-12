@@ -31,7 +31,8 @@ class AssistantConfigDialog(QDialog):
     ):
         super().__init__(parent)
         self.main_window = parent
-        self.instructions_reviewer = self.main_window.instructions_reviewer
+        if hasattr(self.main_window, 'instructions_reviewer'):
+            self.instructions_reviewer = self.main_window.instructions_reviewer
         self.assistant_config_manager = self.main_window.assistant_config_manager
         self.assistant_type = assistant_type
         self.function_config_manager = function_config_manager
@@ -429,6 +430,8 @@ class AssistantConfigDialog(QDialog):
 
     def _check_instructions(self):
         try:
+            if not hasattr(self, 'instructions_reviewer'):
+                raise Exception("Instruction reviewer is not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             # Combine instructions and check them
             instructions = self.newInstructionsEdit.toPlainText()
