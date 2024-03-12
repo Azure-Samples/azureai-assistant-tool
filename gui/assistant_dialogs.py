@@ -11,8 +11,6 @@ from PySide6.QtGui import QIcon, QTextOption
 
 import json, os, shutil, threading
 
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
@@ -21,7 +19,6 @@ from gui.signals import UserInputSendSignal, UserInputSignal
 from gui.speech_input_handler import SpeechInputHandler
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
-from gui.utils import resource_path
 
 
 class AssistantConfigDialog(QDialog):
@@ -33,6 +30,7 @@ class AssistantConfigDialog(QDialog):
     ):
         super().__init__(parent)
         self.main_window = parent
+        self.instructions_reviewer = self.main_window.instructions_reviewer
         self.assistant_config_manager = self.main_window.assistant_config_manager
         self.assistant_type = assistant_type
         self.function_config_manager = function_config_manager
@@ -40,31 +38,6 @@ class AssistantConfigDialog(QDialog):
         self.init_variables()
         self.init_speech_input()
         self.init_ui()
-        self.init_instructions_assistant()
-
-    def init_instructions_assistant(self):
-        instructions_reviewer_config : AssistantConfig = self.assistant_config_manager.get_config("InstructionsReviewer")
-
-        try:
-            ai_client_type : AIClientType = self.main_window.active_ai_client_type
-            if ai_client_type is None:
-                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, instructions review may not work as expected.")
-            else:
-                # update the ai_client_type in the config_json
-                instructions_reviewer_config.ai_client_type = ai_client_type.name
-
-            model = instructions_reviewer_config.model
-            if not model:
-                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
-                model = self.main_window.system_assistant_model
-                instructions_reviewer_config.model = model
-            if not model:
-                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
-                return
-
-            self.instructions_checker = ChatAssistantClient.from_config(instructions_reviewer_config)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
     def init_variables(self):
         self.knowledge_files_dict = {}  # Dictionary to store knowledge file paths and IDs
@@ -455,7 +428,7 @@ class AssistantConfigDialog(QDialog):
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             # Combine instructions and check them
             instructions = self.newInstructionsEdit.toPlainText()
-            self.reviewed_instructions = self.instructions_checker.process_messages(user_request=instructions, stream=False)
+            self.reviewed_instructions = self.instructions_reviewer.process_messages(user_request=instructions, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(str(e))
         finally:

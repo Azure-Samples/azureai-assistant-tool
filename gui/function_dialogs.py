@@ -10,11 +10,7 @@ from PySide6.QtCore import Qt
 import json, re
 import threading
 
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
-from azure.ai.assistant.management.ai_client_factory import AIClientType
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
@@ -24,39 +20,11 @@ class CreateFunctionDialog(QDialog):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
+        self.function_spec_creator = main_window.function_spec_creator
+        self.function_impl_creator = main_window.function_impl_creator
         self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
-        self.assistant_config_manager : AssistantConfigManager = main_window.assistant_config_manager
         self.init_UI()
-        self.init_function_assistants()
         self.previousSize = self.size()
-
-    def init_function_assistants(self):
-        function_spec_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionSpecCreator")
-        function_impl_config : AssistantConfig = self.assistant_config_manager.get_config("FunctionImplCreator")
-
-        try:
-            ai_client_type : AIClientType = self.main_window.active_ai_client_type
-            if ai_client_type is None:
-                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, function generation may not work as expected.")
-            else:
-                # update the ai_client_type in the config_json
-                function_spec_config.ai_client_type = ai_client_type.name
-                function_impl_config.ai_client_type = ai_client_type.name
-
-            model = function_spec_config.model
-            if not model:
-                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
-                model = self.main_window.system_assistant_model
-                function_spec_config.model = model
-                function_impl_config.model = model
-            if not model:
-                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
-                return
-
-            self.function_spec_creator = ChatAssistantClient.from_config(function_spec_config)
-            self.function_impl_creator = ChatAssistantClient.from_config(function_impl_config)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
     def init_UI(self):
         self.setWindowTitle("Create/Edit Functions")

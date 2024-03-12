@@ -149,6 +149,7 @@ class SettingsMenu:
         dialog = ClientSettingsDialog(self.main_window)
         if dialog.exec_() == QDialog.Accepted:
             try:
+                self.main_window.init_system_assistant_settings()
                 self.main_window.init_system_assistants()
             except Exception as e:
                 QMessageBox.warning(self.main_window, "Error", f"An error occurred while updating the settings: {e}")

@@ -4,7 +4,7 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout, QApplication
+from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
@@ -33,7 +33,7 @@ from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
 from gui.conversation import ConversationView
 from gui.signals import ConversationAppendChunkSignal, AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
-
+from gui.utils import init_system_assistant
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
@@ -59,49 +59,24 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def deferred_init(self):
         try:
-            self.init_system_assistants()
-            self.initialize_system_components()
-            self.initialize_assistant_components()
+            self.init_system_assistant_settings()
+            self.initialize_variables()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
-            self.initialize_title_creator()
+            self.init_system_assistants()
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
-    def initialize_title_creator(self):
-        conversation_title_creator_config : AssistantConfig = self.assistant_config_manager.get_config("ConversationTitleCreator")
-        try:
-            ai_client_type : AIClientType = self.active_ai_client_type
-            if ai_client_type is None:
-                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, conversation title generation may not work as expected.")
-            else:
-                # update the ai_client_type in the config_json
-                conversation_title_creator_config.ai_client_type = ai_client_type.name
+    def init_system_assistants(self):
+        init_system_assistant(self, "ConversationTitleCreator")
+        init_system_assistant(self, "SpeechTranscriptionSummarizer")
+        init_system_assistant(self, "FunctionSpecCreator")
+        init_system_assistant(self, "FunctionImplCreator")
+        init_system_assistant(self, "TaskRequestsCreator")
+        init_system_assistant(self, "InstructionsReviewer")
 
-            model = conversation_title_creator_config.model
-            if not model:
-                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
-                model = self.system_assistant_model
-                conversation_title_creator_config.model = model
-            if not model:
-                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
-                return
-
-            self.conversation_title_creator = ChatAssistantClient.from_config(conversation_title_creator_config)
-        except Exception as e:
-            error_message = f"An error occurred while initializing the title creator, check the system settings: {e}"
-            self.error_signal.error_signal.emit(error_message)
-
-    def initialize_system_components(self):
-        try:
-            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
-        except Exception as e:
-            error_message = f"An error occurred while initializing the chat components: {e}"
-            self.error_signal.error_signal.emit(error_message)
-            logger.error(error_message)
-
-    def initialize_assistant_components(self):
+    def initialize_variables(self):
         self.scheduled_task_threads = {}
         self.thread_lock = threading.Lock()
         self.assistants_processing = {}
@@ -125,18 +100,18 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 loaded_settings = json.load(file)
                 self.system_assistant_settings.update(loaded_settings)
 
-    def init_system_assistants(self):
+    def init_system_assistant_settings(self):
         self.load_system_assistant_settings()
 
-        ai_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
-        self.system_assistant_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
-        api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
-        if ai_client_type == AIClientType.AZURE_OPEN_AI.name:
+        self.system_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
+        self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
+        self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
+        if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
             self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.AZURE_OPEN_AI,
-                api_version=api_version
+                api_version=self.system_api_version
             )
-        elif ai_client_type == AIClientType.OPEN_AI.name:
+        elif self.system_client_type == AIClientType.OPEN_AI.name:
             self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.OPEN_AI
             )
@@ -145,7 +120,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.initialize_ui_components()
         self.initialize_signals()
         self.initialize_ui_layout()
-        self.initialize_speech_input()
+        self.initialize_speech()
 
     def initialize_ui_components(self):
         # Main window settings
@@ -238,9 +213,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Set the main splitter as the central widget
         self.setCentralWidget(main_splitter)
 
-    def initialize_speech_input(self):
+    def initialize_speech(self):
         try:
             self.speech_input_handler = SpeechInputHandler(self, self.speech_hypothesis_signal.update_signal, self.speech_final_signal.send_signal)
+            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
         except ValueError as e:
             QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech input handler: {e}")
             logger.error(f"Error initializing speech input handler: {e}")
@@ -523,7 +499,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             # microphone needs to be stopped before speech synthesis otherwise synthesis output will be heard by the microphone
             self.speech_input_handler.stop_listening_from_mic()
             logger.debug(f"Start speech synthesis for last assistant message: {last_assistant_message.content}")
-            result_future = self.speech_synthesis_handler.synthesize_speech_async(last_assistant_message.content)
+            input_text = last_assistant_message.content
+            if self.user_text_summarization_in_synthesis:
+                input_text = self.speech_transcription_summarizer.process_messages(input_text, stream=False)
+            result_future = self.speech_synthesis_handler.synthesize_speech_async(input_text)
             logger.debug(f"Speech synthesis result_future: {result_future}")
             # when synthesis is complete, on_speech_synthesis_complete will be called and listening from microphone will be started again
 

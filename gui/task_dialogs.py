@@ -10,9 +10,6 @@ from PySide6.QtGui import QColor, QPalette, QIntValidator
 
 import json, os, threading, ast
 
-from azure.ai.assistant.management.ai_client_factory import AIClientType
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.task import BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.logger_module import logger
@@ -25,6 +22,7 @@ class CreateTaskDialog(QDialog):
         super().__init__(main_window)
 
         self.main_window = main_window
+        self.task_requests_creator = main_window.task_requests_creator
         self.assistant_config_manager = main_window.assistant_config_manager
         self.task_manager = task_manager
         self.config_folder = config_folder
@@ -82,31 +80,6 @@ class CreateTaskDialog(QDialog):
         self.basic_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.basic_task_selector))
         self.batch_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.batch_task_selector))
         self.multi_task_selector.currentIndexChanged.connect(lambda: self.on_task_selected(self.multi_task_selector))
-        self.init_task_assistant()
-
-    def init_task_assistant(self):
-        task_request_config : AssistantConfig = self.assistant_config_manager.get_config("TaskRequestsCreator")
-
-        try:
-            ai_client_type : AIClientType = self.main_window.active_ai_client_type
-            if ai_client_type is None:
-                QMessageBox.warning(self, "Warning", f"Selected active AI client is not initialized properly, task request generation may not work as expected.")
-            else:
-                # update the ai_client_type in the config_json
-                task_request_config.ai_client_type = ai_client_type.name
-
-            model = task_request_config.model
-            if not model:
-                logger.warning("Model not found in the function spec assistant config, using the system assistant model.")
-                model = self.main_window.system_assistant_model
-                task_request_config.model = model
-            if not model:
-                QMessageBox.warning(self, "Error", "Model not found in the function spec assistant config, please check the system settings.")
-                return
-
-            self.task_requests_creator = ChatAssistantClient.from_config(task_request_config)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while initializing the function assistants, check the system settings: {e}")
 
     def start_processing(self, status):
         self.status_bar.start_animation(status)
