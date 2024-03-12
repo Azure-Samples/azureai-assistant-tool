@@ -501,7 +501,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.debug(f"Start speech synthesis for last assistant message: {last_assistant_message.content}")
             input_text = last_assistant_message.content
             if self.user_text_summarization_in_synthesis:
-                input_text = self.speech_transcription_summarizer.process_messages(input_text, stream=False)
+                input_text = self.speech_transcription_summarizer.process_messages(user_request=input_text, stream=False)
             result_future = self.speech_synthesis_handler.synthesize_speech_async(input_text)
             logger.debug(f"Speech synthesis result_future: {result_future}")
             # when synthesis is complete, on_speech_synthesis_complete will be called and listening from microphone will be started again

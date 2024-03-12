@@ -19,6 +19,7 @@ from gui.signals import UserInputSendSignal, UserInputSignal
 from gui.speech_input_handler import SpeechInputHandler
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
+from gui.utils import resource_path
 
 
 class AssistantConfigDialog(QDialog):
@@ -83,9 +84,9 @@ class AssistantConfigDialog(QDialog):
         tabWidget = QTabWidget(self)
         tabWidget.currentChanged.connect(self.on_tab_changed)
 
-        # Create Configuration tab
+        # Create General Configuration tab
         configTab = self.create_config_tab()
-        tabWidget.addTab(configTab, "Configuration")
+        tabWidget.addTab(configTab, "General")
 
         # Create Tools tab
         toolsTab = self.create_tools_tab()
@@ -213,7 +214,7 @@ class AssistantConfigDialog(QDialog):
         return configTab
 
     def create_tools_tab(self):
-        toolsTab = QWidget()  # Tools tab
+        toolsTab = QWidget()
         toolsLayout = QVBoxLayout(toolsTab)
 
         # Scroll Area for functions

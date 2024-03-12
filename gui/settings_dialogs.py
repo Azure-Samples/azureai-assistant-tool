@@ -36,7 +36,7 @@ class GeneralSettingsDialog(QDialog):
         self.useSystemAssistantForThreadsCheckbox.setChecked(self.main_window.use_system_assistant_for_thread_name)
 
         # Text summarization checkbox for long messages for speech synthesis
-        self.useTextSummarizationCheckbox = QCheckBox("Enable text summarization for long messages for speech synthesis", self)
+        self.useTextSummarizationCheckbox = QCheckBox("Enable system assistant to summarize long messages for speech synthesis", self)
         self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
 
         # Buttons

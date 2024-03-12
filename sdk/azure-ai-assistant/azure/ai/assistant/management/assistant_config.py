@@ -94,6 +94,8 @@ class AssistantConfig:
         self._config_data['code_interpreter'] = self._code_interpreter
         self._config_data['selected_functions'] = self._selected_functions
         self._config_data['output_folder_path'] = self._output_folder_path
+        self._config_data['assistant_type'] = self._assistant_type
+        self._config_data['assistant_role'] = self._assistant_role
         return self._config_data
 
     def _get_function_configs(self):
