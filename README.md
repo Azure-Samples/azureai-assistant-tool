@@ -171,6 +171,10 @@ This command will start the Azure AI Assistant Tool and you can interact with it
 
 ![Ai-Assistant-Tool-screenshot](/assets/AzureAIAssistantTool2.png)
 
+### Tool In Action - Add Functions To Your Assistant
+
+![Ai-Assistant-Tool-Functions-screenshot](/assets/AssistantToolMultiFunctions.png)
+
 ## 📖 License
 The Azure AI Assistant Tool is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
