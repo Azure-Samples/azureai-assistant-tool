@@ -22,6 +22,81 @@ import copy
 import uuid
 
 
+class EventHandler(AssistantEventHandler):
+    def __init__(self, parent : "AssistantClient", thread_id, is_submit_tool_call=False):
+        super().__init__()
+        self._parent = parent
+        self._name = parent._assistant_config.name
+        self._is_first_message = True
+        self._is_started = False
+        self._is_submit_tool_call = is_submit_tool_call
+        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._parent._ai_client_type).get_config()
+        self._thread_name = threads_config.get_thread_name_by_id(thread_id)
+        self._thread_id = thread_id
+
+    def on_exception(self, exception: Exception) -> None:
+        print(f"on_exception called, exception: {exception}")
+
+    def on_timeout(self) -> None:
+        print(f"on_timeout called")
+
+    def on_end(self) -> None:
+        print(f"on_end called, run_id: {self.current_run.id}")
+        if self._is_submit_tool_call is False:
+            self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
+            self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), self._thread_name)
+
+    def on_message_created(self, message) -> None:
+        print(f"on_message_created called, message: {message}")
+
+    def on_message_delta(self, delta, snapshot) -> None:
+        print(f"on_message_delta called, delta: {delta}")
+
+    def on_message_done(self, message) -> None:
+        print(f"on_message_done called, message: {message}")
+
+    def on_text_created(self, text) -> None:
+        print(f"on_text_created called, text: {text}")
+        if self._is_started is False and self._is_submit_tool_call is False:
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            self._is_started = True
+
+    def on_text_delta(self, delta, snapshot):
+        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
+        self._is_first_message = False
+
+    def on_text_done(self, text) -> None:
+        print(f"on_text_done called, text: {text}")
+
+    def on_tool_call_created(self, tool_call):
+        print(f"on_tool_call_created called, tool_call: {tool_call}")
+        if self._is_started is False and self._is_submit_tool_call is False:
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            self._is_started = True
+        if self.current_run.required_action:
+            print(f"create, run.required_action.type: {self.current_run.required_action.type}")
+
+    def on_tool_call_delta(self, delta, snapshot):
+        print(f"on_tool_call_delta called, delta: {delta}")
+        if delta.type == 'function':
+            if delta.function.name:
+                print(f"\n{delta.function.name}", flush=True)
+            if delta.function.arguments:
+                print(f"\n{delta.function.arguments}", flush=True)
+            if delta.function.output:
+                print(f"\n\noutput >", flush=True)
+        if self.current_run.required_action:
+            print(f"delta, run.required_action.type: {self.current_run.required_action.type}")
+
+    def on_tool_call_done(self, tool_call) -> None:
+        print(f"on_tool_call_done called, tool_call: {tool_call}")
+        if self.current_run.required_action:
+            print(f"done, run.required_action.type: {self.current_run.required_action.type}")
+            if self.current_run.required_action.type == "submit_tool_outputs":
+                tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
+                self._parent._handle_required_action(self._name, self._thread_id, self.current_run.id, tool_calls, stream=True)
+
+
 class AssistantClient:
     """
     A class that manages an assistant client.
@@ -351,17 +426,15 @@ class AssistantClient:
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        assistant_config_manager = AssistantConfigManager.get_instance()
-        assistant_config = assistant_config_manager.get_config(self._name)
-        assistant_id = assistant_config.assistant_id
-        threads_config = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
+        assistant_id = self._assistant_config.assistant_id
+        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
             if stream:
-                self._process_messages_streaming(thread_name, thread_id, assistant_config, additional_instructions, timeout)
+                self._process_messages_streaming(thread_name, thread_id, additional_instructions, timeout)
             else:
-                self._process_messages_non_streaming(thread_name, thread_id, assistant_id, additional_instructions, timeout)
+                self._process_messages_non_streaming(thread_name, thread_id, additional_instructions, timeout)
         except Exception as e:
             logger.error(f"Error occurred during processing messages: {e}")
             raise EngineError(f"Error occurred during processing messages: {e}")
@@ -370,7 +443,6 @@ class AssistantClient:
             self,
             thread_name: str,
             thread_id: str,
-            assistant_id: str,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None
     ) -> None:
@@ -379,22 +451,21 @@ class AssistantClient:
 
         :param thread_name: The name of the thread to process.
         :param thread_id: The ID of the thread to process.
-        :param assistant_id: The ID of the assistant to use.
         :param additional_instructions: Additional instructions to provide to the assistant.
         :param timeout: The HTTP request timeout in seconds.
         """
         try:
-            logger.info(f"Creating a run for assistant: {assistant_id} and thread: {thread_id}")
+            logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
             if additional_instructions is None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id,
+                    assistant_id=self.assistant_config.assistant_id,
                     timeout=timeout
                 )
             else:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id,
+                    assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
                     timeout=timeout
                 )
@@ -456,7 +527,6 @@ class AssistantClient:
             self, 
             thread_name: str,
             thread_id: str,
-            assistant_config: AssistantConfig,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None
     ) -> None:
@@ -465,83 +535,18 @@ class AssistantClient:
 
         :param thread_name: The name of the thread to process.
         :param thread_id: The ID of the thread to process.
-        :param assistant_config: Configuration object for the assistant.
         :param additional_instructions: Additional instructions to provide to the assistant.
         :param callbacks: Callback functions to handle updates and completion.
         """
         try:
-            logger.info(f"Creating and streaming a run for assistant: {assistant_config.assistant_id} and thread: {thread_id}")
-
-            class EventHandler(AssistantEventHandler):
-                def __init__(self, parent, assistant_config):
-                    super().__init__()
-                    self._parent = parent
-                    self._name = assistant_config.name
-                    self._is_first_message = True
-                    self._is_started = False
-
-                def on_exception(self, exception: Exception) -> None:
-                    print(f"on_exception called, exception: {exception}")
-
-                def on_timeout(self) -> None:
-                    print(f"on_timeout called")
-
-                def on_end(self) -> None:
-                    print(f"on_end called, run_id: {self.current_run.id}")
-                    self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", thread_name)
-                    self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), thread_name)
-
-                def on_message_created(self, message) -> None:
-                    print(f"on_message_created called, message: {message}")
-
-                def on_message_delta(self, delta, snapshot) -> None:
-                    print(f"on_message_delta called, delta: {delta}")
-
-                def on_message_done(self, message) -> None:
-                    print(f"on_message_done called, message: {message}")
-
-                def on_text_delta(self, delta, snapshot):
-                    if self._is_first_message:
-                        self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
-                        self._is_started = True
-                    self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", thread_name, self._is_first_message, delta.value)
-                    self._is_first_message = False
-
-                def on_text_done(self, text) -> None:
-                    print(f"on_text_done called, text: {text}")
-
-                def on_tool_call_created(self, tool_call):
-                    print(f"on_tool_call_created called, tool_call: {tool_call}")
-                    if self._is_started is False:
-                        self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
-                        self._is_started = True
-                    if self.current_run.required_action:
-                        print(f"create, run.required_action.type: {self.current_run.required_action.type}")
-
-                def on_tool_call_delta(self, delta, snapshot):
-                    print(f"on_tool_call_delta called, delta: {delta}")
-                    if delta.type == 'function':
-                        if delta.function.name:
-                            print(f"\n{delta.function.name}", flush=True)
-                        if delta.function.arguments:
-                            print(f"\n{delta.function.arguments}", flush=True)
-                        if delta.function.output:
-                            print(f"\n\noutput >", flush=True)
-                    if self.current_run.required_action:
-                        print(f"delta, run.required_action.type: {self.current_run.required_action.type}")
-
-                def on_tool_call_done(self, tool_call) -> None:
-                    print(f"on_tool_call_done called, tool_call: {tool_call}")
-                    if self.current_run.required_action:
-                        tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
-                        self._parent._handle_required_action(self._name, thread_id, self.current_run.id, tool_calls)
+            logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
             # Start the streaming process
             with self._ai_client.beta.threads.runs.create_and_stream(
                 thread_id=thread_id,
-                assistant_id=assistant_config.assistant_id,
-                instructions=assistant_config.instructions,
-                event_handler=EventHandler(self, assistant_config),
+                assistant_id=self._assistant_config.assistant_id,
+                instructions=self._assistant_config.instructions,
+                event_handler=EventHandler(self, thread_id)
             ) as stream:
                 stream.until_done()
 
@@ -559,7 +564,8 @@ class AssistantClient:
         logger.info("User processing run cancellation requested.")
         self._user_input_processing_cancel_requested = True
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
+        print("Handling required action")
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
             self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
@@ -569,18 +575,30 @@ class AssistantClient:
         if not tool_outputs:
             return False
 
-        self._ai_client.beta.threads.runs.submit_tool_outputs(
-            thread_id=thread_id,
-            run_id=run_id,
-            tool_outputs=tool_outputs,
-            timeout=timeout
-        )
+        if stream:
+            print("Submitting tool outputs with stream")
+            with self._ai_client.beta.threads.runs.submit_tool_outputs_stream(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs,
+                timeout=timeout,
+                event_handler=EventHandler(self, thread_id, is_submit_tool_call=True)
+            ) as stream:
+                stream.until_done()
+        else:
+            self._ai_client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs,
+                timeout=timeout
+            )
         return True
 
     def _process_tool_calls(self, name, run_id, tool_calls):
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
+            print(f"Handling tool call: {tool_call}")
             function_response = self._handle_function_call(tool_call)
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
