@@ -581,7 +581,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         return thread_name in self.scheduled_task_threads.values()
 
     # PySide6 overrides, UI events
-
     def changeEvent(self, event):
         if event.type() == QEvent.ActivationChange:
             if self.isActiveWindow():

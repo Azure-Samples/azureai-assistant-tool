@@ -400,7 +400,7 @@ class AssistantClient:
             while True:
                 time.sleep(0.5)
 
-                logger.info(f"Retrieving run: {run.id} with status: {run.status}")
+                logger.debug(f"Retrieving run: {run.id} with status: {run.status}")
                 run = self._ai_client.beta.threads.runs.retrieve(
                     thread_id=thread_id,
                     run_id=run.id,
@@ -523,7 +523,6 @@ class AssistantClient:
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
-            logger.info(f"Handling tool call: {tool_call}")
             function_response = self._handle_function_call(tool_call)
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")

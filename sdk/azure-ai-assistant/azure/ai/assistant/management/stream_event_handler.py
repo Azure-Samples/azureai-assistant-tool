@@ -46,17 +46,16 @@ class StreamEventHandler(AssistantEventHandler):
 
     @override
     def on_exception(self, exception: Exception) -> None:
-        logger.info(f"on_exception called, exception: {exception}")
+        logger.debug(f"on_exception called, exception: {exception}")
 
     @override
     def on_timeout(self) -> None:
-        logger.info(f"on_timeout called")
+        logger.debug(f"on_timeout called")
 
     @override
     def on_end(self) -> None:
         logger.info(f"on_end called, run_id: {self.current_run.id}")
         if self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
             self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), self._thread_name)
 
     @override
@@ -65,10 +64,11 @@ class StreamEventHandler(AssistantEventHandler):
 
     @override
     def on_message_delta(self, delta, snapshot) -> None:
-        logger.info(f"on_message_delta called, delta: {delta}")
+        logger.debug(f"on_message_delta called, delta: {delta}")
 
     @override
     def on_message_done(self, message) -> None:
+        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
         logger.info(f"on_message_done called, message: {message}")
 
     @override
@@ -80,7 +80,7 @@ class StreamEventHandler(AssistantEventHandler):
 
     @override
     def on_text_delta(self, delta, snapshot):
-        logger.info(f"on_text_delta called, delta: {delta}")
+        logger.debug(f"on_text_delta called, delta: {delta}")
         self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
         self._is_first_message = False
 
@@ -99,16 +99,16 @@ class StreamEventHandler(AssistantEventHandler):
 
     @override
     def on_tool_call_delta(self, delta, snapshot):
-        logger.info(f"on_tool_call_delta called, delta: {delta}")
+        logger.debug(f"on_tool_call_delta called, delta: {delta}")
         if delta.type == 'function':
             if delta.function.name:
-                logger.info(f"{delta.function.name}")
+                logger.debug(f"{delta.function.name}")
             if delta.function.arguments:
-                logger.info(f"{delta.function.arguments}")
+                logger.debug(f"{delta.function.arguments}")
             if delta.function.output:
-                logger.info(f"{delta.function.output}")
+                logger.debug(f"{delta.function.output}")
         if self.current_run.required_action:
-            logger.info(f"delta, run.required_action.type: {self.current_run.required_action.type}")
+            logger.debug(f"delta, run.required_action.type: {self.current_run.required_action.type}")
 
     @override
     def on_tool_call_done(self, tool_call) -> None:
