@@ -92,7 +92,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Go to the`sdk/azure-ai-assistant` folder
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.7a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.8a1-py3-none-any.whl`
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
 ### Step 4: Install Python UI libraries

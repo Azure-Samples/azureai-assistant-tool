@@ -18,6 +18,7 @@ from datetime import datetime
 import json, time, importlib, sys, os
 import copy
 
+
 class AssistantClient:
     """
     A class that manages an assistant client.
@@ -334,44 +335,59 @@ class AssistantClient:
 
     def process_messages(
             self, 
-            thread_name : str,
-            additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None
+            thread_name: str,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None,
+            stream: Optional[bool] = False
     ) -> None:
         """
-        Process the messages in given thread.
+        Process the messages in given thread, either in streaming or non-streaming mode.
 
         :param thread_name: The name of the thread to process.
-        :type thread_name: str
         :param additional_instructions: Additional instructions to provide to the assistant.
-        :type additional_instructions: Optional[str]
         :param timeout: The HTTP request timeout in seconds.
-        :type timeout: Optional[float]
-
-        :return: None
-        :rtype: None
+        :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        assistant_config_manager = AssistantConfigManager.get_instance()
-        assistant_config = assistant_config_manager.get_config(self._name)
-        assistant_id = assistant_config.assistant_id
-        # TODO retrieve thread_id from ConversationThreadClient which then retrieve from cloud service
+        assistant_id = self._assistant_config.assistant_id
         threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
+            if stream:
+                self._process_messages_streaming(thread_name, thread_id, additional_instructions, timeout)
+            else:
+                self._process_messages_non_streaming(thread_name, thread_id, additional_instructions, timeout)
+        except Exception as e:
+            logger.error(f"Error occurred during processing messages: {e}")
+            raise EngineError(f"Error occurred during processing messages: {e}")
 
-            logger.info(f"Creating a run for assistant: {assistant_id} and thread: {thread_id}")
-            # Azure OpenAI does not currently support additional_instructions
+    def _process_messages_non_streaming(
+            self,
+            thread_name: str,
+            thread_id: str,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Process the messages in a given thread without streaming.
+
+        :param thread_name: The name of the thread to process.
+        :param thread_id: The ID of the thread to process.
+        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param timeout: The HTTP request timeout in seconds.
+        """
+        try:
+            logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
             if additional_instructions is None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id,
+                    assistant_id=self.assistant_config.assistant_id,
                     timeout=timeout
                 )
             else:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
-                    assistant_id=assistant_id,
+                    assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
                     timeout=timeout
                 )
@@ -384,7 +400,7 @@ class AssistantClient:
             while True:
                 time.sleep(0.5)
 
-                logger.info(f"Retrieving run: {run.id} with status: {run.status}")
+                logger.debug(f"Retrieving run: {run.id} with status: {run.status}")
                 run = self._ai_client.beta.threads.runs.retrieve(
                     thread_id=thread_id,
                     run_id=run.id,
@@ -426,8 +442,41 @@ class AssistantClient:
                         return None
 
         except Exception as e:
-            logger.error(f"Error occurred during processing run: {e}")
-            raise EngineError(f"Error occurred during processing run: {e}")
+            logger.error(f"Error occurred during non-streaming processing run: {e}")
+            raise EngineError(f"Error occurred during non-streaming processing run: {e}")
+
+    def _process_messages_streaming(
+            self, 
+            thread_name: str,
+            thread_id: str,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Process the messages in a given thread with streaming.
+
+        :param thread_name: The name of the thread to process.
+        :param thread_id: The ID of the thread to process.
+        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param timeout: The HTTP request timeout in seconds.
+        """
+        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
+        try:
+            logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
+
+            # Start the streaming process
+            with self._ai_client.beta.threads.runs.create_and_stream(
+                thread_id=thread_id,
+                assistant_id=self._assistant_config.assistant_id,
+                instructions=self._assistant_config.instructions,
+                event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                timeout=timeout
+            ) as stream:
+                stream.until_done()
+
+        except Exception as e:
+            logger.error(f"Error occurred during streaming processing run: {e}")
+            raise EngineError(f"Error occurred during streaming processing run: {e}")
 
     def cancel_processing(self) -> None:
         """
@@ -439,7 +488,9 @@ class AssistantClient:
         logger.info("User processing run cancellation requested.")
         self._user_input_processing_cancel_requested = True
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None) -> bool:
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
+        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
+        logger.info("Handling required action")
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
             self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
@@ -449,12 +500,23 @@ class AssistantClient:
         if not tool_outputs:
             return False
 
-        self._ai_client.beta.threads.runs.submit_tool_outputs(
-            thread_id=thread_id,
-            run_id=run_id,
-            tool_outputs=tool_outputs,
-            timeout=timeout
-        )
+        if stream:
+            logger.info("Submitting tool outputs with stream")
+            with self._ai_client.beta.threads.runs.submit_tool_outputs_stream(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs,
+                timeout=timeout,
+                event_handler=StreamEventHandler(self, thread_id, is_submit_tool_call=True)
+            ) as stream:
+                stream.until_done()
+        else:
+            self._ai_client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs,
+                timeout=timeout
+            )
         return True
 
     def _process_tool_calls(self, name, run_id, tool_calls):

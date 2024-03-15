@@ -63,7 +63,7 @@ setup(
         'azure.ai.assistant': ['py.typed'],
     },
     install_requires=[
-        "openai>=1.6.0,<=1.12.0",
+        "openai>=1.14.0",
         "python-Levenshtein>=0.20.0,<=0.23.0",
         "fuzzywuzzy>=0.17.0,<=0.18.0",
         "Pillow>=10.1.0,<=10.2.0",

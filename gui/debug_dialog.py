@@ -4,7 +4,7 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QTextEdit, QHBoxLayout, QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QComboBox, QTextEdit, QHBoxLayout, QListWidget, QListWidgetItem, QCheckBox
 from PySide6.QtCore import Signal, Slot, Qt, QObject, QThread, Qt, QMetaObject, Q_ARG, QTimer
 
 import logging, threading
@@ -21,14 +21,18 @@ class LogMessageProcessor(QObject):
         self.thread_lock = threading.Lock()
         self.bufferTimer = QTimer(self)
         self.bufferTimer.timeout.connect(self.flushBuffer)
+        self.timer_interval = 1000  # Default timer interval in milliseconds
 
     def startTimer(self):
         # Safe method to start the timer from the correct thread
-        self.bufferTimer.start(1000)  # Adjust the interval as needed
+        self.bufferTimer.start(self.timer_interval)
 
     def stopTimer(self):
         # Safe method to stop the timer
         self.bufferTimer.stop()
+
+    def setTimerInterval(self, interval):
+        self.timer_interval = interval
 
     @Slot(str)
     def processMessage(self, message):
@@ -36,7 +40,7 @@ class LogMessageProcessor(QObject):
             self.messageBuffer.append(message)
             if not self.bufferTimer.isActive():
                 # Use QMetaObject.invokeMethod to safely start the timer from the correct thread
-                QMetaObject.invokeMethod(self.bufferTimer, "start", Qt.AutoConnection, Q_ARG(int, 1000))
+                QMetaObject.invokeMethod(self.bufferTimer, "start", Qt.AutoConnection, Q_ARG(int, self.timer_interval))
 
     def flushBuffer(self):
         with self.thread_lock:
@@ -102,6 +106,10 @@ class DebugViewDialog(QDialog):
         controlLayout.addWidget(self.logLevelComboBox)
         controlLayout.addWidget(self.clearButton)
         logViewLayout.addLayout(controlLayout)
+        # Add checkbox for enabling openai logging
+        openaiLoggingCheckBox = QCheckBox("Enable OpenAI logging")
+        openaiLoggingCheckBox.stateChanged.connect(self.toggle_openai_logging)
+        logViewLayout.addWidget(openaiLoggingCheckBox)
 
         # Populate log level combo box
         for level in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
@@ -137,35 +145,47 @@ class DebugViewDialog(QDialog):
         self.processorThread.start()
 
     def append_text_slot(self, message):
-        self.textEdit.append(message)
+        if self.is_filter_selected():
+            # Filter based on selected items in the list box
+            selected_filters = [self.filterList.item(i).text().lower() for i in range(self.filterList.count()) if self.filterList.item(i).checkState() == Qt.CheckState.Checked]
+
+            # Re-add messages that match any of the selected filters
+            if any(filter_word in message.lower() for filter_word in selected_filters):
+                self.textEdit.append(message)
+        else:
+            self.textEdit.append(message)
         # Store the message
         self.logMessages.append(message)
-        # Apply the current filter
-        self.apply_filter()
 
     def queue_append_text(self, message):
         QMetaObject.invokeMethod(self.logProcessor, 'processMessage', Qt.QueuedConnection, Q_ARG(str, message))
+
+    def toggle_openai_logging(self, state):
+        level = self.logLevelComboBox.itemData(self.logLevelComboBox.currentIndex())
+        openai_logger = logging.getLogger("openai")
+        if state == Qt.CheckState.Checked.value:
+            openai_logger.setLevel(level)
+        else:
+            openai_logger.setLevel(0)
 
     def change_log_level(self, index):
         level = self.logLevelComboBox.itemData(index)
         logger.setLevel(level)
 
-        # Set the log level for the OpenAI logger
-        openai_logger = logging.getLogger("openai")
-        openai_logger.setLevel(level)
-
     def clear_log_window(self):
         self.textEdit.clear()
         self.logMessages.clear()
 
-    def apply_filter(self):
+    def is_filter_selected(self):
         # Check if any filter is selected
         is_any_filter_selected = any(self.filterList.item(i).checkState() == Qt.CheckState.Checked for i in range(self.filterList.count()))
+        return is_any_filter_selected
 
+    def apply_filter(self):
         # Clear the textEdit widget
         self.textEdit.clear()
 
-        if is_any_filter_selected:
+        if self.is_filter_selected():
             # Filter based on selected items in the list box
             selected_filters = [self.filterList.item(i).text().lower() for i in range(self.filterList.count()) if self.filterList.item(i).checkState() == Qt.CheckState.Checked]
 
@@ -180,7 +200,6 @@ class DebugViewDialog(QDialog):
             for message in self.logMessages:
                 if filter_text in message.lower():
                     self.textEdit.append(message)
-        pass
 
     def add_filter_word(self):
         # Get the text from QLineEdit
