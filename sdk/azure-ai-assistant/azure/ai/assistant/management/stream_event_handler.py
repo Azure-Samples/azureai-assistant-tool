@@ -54,7 +54,7 @@ class StreamEventHandler(AssistantEventHandler):
 
     @override
     def on_end(self) -> None:
-        logger.info(f"on_end called, run_id: {self.current_run.id}")
+        logger.info(f"on_end called, run_id: {self.current_run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
         if self._is_submit_tool_call is False:
             self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), self._thread_name)
 
