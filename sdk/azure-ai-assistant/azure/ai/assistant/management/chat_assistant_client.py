@@ -216,7 +216,7 @@ class ChatAssistantClient:
             user_request: Optional[str] = None,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = True,
+            stream: Optional[bool] = False,
             temperature: Optional[float] = None,
             seed: Optional[int] = None
     ) -> Optional[str]:

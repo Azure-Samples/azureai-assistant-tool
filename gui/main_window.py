@@ -44,6 +44,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         }
         self.connection_timeout : float = 90.0
         self.use_system_assistant_for_thread_name : bool = False
+        self.use_streaming_for_assistant : bool = False
         self.user_text_summarization_in_synthesis : bool = False
         self.active_ai_client_type = None
         self.in_background = False
@@ -394,7 +395,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 assistant_client = self.assistant_client_manager.get_client(assistant_name)
                 if assistant_client is not None:
                     start_time = time.time()
-                    assistant_client.process_messages(thread_name=thread_name, additional_instructions=additional_instructions, timeout=self.connection_timeout)
+                    assistant_client.process_messages(thread_name=thread_name, additional_instructions=additional_instructions, timeout=self.connection_timeout, stream=self.use_streaming_for_assistant)
                     end_time = time.time()
                     logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
 

@@ -9,10 +9,11 @@ from azure.ai.assistant.management.logger_module import logger
 
 from openai import AssistantEventHandler
 from datetime import datetime
+from typing import Optional
 
 
 class StreamEventHandler(AssistantEventHandler):
-    def __init__(self, parent : AssistantClient, thread_id, is_submit_tool_call=False):
+    def __init__(self, parent : AssistantClient, thread_id, is_submit_tool_call=False, timeout : Optional[float] = None):
         super().__init__()
         self._parent = parent
         self._name = parent._assistant_config.name
@@ -22,6 +23,7 @@ class StreamEventHandler(AssistantEventHandler):
         threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._parent._ai_client_type).get_config()
         self._thread_name = threads_config.get_thread_name_by_id(thread_id)
         self._thread_id = thread_id
+        self._timeout = timeout
 
     def on_exception(self, exception: Exception) -> None:
         logger.info(f"on_exception called, exception: {exception}")
@@ -84,4 +86,4 @@ class StreamEventHandler(AssistantEventHandler):
             logger.info(f"done, run.required_action.type: {self.current_run.required_action.type}")
             if self.current_run.required_action.type == "submit_tool_outputs":
                 tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
-                self._parent._handle_required_action(self._name, self._thread_id, self.current_run.id, tool_calls, stream=True)
+                self._parent._handle_required_action(self._name, self._thread_id, self.current_run.id, tool_calls, timeout=self._timeout, stream=True)

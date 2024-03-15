@@ -339,7 +339,7 @@ class AssistantClient:
             thread_name: str,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = True
+            stream: Optional[bool] = False
     ) -> None:
         """
         Process the messages in given thread, either in streaming or non-streaming mode.
@@ -459,7 +459,7 @@ class AssistantClient:
         :param thread_name: The name of the thread to process.
         :param thread_id: The ID of the thread to process.
         :param additional_instructions: Additional instructions to provide to the assistant.
-        :param callbacks: Callback functions to handle updates and completion.
+        :param timeout: The HTTP request timeout in seconds.
         """
         from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
         try:
@@ -470,7 +470,8 @@ class AssistantClient:
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
-                event_handler=StreamEventHandler(self, thread_id)
+                event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                timeout=timeout
             ) as stream:
                 stream.until_done()
 

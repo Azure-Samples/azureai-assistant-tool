@@ -39,6 +39,10 @@ class GeneralSettingsDialog(QDialog):
         self.useTextSummarizationCheckbox = QCheckBox("Enable system assistant to summarize long messages for speech synthesis", self)
         self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
 
+        # Streaming for assistant
+        self.useStreamingForAssistantCheckbox = QCheckBox("Use streaming for assistant", self)
+        self.useStreamingForAssistantCheckbox.setChecked(self.main_window.use_streaming_for_assistant)
+
         # Buttons
         self.buttonsLayout = QHBoxLayout()
         self.okButton = QPushButton("OK", self)
@@ -48,6 +52,7 @@ class GeneralSettingsDialog(QDialog):
 
         # Adding layouts to the main layout
         self.layout.addLayout(self.connectionTimeoutLayout)
+        self.layout.addWidget(self.useStreamingForAssistantCheckbox)
         self.layout.addWidget(self.useSystemAssistantForThreadsCheckbox)
         self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
@@ -62,6 +67,7 @@ class GeneralSettingsDialog(QDialog):
             self.main_window.connection_timeout = connection_timeout
             self.main_window.use_system_assistant_for_thread_name = self.useSystemAssistantForThreadsCheckbox.isChecked()
             self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
+            self.main_window.use_streaming_for_assistant = self.useStreamingForAssistantCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
             super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
         except ValueError:
