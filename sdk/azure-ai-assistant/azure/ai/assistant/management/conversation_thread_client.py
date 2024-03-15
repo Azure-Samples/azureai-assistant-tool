@@ -8,10 +8,10 @@ from typing import Optional
 from openai import AzureOpenAI, OpenAI
 from typing import Union, List
 from openai.types.beta.threads import (
-    MessageContentImageFile,
-    MessageContentText
+    ImageFileContentBlock,
+    TextContentBlock
 )
-from openai.types.beta.threads import ThreadMessage
+from openai.types.beta.threads import Message
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -138,7 +138,7 @@ class ConversationThreadClient:
             self, 
             thread_name : str,
             timeout : Optional[float] = None
-    ) -> List[ThreadMessage]:
+    ) -> List[Message]:
         try:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             messages = self._ai_client.beta.threads.messages.list(
@@ -177,7 +177,7 @@ class ConversationThreadClient:
 
     def _retrieve_messages(
             self, 
-            messages: List[ThreadMessage]
+            messages: List[Message]
     ) -> Conversation:
 
         conversation = Conversation(self._ai_client_type)
@@ -195,7 +195,7 @@ class ConversationThreadClient:
                     sender_name = "user"
 
             for content_item in message.content:
-                if isinstance(content_item, MessageContentText):
+                if isinstance(content_item, TextContentBlock):
                     conversation.add_message(content_item.text.value, message.role, sender_name)
                     file_annotations = content_item.text.annotations
                     if file_annotations:
@@ -204,7 +204,7 @@ class ConversationThreadClient:
                             sandbox_file_path = annotation.text
                             file_name = sandbox_file_path.split("/")[-1]
                             conversation.add_file(file_id, file_name, message.role, sender_name)
-                elif isinstance(content_item, MessageContentImageFile):
+                elif isinstance(content_item, ImageFileContentBlock):
                     file_id = content_item.image_file.file_id
                     file_name = f"{file_id}.png" # file type is currently always png for images
                     conversation.add_image(file_id, file_name, message.role, sender_name)

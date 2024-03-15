@@ -15,8 +15,12 @@ from typing import Optional
 from openai import AzureOpenAI, OpenAI
 from typing import Union
 from datetime import datetime
+from typing_extensions import override
+from openai import AssistantEventHandler
 import json, time, importlib, sys, os
 import copy
+import uuid
+
 
 class AssistantClient:
     """
@@ -334,34 +338,53 @@ class AssistantClient:
 
     def process_messages(
             self, 
-            thread_name : str,
-            additional_instructions : Optional[str] = None,
-            timeout : Optional[float] = None
+            thread_name: str,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None,
+            stream: Optional[bool] = True
     ) -> None:
         """
-        Process the messages in given thread.
+        Process the messages in given thread, either in streaming or non-streaming mode.
 
         :param thread_name: The name of the thread to process.
-        :type thread_name: str
         :param additional_instructions: Additional instructions to provide to the assistant.
-        :type additional_instructions: Optional[str]
         :param timeout: The HTTP request timeout in seconds.
-        :type timeout: Optional[float]
-
-        :return: None
-        :rtype: None
+        :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
         assistant_config_manager = AssistantConfigManager.get_instance()
         assistant_config = assistant_config_manager.get_config(self._name)
         assistant_id = assistant_config.assistant_id
-        # TODO retrieve thread_id from ConversationThreadClient which then retrieve from cloud service
-        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
+        threads_config = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
+            if stream:
+                self._process_messages_streaming(thread_name, thread_id, assistant_config, additional_instructions, timeout)
+            else:
+                self._process_messages_non_streaming(thread_name, thread_id, assistant_id, additional_instructions, timeout)
+        except Exception as e:
+            logger.error(f"Error occurred during processing messages: {e}")
+            raise EngineError(f"Error occurred during processing messages: {e}")
 
+    def _process_messages_non_streaming(
+            self,
+            thread_name: str,
+            thread_id: str,
+            assistant_id: str,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Process the messages in a given thread without streaming.
+
+        :param thread_name: The name of the thread to process.
+        :param thread_id: The ID of the thread to process.
+        :param assistant_id: The ID of the assistant to use.
+        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param timeout: The HTTP request timeout in seconds.
+        """
+        try:
             logger.info(f"Creating a run for assistant: {assistant_id} and thread: {thread_id}")
-            # Azure OpenAI does not currently support additional_instructions
             if additional_instructions is None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
@@ -426,8 +449,105 @@ class AssistantClient:
                         return None
 
         except Exception as e:
-            logger.error(f"Error occurred during processing run: {e}")
-            raise EngineError(f"Error occurred during processing run: {e}")
+            logger.error(f"Error occurred during non-streaming processing run: {e}")
+            raise EngineError(f"Error occurred during non-streaming processing run: {e}")
+
+    def _process_messages_streaming(
+            self, 
+            thread_name: str,
+            thread_id: str,
+            assistant_config: AssistantConfig,
+            additional_instructions: Optional[str] = None,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Process the messages in a given thread with streaming.
+
+        :param thread_name: The name of the thread to process.
+        :param thread_id: The ID of the thread to process.
+        :param assistant_config: Configuration object for the assistant.
+        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param callbacks: Callback functions to handle updates and completion.
+        """
+        try:
+            logger.info(f"Creating and streaming a run for assistant: {assistant_config.assistant_id} and thread: {thread_id}")
+
+            class EventHandler(AssistantEventHandler):
+                def __init__(self, parent, assistant_config):
+                    super().__init__()
+                    self._parent = parent
+                    self._name = assistant_config.name
+                    self._is_first_message = True
+                    self._is_started = False
+
+                def on_exception(self, exception: Exception) -> None:
+                    print(f"on_exception called, exception: {exception}")
+
+                def on_timeout(self) -> None:
+                    print(f"on_timeout called")
+
+                def on_end(self) -> None:
+                    print(f"on_end called, run_id: {self.current_run.id}")
+                    self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", thread_name)
+                    self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), thread_name)
+
+                def on_message_created(self, message) -> None:
+                    print(f"on_message_created called, message: {message}")
+
+                def on_message_delta(self, delta, snapshot) -> None:
+                    print(f"on_message_delta called, delta: {delta}")
+
+                def on_message_done(self, message) -> None:
+                    print(f"on_message_done called, message: {message}")
+
+                def on_text_delta(self, delta, snapshot):
+                    if self._is_first_message:
+                        self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+                        self._is_started = True
+                    self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", thread_name, self._is_first_message, delta.value)
+                    self._is_first_message = False
+
+                def on_text_done(self, text) -> None:
+                    print(f"on_text_done called, text: {text}")
+
+                def on_tool_call_created(self, tool_call):
+                    print(f"on_tool_call_created called, tool_call: {tool_call}")
+                    if self._is_started is False:
+                        self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+                        self._is_started = True
+                    if self.current_run.required_action:
+                        print(f"create, run.required_action.type: {self.current_run.required_action.type}")
+
+                def on_tool_call_delta(self, delta, snapshot):
+                    print(f"on_tool_call_delta called, delta: {delta}")
+                    if delta.type == 'function':
+                        if delta.function.name:
+                            print(f"\n{delta.function.name}", flush=True)
+                        if delta.function.arguments:
+                            print(f"\n{delta.function.arguments}", flush=True)
+                        if delta.function.output:
+                            print(f"\n\noutput >", flush=True)
+                    if self.current_run.required_action:
+                        print(f"delta, run.required_action.type: {self.current_run.required_action.type}")
+
+                def on_tool_call_done(self, tool_call) -> None:
+                    print(f"on_tool_call_done called, tool_call: {tool_call}")
+                    if self.current_run.required_action:
+                        tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
+                        self._parent._handle_required_action(self._name, thread_id, self.current_run.id, tool_calls)
+
+            # Start the streaming process
+            with self._ai_client.beta.threads.runs.create_and_stream(
+                thread_id=thread_id,
+                assistant_id=assistant_config.assistant_id,
+                instructions=assistant_config.instructions,
+                event_handler=EventHandler(self, assistant_config),
+            ) as stream:
+                stream.until_done()
+
+        except Exception as e:
+            logger.error(f"Error occurred during streaming processing run: {e}")
+            raise EngineError(f"Error occurred during streaming processing run: {e}")
 
     def cancel_processing(self) -> None:
         """
