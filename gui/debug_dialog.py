@@ -24,7 +24,7 @@ class LogMessageProcessor(QObject):
 
     def startTimer(self):
         # Safe method to start the timer from the correct thread
-        self.bufferTimer.start(1000)  # Adjust the interval as needed
+        self.bufferTimer.start(3000)  # Adjust the interval as needed
 
     def stopTimer(self):
         # Safe method to stop the timer
@@ -36,7 +36,7 @@ class LogMessageProcessor(QObject):
             self.messageBuffer.append(message)
             if not self.bufferTimer.isActive():
                 # Use QMetaObject.invokeMethod to safely start the timer from the correct thread
-                QMetaObject.invokeMethod(self.bufferTimer, "start", Qt.AutoConnection, Q_ARG(int, 1000))
+                QMetaObject.invokeMethod(self.bufferTimer, "start", Qt.AutoConnection, Q_ARG(int, 3000))
 
     def flushBuffer(self):
         with self.thread_lock:
