@@ -1,9 +1,9 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+from azure.ai.assistant.functions.system_function_mappings import system_functions
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_client import system_functions
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
@@ -56,7 +56,6 @@ class BaseAssistantClient:
             self._functions = {}
             self._user_input_processing_cancel_requested = False
             self._assistant_config = AssistantConfig.from_dict(self._config_data)
-            # Further initialization in derived classes...
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")

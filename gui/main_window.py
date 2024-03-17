@@ -16,8 +16,6 @@ import os, time, json
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
