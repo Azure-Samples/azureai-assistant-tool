@@ -6,20 +6,18 @@ from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-from azure.ai.assistant.functions.system_function_mappings import system_functions
 from typing import Optional
-from openai import AzureOpenAI, OpenAI
-from typing import Union
 from datetime import datetime
-import json, time, importlib, sys, os
+import json, time
 import copy
 
 
-class AssistantClient:
+class AssistantClient(BaseAssistantClient):
     """
     A class that manages an assistant client.
 
@@ -41,112 +39,60 @@ class AssistantClient:
             callbacks: Optional[AssistantClientCallbacks] = None,
             is_create: bool = True,
             timeout: Optional[float] = None
-        ) -> None:
-        try:
-            # Parse the configuration data
-            config_data = json.loads(config_json)
-
-            # Validate that 'name' is present and not empty
-            if "name" not in config_data or not config_data["name"].strip():
-                logger.error("The 'name' field in config_data cannot be empty")
-                raise ValueError("The 'name' field in config_data cannot be empty")
-
-            # Validate that 'ai_client_type' is present
-            if "ai_client_type" not in config_data:
-                logger.error("The 'ai_client_type' field is required in config_data")
-                raise ValueError("The 'ai_client_type' field is required in config_data")
-            
-            # validate that 'model' is present
-            if "model" not in config_data:
-                logger.error("The 'model' field is required in config_data")
-                raise ValueError("The 'model' field is required in config_data")
-
-            ai_client_type_str = config_data["ai_client_type"]
-            try:
-                self._ai_client_type = AIClientType[ai_client_type_str]
-            except KeyError:
-                error_message = f"Invalid AI client type specified: '{ai_client_type_str}'. Must be one of {[e.name for e in AIClientType]}"
-                logger.error(error_message)
-                raise ValueError(error_message)
-
-            self._name = config_data["name"]
-            client_factory = AIClientFactory.get_instance()
-            self._ai_client: Union[OpenAI, AzureOpenAI] = client_factory.get_client(self._ai_client_type)
-            self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
-            self._functions = {}
-            self._user_input_processing_cancel_requested = False
-
-            # Initialize the assistant client (create or update)
-            self._init_assistant_client(config_data, is_create, timeout=timeout)
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON format: {e}")
-            raise InvalidJSONError(f"Invalid JSON format: {e}")
-        except Exception as e:
-            logger.error(f"Failed to initialize assistant client: {e}")
-            raise EngineError(f"Failed to initialize assistant client: {e}")
+    ) -> None:
+        super().__init__(config_json, callbacks, is_create, timeout)
+        self._init_assistant_client(self._config_data, is_create, timeout=timeout)
 
     @classmethod
     def from_json(
-        cls, 
-        config_json : str,
+        cls,
+        config_json: str,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AssistantClient":
         """
-        Creates a new assistant client from the given configuration data.
+        Creates an AssistantClient instance from JSON configuration data.
 
-        New assistant client is created in the service and assistant configuration is saved with the given json data.
-
-        :param config_json: The configuration data to use to create the assistant client.
+        :param config_json: JSON string containing the configuration for the assistant.
         :type config_json: str
-        :param callbacks: The callbacks to use for the assistant client.
+        :param callbacks: Optional callbacks for the assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
-        :param timeout: The HTTP request timeout in seconds.
+        :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-
-        :return: The new assistant client.
+        :return: An instance of AssistantClient.
         :rtype: AssistantClient
         """
         try:
-            # check if config_json contains assistant_id which is not null or empty, if so, set is_create to False
             config_data = json.loads(config_json)
-            if "assistant_id" in config_data and config_data["assistant_id"]:
-                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=False, timeout=timeout)
-            else:
-                return AssistantClient(config_json=config_json, callbacks=callbacks, is_create=True, timeout=timeout)
+            is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
+            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     @classmethod
     def from_config(
-        cls, 
-        config: AssistantConfig, 
+        cls,
+        config: AssistantConfig,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AssistantClient":
         """
-        Creates a new assistant client from the given configuration.
+        Creates an AssistantClient instance from an AssistantConfig object.
 
-        New assistant client is created in the service and assistant configuration is saved with the given configuration.
-
-        :param config: The configuration to use to create the assistant client.
+        :param config: AssistantConfig object containing the configuration for the assistant.
         :type config: AssistantConfig
-        :param callbacks: The callbacks to use for the assistant client.
+        :param callbacks: Optional callbacks for the assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
-        :param timeout: The HTTP request timeout in seconds.
+        :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-
-        :return: The new assistant client.
+        :return: An instance of AssistantClient.
         :rtype: AssistantClient
         """
         try:
-            # check if config contains assistant_id which is not null or empty, if so, set is_create to False
-            if config.assistant_id:
-                return AssistantClient(config.to_json(), callbacks, is_create=False, timeout=timeout)
-            else:
-                return AssistantClient(config.to_json(), callbacks, is_create=True, timeout=timeout)
+            config_json = config.to_json()
+            is_create = not config.assistant_id
+            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
         except Exception as e:
             logger.error(f"Failed to create assistant client from config: {e}")
             raise EngineError(f"Failed to create assistant client from config: {e}")
@@ -289,16 +235,6 @@ class AssistantClient:
             logger.error(f"Failed to purge assistant with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge assistant with name: {self.name}: {e}")
 
-    def _clear_variables(self):
-        # clear the local variables
-        self._assistant_config = None
-        self._functions = {}
-        self._ai_client = None
-        self._callbacks = None
-        self._user_input_processing_cancel_requested = False
-        self._ai_client_type = None
-        self._name = None
-
     def _delete_assistant(
             self, 
             assistant_config : AssistantConfig,
@@ -348,7 +284,6 @@ class AssistantClient:
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        assistant_id = self._assistant_config.assistant_id
         threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
@@ -478,16 +413,6 @@ class AssistantClient:
             logger.error(f"Error occurred during streaming processing run: {e}")
             raise EngineError(f"Error occurred during streaming processing run: {e}")
 
-    def cancel_processing(self) -> None:
-        """
-        Cancels the processing of the user input.
-
-        :return: None
-        :rtype: None
-        """
-        logger.info("User processing run cancellation requested.")
-        self._user_input_processing_cancel_requested = True
-
     def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
         from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
         logger.info("Handling required action")
@@ -523,7 +448,7 @@ class AssistantClient:
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
-            function_response = self._handle_function_call(tool_call)
+            function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
@@ -536,116 +461,6 @@ class AssistantClient:
             tool_outputs.append(tool_output)
 
         return tool_outputs
-
-    def _update_arguments(self, args):
-        """
-        Updates the arguments if they contain '/mnt/data/'.
-        """
-        updated_args = {}
-        for key, value in args.items():
-            if isinstance(value, str) and '/mnt/data/' in value:
-                assistant_config = AssistantConfigManager.get_instance().get_config(self._name)
-                replacement_path = assistant_config.output_folder_path
-                if not replacement_path.endswith('/'):
-                    replacement_path += '/'
-                updated_value = value.replace('/mnt/data/', replacement_path)
-                updated_args[key] = updated_value
-            else:
-                updated_args[key] = value
-        return updated_args
-
-    def _handle_function_call(self, tool_call):
-        logger.info(f"Handling function call: {tool_call.function.name} with arguments: {tool_call.function.arguments}")
-
-        function_name = tool_call.function.name
-        function_to_call = self._functions.get(function_name)
-        if function_to_call:
-            try:
-                function_args = json.loads(tool_call.function.arguments)
-            except json.JSONDecodeError:
-                logger.error(f"Function {function_name} has invalid arguments.")
-                return json.dumps({"function_error": function_name, "error": "Invalid JSON arguments."})
-            
-            # Update the arguments if necessary
-            function_args = self._update_arguments(function_args)
-
-            logger.info(f"Calling function: {function_name} with arguments: {function_args}")
-            try:
-                function_response = function_to_call(**function_args)
-                return function_response
-            except Exception as e:
-                logger.error(f"Error in function call: {function_name}. Error: {str(e)}")
-                return json.dumps({"function_error": function_name, "error": str(e)})
-        else:
-            logger.error(f"Function: {function_name} is not available.")
-            return json.dumps({"function_error": function_name, "error": "Function is not available."})
-
-    def _load_selected_functions(self, assistant_config: AssistantConfig):
-        functions = {}
-
-        try:
-            for func_spec in assistant_config.selected_functions:
-                logger.info(f"Loading selected function: {func_spec['function']['name']}")
-                function_name = func_spec["function"]["name"]
-                module_name = func_spec["function"].get("module", "default.module.path")
-
-                # Check if it is a system function
-                if function_name in system_functions:
-                    functions[function_name] = system_functions[function_name]
-                elif module_name.startswith("functions"):
-                    # Dynamic loading for user-defined functions
-                    functions[function_name] = self._import_user_function_from_module(module_name, function_name)
-                else:
-                    logger.error(f"Invalid module name: {module_name}")
-                    raise EngineError(f"Invalid module name: {module_name}")
-                self._functions = functions
-        except Exception as e:
-            logger.error(f"Error loading selected functions for assistant: {e}")
-            raise EngineError(f"Error loading selected functions for assistant: {e}")
-
-    def _import_system_function_from_module(self, module_name, function_name):
-        try:
-            logger.info(f"Importing system function: {function_name} from module: {module_name}")
-            module = importlib.import_module(module_name)
-            # Retrieve the function from the imported module
-            return getattr(module, function_name)
-        except Exception as e:
-            logger.error(f"Error importing system {function_name} from {module_name}: {e}")
-            raise EngineError(f"Error importing system {function_name} from {module_name}: {e}")
-
-    def _import_user_function_from_module(self, module_name, function_name):
-        try:
-            logger.info(f"Importing user function: {function_name} from module: {module_name}")
-            module_path = self._get_module_path(module_name)
-            spec = importlib.util.spec_from_file_location(module_name, module_path)
-            if module_name in sys.modules:
-                logger.info("Module is loaded, reloading...")
-                # Reload the module if it's already loaded
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[module_name] = module  # Update sys.modules with the reloaded module
-            else:
-                logger.info("Module is not loaded, loading from scratch")
-                # Import the module for the first time
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[module_name] = module  # Add it to sys.modules
-            spec.loader.exec_module(module)
-            return getattr(module, function_name)
-        except Exception as e:
-            logger.error(f"Error importing {function_name} from {module_name}: {e}")
-            return None
-
-    def _get_module_path(self, module_name):
-        logger.info("Module_name: {}".format(module_name))
-        if getattr(sys, 'frozen', False):
-            # Path for PyInstaller bundle
-            base_path = os.path.join(os.path.expanduser("~"), 'AssistantStudioData')
-            module_path = os.path.join(base_path, module_name.replace('.', os.sep) + '.py')
-            logger.info("Module path: {}".format(module_path))
-        else:
-            # Path for normal Python environment
-            module_path = os.path.join(module_name.replace('.', os.sep) + '.py')
-            logger.info("Module path: {}".format(module_path))
-        return module_path
 
     def _retrieve_assistant(
             self, 
@@ -764,26 +579,3 @@ class AssistantClient:
         except Exception as e:
             logger.error(f"Failed to get assistants list: {e}")
             raise EngineError(f"Failed to get assistants list: {e}")
-
-    @property
-    def name(self) -> str:
-        """
-        The name of the assistant.
-
-        :return: The name of the assistant.
-        :rtype: str
-        """
-        return self._name
-
-    @property
-    def assistant_config(self) -> AssistantConfig:
-        """
-        The assistant configuration.
-
-        AssistantClient update() method will update the assistant configuration in the cloud service
-        and apply the changes locally.
-
-        :return: The assistant configuration.
-        :rtype: AssistantConfig
-        """
-        return self._assistant_config

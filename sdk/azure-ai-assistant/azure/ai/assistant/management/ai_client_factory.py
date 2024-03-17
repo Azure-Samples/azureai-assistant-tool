@@ -2,7 +2,8 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from enum import Enum, auto
-from openai import AzureOpenAI, OpenAI
+from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
+
 import os
 from typing import Union
 from azure.ai.assistant.management.logger_module import logger
@@ -15,8 +16,13 @@ class AIClientType(Enum):
     """
     AZURE_OPEN_AI = auto()
     """Azure OpenAI client"""
+    AZURE_OPEN_AI_ASYNC = auto()
+    """Azure OpenAI async client"""
     OPEN_AI = auto()
     """OpenAI client"""
+    OPEN_AI_ASYNC = auto()
+    """OpenAI async client"""
+
 
 class AIClientFactory:
     _instance = None
@@ -74,6 +80,7 @@ class AIClientFactory:
                     logger.warning(error_message)
                     raise EngineError(error_message) 
                 self._clients[client_key] = OpenAI()
+
             elif client_type == AIClientType.AZURE_OPEN_AI:
                 if not os.getenv("AZURE_OPENAI_API_KEY"):
                     error_message = "Azure OpenAI API key is not set"
@@ -83,8 +90,57 @@ class AIClientFactory:
                     error_message = "Azure OpenAI endpoint is not set"
                     logger.warning(error_message)
                     raise EngineError(error_message)
-
                 self._clients[client_key] = AzureOpenAI(
+                    api_version=api_version,
+                    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                )
+            else:
+                raise ValueError(f"Invalid client type: {client_type}")
+
+        return self._clients[client_key]
+    
+    def get_async_client(
+            self, 
+            client_type: AIClientType,
+            api_version: str = "2024-02-15-preview"
+    ) -> Union[AsyncOpenAI, AsyncAzureOpenAI]:
+        """
+        Get an async AI client with the given type and API version.
+
+        :param client_type: The type of AI client to get.
+        :type client_type: AIClientType
+        :param api_version: The version of the API to use, defaults to "2024-02-15-preview" or environment variable if set.
+        :type api_version: str
+
+        :return: The async AI client.
+        :rtype: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        """
+        # Check for an environment variable to override the default API version
+        api_version_env = os.getenv("AZURE_OPENAI_API_VERSION")
+        if api_version_env:
+            api_version = api_version_env
+
+        # Create a unique key based on client type and API version
+        client_key = (client_type, api_version)
+
+        if client_key not in self._clients:
+            if client_type == AIClientType.OPEN_AI_ASYNC:
+                if not os.getenv("OPENAI_API_KEY"):
+                    error_message = "OpenAI API key is not set"
+                    logger.warning(error_message)
+                    raise EngineError(error_message) 
+                self._clients[client_key] = AsyncOpenAI()
+
+            elif client_type == AIClientType.AZURE_OPEN_AI_ASYNC:
+                if not os.getenv("AZURE_OPENAI_API_KEY"):
+                    error_message = "Azure OpenAI API key is not set"
+                    logger.warning(error_message)
+                    raise EngineError(error_message)
+                if not os.getenv("AZURE_OPENAI_ENDPOINT"):
+                    error_message = "Azure OpenAI endpoint is not set"
+                    logger.warning(error_message)
+                    raise EngineError(error_message)
+                self._clients[client_key] = AsyncAzureOpenAI(
                     api_version=api_version,
                     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
                 )
