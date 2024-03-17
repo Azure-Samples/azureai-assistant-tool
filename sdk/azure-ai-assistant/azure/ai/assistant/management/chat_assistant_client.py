@@ -35,7 +35,7 @@ class ChatAssistantClient(BaseAssistantClient):
             is_create: bool = True,
             timeout: Optional[float] = None
     ) -> None:
-        super().__init__(config_json, callbacks, is_create, timeout)
+        super().__init__(config_json, callbacks)
         self._tools = None
         self._messages = []
         self._init_chat_assistant_client(self._config_data, is_create, timeout=timeout)

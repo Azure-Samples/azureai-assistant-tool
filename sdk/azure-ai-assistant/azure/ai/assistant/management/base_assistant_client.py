@@ -5,12 +5,12 @@ from azure.ai.assistant.functions.system_function_mappings import system_functio
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
-from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientType, AsyncAIClientType
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 
-from openai import AzureOpenAI, OpenAI
+from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
 from typing import Union
 
 import json, importlib, sys, os
@@ -34,24 +34,22 @@ class BaseAssistantClient:
             self,
             config_json: str,
             callbacks: Optional[AssistantClientCallbacks] = None,
-            is_create: bool = True,
-            timeout: Optional[float] = None
+            async_mode: bool = False
         ) -> None:
-        self._initialize_client(config_json, callbacks, is_create, timeout)
+        self._initialize_client(config_json, callbacks, async_mode)
 
     def _initialize_client(
             self,
             config_json: str,
             callbacks: Optional[AssistantClientCallbacks],
-            is_create: bool,
-            timeout: Optional[float]
+            async_mode: Optional[bool] = False
         ):
         try:
             self._config_data = json.loads(config_json)
             self._validate_config_data(self._config_data)
             self._name = self._config_data["name"]
-            self._ai_client_type = self._get_ai_client_type(self._config_data["ai_client_type"])
-            self._ai_client : Union[OpenAI, AzureOpenAI] = self._get_ai_client(self._ai_client_type)
+            self._ai_client_type = self._get_ai_client_type(self._config_data["ai_client_type"], async_mode)
+            self._ai_client : Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI] = self._get_ai_client(self._ai_client_type)
             self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
             self._functions = {}
             self._user_input_processing_cancel_requested = False
@@ -71,15 +69,18 @@ class BaseAssistantClient:
         if "model" not in config_data:
             raise ValueError("The 'model' field is required in config_data")
 
-    def _get_ai_client_type(self, ai_client_type_str: str):
+    def _get_ai_client_type(self, ai_client_type_str: str, async_mode: bool = False):
         try:
-            return AIClientType[ai_client_type_str]
+            if async_mode:
+                return AsyncAIClientType[ai_client_type_str]
+            else:
+                return AIClientType[ai_client_type_str]
         except KeyError:
             error_message = f"Invalid AI client type specified: '{ai_client_type_str}'. Must be one of {[e.name for e in AIClientType]}"
             logger.error(error_message)
             raise ValueError(error_message)
 
-    def _get_ai_client(self, ai_client_type: AIClientType):
+    def _get_ai_client(self, ai_client_type: AIClientType | AsyncAIClientType):
         client_factory = AIClientFactory.get_instance()
         return client_factory.get_client(ai_client_type)
 

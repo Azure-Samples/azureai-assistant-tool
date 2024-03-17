@@ -5,17 +5,21 @@ from azure.ai.assistant.management.assistant_client_callbacks import AssistantCl
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
-from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-from typing import Optional
+
+from openai import AsyncAzureOpenAI, AsyncOpenAI
+
+from typing import Optional, Union
 from datetime import datetime
 import json, time
 import copy
+import asyncio
 
 
-class AssistantClient(BaseAssistantClient):
+class AsyncAssistantClient(BaseAssistantClient):
     """
     A class that manages an assistant client.
 
@@ -34,22 +38,36 @@ class AssistantClient(BaseAssistantClient):
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None,
-            is_create: bool = True,
-            timeout: Optional[float] = None
+            callbacks: Optional[AssistantClientCallbacks] = None
     ) -> None:
-        super().__init__(config_json, callbacks)
-        self._init_assistant_client(self._config_data, is_create, timeout=timeout)
+        super().__init__(config_json, callbacks, async_mode=True)
+        self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
+        # Init with base settings, leaving async init for the factory method
+
+    async def _async_init(
+            self, 
+            is_create: bool, 
+            timeout: Optional[float]
+    ):
+        """
+        An asynchronous initialization method that loads and sets up the assistant configuration.
+
+        :param is_create: A flag to indicate if the assistant client is being created.
+        :type is_create: bool
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+        """
+        await self._init_assistant_client(self._config_data, is_create, timeout)
 
     @classmethod
-    def from_json(
+    async def from_json(
         cls,
         config_json: str,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
-    ) -> "AssistantClient":
+    ) -> "AsyncAssistantClient":
         """
-        Creates an AssistantClient instance from JSON configuration data.
+        Creates an AsyncAssistantClient instance from JSON configuration data.
 
         :param config_json: JSON string containing the configuration for the assistant.
         :type config_json: str
@@ -57,26 +75,28 @@ class AssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-        :return: An instance of AssistantClient.
-        :rtype: AssistantClient
+        :return: An instance of AsyncAssistantClient.
+        :rtype: AsyncAssistantClient
         """
         try:
+            instance = cls(config_json, callbacks)  # Instance creation without async init
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
+            await instance._async_init(is_create, timeout)  # Perform async initialization
+            return instance
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     @classmethod
-    def from_config(
+    async def from_config(
         cls,
         config: AssistantConfig,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
-    ) -> "AssistantClient":
+    ) -> "AsyncAssistantClient":
         """
-        Creates an AssistantClient instance from an AssistantConfig object.
+        Creates an AsyncAssistantClient instance from an AssistantConfig object.
 
         :param config: AssistantConfig object containing the configuration for the assistant.
         :type config: AssistantConfig
@@ -84,21 +104,22 @@ class AssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-        :return: An instance of AssistantClient.
-        :rtype: AssistantClient
+        :return: An instance of AsyncAssistantClient.
+        :rtype: AsyncAssistantClient
         """
         try:
-            config_json = config.to_json()
+            instance = cls(config.to_json(), callbacks)  # Instance creation without async init
             is_create = not config.assistant_id
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
+            await instance._async_init(is_create, timeout)  # Perform async initialization
+            return instance
         except Exception as e:
             logger.error(f"Failed to create assistant client from config: {e}")
             raise EngineError(f"Failed to create assistant client from config: {e}")
 
-    def sync_from_cloud(
+    async def sync_from_cloud(
             self,
             timeout: Optional[float] = None
-    ) -> "AssistantClient":
+    ) -> "AsyncAssistantClient":
         """
         Synchronizes the assistant client with the cloud service configuration.
 
@@ -106,7 +127,7 @@ class AssistantClient(BaseAssistantClient):
         :type timeout: Optional[float]
 
         :return: The assistant client with the given name.
-        :rtype: AssistantClient
+        :rtype: AsyncAssistantClient
         """
         try:
             # If not registered, retrieve data from cloud and register it to AssistantConfig using AssistantConfigManager
@@ -117,7 +138,7 @@ class AssistantClient(BaseAssistantClient):
                 raise EngineError(f"Assistant with name: {self.name} does not exist.")
 
             # Retrieve the assistant from the cloud service and update the local configuration
-            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout)
+            assistant = await self._retrieve_assistant(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
             assistant_config.model = assistant.model
             assistant_config.knowledge_files = {file_path: file_id for file_path, file_id in zip(assistant_config.knowledge_files.keys(), assistant.file_ids)}
@@ -133,7 +154,7 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Error retrieving configuration for {self.name}: {e}")
             raise Exception(f"Error retrieving configuration for {self.name}: {e}")
 
-    def _init_assistant_client(
+    async def _init_assistant_client(
             self, 
             config_data: dict,
             is_create: bool = True,
@@ -144,7 +165,7 @@ class AssistantClient(BaseAssistantClient):
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
                 start_time = time.time()
-                self._create_assistant(assistant_config, timeout=timeout)
+                await self._create_assistant(assistant_config, timeout=timeout)
                 end_time = time.time()
                 logger.debug(f"Total time taken for _create_assistant: {end_time - start_time} seconds")
             else:
@@ -154,14 +175,14 @@ class AssistantClient(BaseAssistantClient):
                 # check if the local configuration is different from the given configuration
                 if local_config and local_config != assistant_config:
                     logger.debug("Local config is different from the given configuration. Updating the assistant...")
-                    self._update_assistant(assistant_config, timeout=timeout)
+                    await self._update_assistant(assistant_config, timeout=timeout)
                 else:
                     logger.debug("Local config is the same as the given configuration. No need to update the assistant.")
                 end_time = time.time()
                 logger.debug(f"Total time taken for _update_assistant: {end_time - start_time} seconds")
 
             start_time = time.time()
-            self._load_selected_functions(assistant_config)
+            await asyncio.to_thread(self._load_selected_functions, assistant_config)
             end_time = time.time()
             logger.debug(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
             self._assistant_config = assistant_config
@@ -175,7 +196,7 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to initialize assistant instance: {e}")
             raise EngineError(f"Failed to initialize assistant instance: {e}")
 
-    def _create_assistant(
+    async def _create_assistant(
             self, 
             assistant_config: AssistantConfig,
             timeout: Optional[float] = None
@@ -183,11 +204,11 @@ class AssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Creating new assistant with name: {assistant_config.name}")
             # Upload the files for new assistant
-            self._upload_new_files(assistant_config, timeout=timeout)
+            await self._upload_new_files(assistant_config, timeout=timeout)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
 
-            assistant = self._ai_client.beta.assistants.create(
+            assistant = await self._async_client.beta.assistants.create(
                 name=assistant_config.name,
                 instructions=assistant_config.instructions,
                 tools=tools,
@@ -202,7 +223,7 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
 
-    def purge(
+    async def purge(
             self,
             timeout: Optional[float] = None
     )-> None:
@@ -222,7 +243,7 @@ class AssistantClient(BaseAssistantClient):
             assistant_config = config_manager.get_config(self.name)
 
             # remove from the cloud service
-            self._delete_assistant(assistant_config, timeout=timeout)
+            await self._delete_assistant(assistant_config, timeout=timeout)
 
             # remove from the local config
             config_manager.delete_config(assistant_config.name)
@@ -233,14 +254,14 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to purge assistant with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge assistant with name: {self.name}: {e}")
 
-    def _delete_assistant(
+    async def _delete_assistant(
             self, 
             assistant_config : AssistantConfig,
             timeout : Optional[float] = None
     ):
         try:
             assistant_id = assistant_config.assistant_id
-            self._ai_client.beta.assistants.delete(
+            await self._async_client.beta.assistants.delete(
                 assistant_id=assistant_id,
                 timeout=timeout
             )
@@ -250,7 +271,7 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to delete assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to delete assistant with ID: {assistant_id}: {e}")
 
-    def _update_files(
+    async def _update_files(
             self,
             assistant_config: AssistantConfig,
             timeout: Optional[float] = None
@@ -258,16 +279,16 @@ class AssistantClient(BaseAssistantClient):
 
         try:
             logger.info(f"Updating files for assistant: {assistant_config.name}")
-            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
+            assistant = await self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
             existing_file_ids = set(assistant.file_ids)
-            self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
-            self._upload_new_files(assistant_config, timeout=timeout)
+            await self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
+            await self._upload_new_files(assistant_config, timeout=timeout)
 
         except Exception as e:
             logger.error(f"Failed to update files for assistant: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to update files for assistant: {assistant_config.name}: {e}")
 
-    def process_messages(
+    async def process_messages(
             self, 
             thread_name: str,
             additional_instructions: Optional[str] = None,
@@ -282,19 +303,19 @@ class AssistantClient(BaseAssistantClient):
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
+        threads_config : ConversationThreadConfig = AsyncConversationThreadClient.get_instance(self._ai_client_type).get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
             if stream:
-                self._process_messages_streaming(thread_name, thread_id, additional_instructions, timeout)
+                await self._process_messages_streaming(thread_name, thread_id, additional_instructions, timeout)
             else:
-                self._process_messages_non_streaming(thread_name, thread_id, additional_instructions, timeout)
+                await self._process_messages_non_streaming(thread_name, thread_id, additional_instructions, timeout)
         except Exception as e:
             logger.error(f"Error occurred during processing messages: {e}")
             raise EngineError(f"Error occurred during processing messages: {e}")
 
-    def _process_messages_non_streaming(
+    async def _process_messages_non_streaming(
             self,
             thread_name: str,
             thread_id: str,
@@ -312,13 +333,13 @@ class AssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
             if additional_instructions is None:
-                run = self._ai_client.beta.threads.runs.create(
+                run = await self._async_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     timeout=timeout
                 )
             else:
-                run = self._ai_client.beta.threads.runs.create(
+                run = await self._async_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
@@ -334,7 +355,7 @@ class AssistantClient(BaseAssistantClient):
                 time.sleep(0.5)
 
                 logger.debug(f"Retrieving run: {run.id} with status: {run.status}")
-                run = self._ai_client.beta.threads.runs.retrieve(
+                run = await self._async_client.beta.threads.runs.retrieve(
                     thread_id=thread_id,
                     run_id=run.id,
                     timeout=timeout
@@ -347,7 +368,7 @@ class AssistantClient(BaseAssistantClient):
                 logger.info(f"Processing run: {run.id} with status: {run.status}")
 
                 if self._user_input_processing_cancel_requested:
-                    self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
+                    await self._async_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
                     self._user_input_processing_cancel_requested = False
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
@@ -371,14 +392,14 @@ class AssistantClient(BaseAssistantClient):
                     return None
                 if run.status == "requires_action":
                     tool_calls = run.required_action.submit_tool_outputs.tool_calls
-                    if not self._handle_required_action(self._name, thread_id, run.id, tool_calls):
+                    if not await self._handle_required_action(self._name, thread_id, run.id, tool_calls):
                         return None
 
         except Exception as e:
             logger.error(f"Error occurred during non-streaming processing run: {e}")
             raise EngineError(f"Error occurred during non-streaming processing run: {e}")
 
-    def _process_messages_streaming(
+    async def _process_messages_streaming(
             self, 
             thread_name: str,
             thread_id: str,
@@ -393,48 +414,48 @@ class AssistantClient(BaseAssistantClient):
         :param additional_instructions: Additional instructions to provide to the assistant.
         :param timeout: The HTTP request timeout in seconds.
         """
-        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
+        from azure.ai.assistant.management.async_stream_event_handler import AsyncStreamEventHandler
         try:
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
             # Start the streaming process
-            with self._ai_client.beta.threads.runs.create_and_stream(
+            async with self._async_client.beta.threads.runs.create_and_stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
-                event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
-                stream.until_done()
+                await stream.until_done()
 
         except Exception as e:
             logger.error(f"Error occurred during streaming processing run: {e}")
             raise EngineError(f"Error occurred during streaming processing run: {e}")
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
-        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
+    async def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
+        from azure.ai.assistant.management.async_stream_event_handler import AsyncStreamEventHandler
         logger.info("Handling required action")
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
-            self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
+            await self._async_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
             return False
 
-        tool_outputs = self._process_tool_calls(name, run_id, tool_calls)
+        tool_outputs = await asyncio.to_thread(self._process_tool_calls, name, run_id, tool_calls)
         if not tool_outputs:
             return False
 
         if stream:
             logger.info("Submitting tool outputs with stream")
-            with self._ai_client.beta.threads.runs.submit_tool_outputs_stream(
+            async with self._async_client.beta.threads.runs.submit_tool_outputs_stream(
                 thread_id=thread_id,
                 run_id=run_id,
                 tool_outputs=tool_outputs,
                 timeout=timeout,
-                event_handler=StreamEventHandler(self, thread_id, is_submit_tool_call=True)
+                event_handler=AsyncStreamEventHandler(self, thread_id, is_submit_tool_call=True)
             ) as stream:
-                stream.until_done()
+                await stream.until_done()
         else:
-            self._ai_client.beta.threads.runs.submit_tool_outputs(
+            await self._async_client.beta.threads.runs.submit_tool_outputs(
                 thread_id=thread_id,
                 run_id=run_id,
                 tool_outputs=tool_outputs,
@@ -460,14 +481,14 @@ class AssistantClient(BaseAssistantClient):
 
         return tool_outputs
 
-    def _retrieve_assistant(
+    async def _retrieve_assistant(
             self, 
             assistant_id : str,
             timeout : Optional[float] = None
     ):
         try:
             logger.info(f"Retrieving assistant with ID: {assistant_id}")
-            assistant = self._ai_client.beta.assistants.retrieve(
+            assistant = await self._async_client.beta.assistants.retrieve(
                 assistant_id=assistant_id,
                 timeout=timeout
             )
@@ -476,7 +497,7 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
 
-    def _delete_old_files(
+    async def _delete_old_files(
             self,
             assistant_config : AssistantConfig,
             existing_file_ids,
@@ -486,13 +507,13 @@ class AssistantClient(BaseAssistantClient):
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.beta.assistants.files.delete(
+            file_deletion_status = await self._async_client.beta.assistants.files.delete(
                 assistant_id=assistant_config.assistant_id,
                 file_id=file_id,
                 timeout=timeout
             )
 
-    def _upload_new_files(
+    async def _upload_new_files(
             self, 
             assistant_config: AssistantConfig,
             timeout : Optional[float] = None
@@ -501,14 +522,14 @@ class AssistantClient(BaseAssistantClient):
         for file_path, file_id in assistant_config.knowledge_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
-                file = self._ai_client.files.create(
+                file = await self._async_client.files.create(
                     file=open(file_path, "rb"),
                     purpose='assistants',
                     timeout=timeout
                 )
                 assistant_config.knowledge_files[file_path] = file.id
 
-    def _update_assistant(
+    async def _update_assistant(
             self, 
             assistant_config: AssistantConfig,
             timeout : Optional[float] = None
@@ -520,7 +541,7 @@ class AssistantClient(BaseAssistantClient):
             tools = self._update_tools(assistant_config)
 
             # TODO update the assistant with the new configuration only if there are changes
-            self._ai_client.beta.assistants.update(
+            await self._async_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=assistant_config.instructions,
