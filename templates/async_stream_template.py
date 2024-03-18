@@ -35,8 +35,7 @@ async def display_streamed_messages(message_queue, assistant_name):
             # Print the streamed part of the message; `flush=True` ensures it's immediately displayed
             print(message, end="", flush=True)
         elif message_type == "end":
-            # When the message ends, ensure to print a newline to cleanly separate from the next prompt
-            print()  # This ensures there's always a newline after the assistant's response
+            pass
 
         message_queue.task_done()
 
@@ -94,6 +93,6 @@ async def main():
     display_task.cancel()  # Cleanly cancel the display task
     await conversation_thread_client.close()
 
-# Note that we run the main function using asyncio.run() since main is async
+
 if __name__ == "__main__":
     asyncio.run(main())

@@ -6,7 +6,8 @@ import json
 import os
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
-from azure.ai.assistant.management.assistant_client import AIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 
 MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4-1106-preview')
 
@@ -152,4 +153,18 @@ def test_assistant_client_enable_code_interpreter():
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
     assert client.assistant_config.code_interpreter == True
+    client.purge()
+
+def test_assistant_client_create_thread_and_process_message():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = AssistantClient.from_json(config_json)
+    thread_client = ConversationThreadClient.get_instance(AIClientType.AZURE_OPEN_AI)
+    thread_name = thread_client.create_conversation_thread()
+    thread_client.create_conversation_thread_message("Hello!", thread_name)
+    client.process_messages(thread_name)
+    conversation = thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_text_message(client.assistant_config.name)
+    assert last_message is not None
     client.purge()
