@@ -11,42 +11,34 @@ class MyAssistantClientCallbacks(AssistantClientCallbacks):
     def __init__(self, message_queue):
         self.message_queue = message_queue
 
+    async def handle_message(self, action, message=""):
+        await self.message_queue.put((action, message))
+
     def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "streaming":
-            if is_first_message:
-                # Indicate the start of a new message
-                asyncio.create_task(self.message_queue.put(("start", "")))
-            if message is not None:
-                asyncio.create_task(self.message_queue.put(("message", message)))
-
-    def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
-        asyncio.create_task(self.message_queue.put(("end", "")))
+            asyncio.create_task(self.handle_message("start" if is_first_message else "message", message))
 
 
 # Define a function to display streamed messages
 async def display_streamed_messages(message_queue, assistant_name):
     while True:
         message_type, message = await message_queue.get()
-
         if message_type == "start":
-            # Print the assistant's name only at the beginning of a new streamed message
-            print(f"{assistant_name}: ", end="")
+            # At the start of a new message, include the assistant's name.
+            print(f"{assistant_name}: {message}", end="")
         elif message_type == "message":
             # Print the streamed part of the message; `flush=True` ensures it's immediately displayed
             print(message, end="", flush=True)
-        elif message_type == "end":
-            pass
-
         message_queue.task_done()
 
 
-assistant_name = "ASSISTANT_NAME"
-
 # Define the main function
 async def main():
-    # Open assistant configuration file
+    assistant_name = "ASSISTANT_NAME"
+    config_path = f"config/{assistant_name}_assistant_config.json"
+
     try:
-        with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
+        with open(config_path, "r") as file:
             config_json = json.load(file)
         ai_client_type = AsyncAIClientType[config_json["ai_client_type"]]
         message_queue = asyncio.Queue()
@@ -54,11 +46,11 @@ async def main():
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         return
-    except KeyError:
-        print(f"AI client type not found in the configuration file for {assistant_name}.")
+    except KeyError as e:
+        print(f"Missing key in configuration file for {assistant_name}: {e}")
         return
 
-    # Retrieve the assistant client
+    # Create a new assistant client
     assistant_client = await AsyncAssistantClient.from_json(json.dumps(config_json), callbacks=callbacks)
 
     # Create a new conversation thread client
@@ -69,10 +61,10 @@ async def main():
 
     display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
 
-    while True:
-        try:
-            user_message = input("user: ")
-            if user_message.lower() == 'exit':  # Allow the user to exit the chat
+    try:
+        while True:
+            user_message = input("user: ").strip()
+            if user_message.lower() == 'exit':
                 print("Exiting chat.")
                 break
 
@@ -84,15 +76,13 @@ async def main():
 
             print()  # Add a newline for better readability
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            break
-
-    # Cleanup before exiting
-    await message_queue.join()  # Ensure all messages are processed
-    display_task.cancel()  # Cleanly cancel the display task
-    await conversation_thread_client.close()
-
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        # Cleanup before exiting
+        await message_queue.join()
+        display_task.cancel()
+        await conversation_thread_client.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
