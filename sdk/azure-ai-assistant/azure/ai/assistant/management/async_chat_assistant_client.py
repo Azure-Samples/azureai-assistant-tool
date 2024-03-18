@@ -354,7 +354,7 @@ class AsyncChatAssistantClient(BaseAssistantClient):
 
     async def _update_conversation_with_messages(self, collected_messages, thread_name):
         full_response = ''.join(filter(None, collected_messages))
-        if full_response:
+        if full_response and thread_name:
             conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
             await conversation_thread_client.create_conversation_thread_message(
                 message=full_response, 

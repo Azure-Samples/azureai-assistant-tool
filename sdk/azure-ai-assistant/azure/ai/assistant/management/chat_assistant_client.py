@@ -6,7 +6,6 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
-from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from typing import Optional
@@ -178,16 +177,8 @@ class ChatAssistantClient(BaseAssistantClient):
         if thread_name is None and user_request is None:
             raise ValueError("Either thread_name or user_request must be provided.")
 
-        assistant_config_manager = AssistantConfigManager.get_instance()
-        assistant_config = assistant_config_manager.get_config(self._name)
-        assistant_id = assistant_config.assistant_id
-        if thread_name:
-            conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            threads_config : ConversationThreadConfig = conversation_thread_client.get_config()
-            thread_id = threads_config.get_thread_id_by_name(thread_name)
-
         try:
-            logger.info(f"Process messages for chat assistant: {assistant_id}")
+            logger.info(f"Process messages for chat assistant")
 
             if additional_instructions:
                 self._messages.append({"role": "system", "content": additional_instructions})
@@ -198,6 +189,7 @@ class ChatAssistantClient(BaseAssistantClient):
             self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
 
             if thread_name:
+                conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
                 conversation = conversation_thread_client.retrieve_conversation(thread_name)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
@@ -219,7 +211,7 @@ class ChatAssistantClient(BaseAssistantClient):
                     break
 
                 response = self._ai_client.chat.completions.create(
-                    model=assistant_config.model,
+                    model=self._assistant_config.model,
                     messages=self._messages,
                     tools=self._tools,
                     tool_choice=None if self._tools is None else "auto",
@@ -243,7 +235,7 @@ class ChatAssistantClient(BaseAssistantClient):
             self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
 
             # clear the messages for other than system messages
-            self._messages = [{"role": "system", "content": assistant_config.instructions}]
+            self._messages = [{"role": "system", "content": self._assistant_config.instructions}]
 
             if not stream:
                 return response.choices[0].message.content
@@ -283,74 +275,75 @@ class ChatAssistantClient(BaseAssistantClient):
             return True
 
     def _handle_streaming_response(self, response, thread_name, run_id):
+        tool_calls, collected_messages = self._process_response_chunks(response, thread_name, run_id)
+        self._process_tool_calls(tool_calls, run_id)
+        self._update_conversation_with_messages(collected_messages, thread_name)
+        return bool(tool_calls)  # Return True if there were tool calls processed, otherwise False
+
+    def _process_response_chunks(self, response, thread_name, run_id):
         tool_calls = []
         collected_messages = []
         is_first_message = True
 
         for chunk in response:
-            if not chunk.choices:
-                continue
-
-            delta = chunk.choices[0].delta
+            delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
-                chunk_message = delta.content
-                collected_messages.append(chunk_message)
-                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, chunk_message)
+                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, delta.content)
+                collected_messages.append(delta.content)
                 is_first_message = False
+            if delta and delta.tool_calls:
+                tool_calls = self._append_tool_calls(tool_calls, delta.tool_calls)
 
-            elif delta and delta.tool_calls:
-                tcchunklist = delta.tool_calls
-                for tcchunk in tcchunklist:
-                    if len(tool_calls) <= tcchunk.index:
-                        tool_calls.append({"id": "", "type": "function", "function": { "name": "", "arguments": "" } })
-                    tc = tool_calls[tcchunk.index]
+        return tool_calls, collected_messages
 
-                    if tcchunk.id:
-                        tc["id"] += tcchunk.id
-                    if tcchunk.function.name:
-                        tc["function"]["name"] += tcchunk.function.name
-                    if tcchunk.function.arguments:
-                        tc["function"]["arguments"] += tcchunk.function.arguments
+    def _append_tool_calls(self, tool_calls, tcchunklist):
+        for tcchunk in tcchunklist:
+            while len(tool_calls) <= tcchunk.index:
+                tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+            tc = tool_calls[tcchunk.index]
+            tc["id"] += tcchunk.id or ""
+            tc["function"]["name"] += tcchunk.function.name or ""
+            tc["function"]["arguments"] += tcchunk.function.arguments or ""
+        return tool_calls
 
+    def _process_tool_calls(self, tool_calls, run_id):
         if tool_calls:
             logger.info(f"Tool calls: {tool_calls}")
-            self._messages.append(
-                {
-                    "tool_calls": tool_calls,
-                    "role": 'assistant',
-                }
-            )
-
+            self._messages.append({
+                "tool_calls": tool_calls,
+                "role": 'assistant',
+            })
+    
         for tool_call in tool_calls:
-            function_response = self._handle_function_call(tool_call['function']['name'], tool_call['function']['arguments'])
-            self._callbacks.on_function_call_processed(self._name, run_id, tool_call['function']['name'], tool_call['function']['arguments'], str(function_response))
-
-            self._messages.append(
-                {
-                    "tool_call_id": tool_call['id'],
-                    "role": "tool",
-                    "name": tool_call['function']['name'],
-                    "content": function_response,
-                }
+            function_response = self._handle_function_call(
+                tool_call['function']['name'],
+                tool_call['function']['arguments']
+            )
+            self._callbacks.on_function_call_processed(
+                self._name, run_id, 
+                tool_call['function']['name'], 
+                tool_call['function']['arguments'], 
+                str(function_response)
             )
 
-        if tool_calls:
-            logger.info("Tool calls processed, return True and continue the loop")
-            return True
+            # Appending the processed tool call and its response to self._messages
+            self._messages.append({
+                "tool_call_id": tool_call['id'],
+                "role": "tool",
+                "name": tool_call['function']['name'],
+                "content": str(function_response),  # Ensure content is stringified if necessary
+            })
 
-        collected_messages = [m for m in collected_messages if m is not None]
-        full_response = ''.join([m for m in collected_messages])
-
-        # extend conversation with assistant's reply for the full response
+    def _update_conversation_with_messages(self, collected_messages, thread_name):
+        full_response = ''.join(filter(None, collected_messages))
         if full_response and thread_name:
             conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
             conversation_thread_client.create_conversation_thread_message(
-                full_response,
-                thread_name,
+                message=full_response, 
+                thread_name=thread_name, 
                 metadata={"chat_assistant": self._name}
             )
-        logger.info("No tool calls, return False and stop the loop")
-        return False
+            logger.info("Messages updated in conversation.")
 
     def _update_tools(self, assistant_config: AssistantConfig):
         logger.info(f"Updating tools for assistant: {assistant_config.name}")
