@@ -30,10 +30,6 @@ class AsyncAssistantClient(BaseAssistantClient):
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
     :type callbacks: Optional[AssistantClientCallbacks]
-    :param is_create: A flag to indicate if the assistant client is being created.
-    :type is_create: bool
-    :param timeout: The HTTP request timeout in seconds.
-    :type timeout: Optional[float]
     """
     def __init__(
             self, 
