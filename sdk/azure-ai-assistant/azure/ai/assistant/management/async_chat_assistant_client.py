@@ -309,7 +309,7 @@ class AsyncChatAssistantClient(BaseAssistantClient):
                 collected_messages.append(delta.content)
                 is_first_message = False
             if delta and delta.tool_calls:
-                tool_calls = self._append_tool_calls(tool_calls, delta.tool_calls)
+                tool_calls = await asyncio.to_thread(self._append_tool_calls, tool_calls, delta.tool_calls)
 
         return tool_calls, collected_messages
 
