@@ -5,49 +5,65 @@ from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
-from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-from typing import Optional
+
+from openai import AsyncAzureOpenAI, AsyncOpenAI
+
+from typing import Optional, Union
 from datetime import datetime
 import json, uuid
 import copy
+import asyncio
 
 
-class ChatAssistantClient(BaseAssistantClient):
+class AsyncChatAssistantClient(BaseAssistantClient):
     """
     A class that manages an chat assistant client.
+
+    Use the `from_json` or `from_config` factory methods to create an instance of this class.
 
     :param config_json: The configuration data to use to create the chat client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
     :type callbacks: Optional[AssistantClientCallbacks]
-    :param is_create: A flag to indicate if the assistant client is being created.
-    :type is_create: bool
-    :param timeout: The HTTP request timeout in seconds.
-    :type timeout: Optional[float]
     """
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None,
-            is_create: bool = True,
-            timeout: Optional[float] = None
+            callbacks: Optional[AssistantClientCallbacks] = None
     ) -> None:
-        super().__init__(config_json, callbacks)
+        super().__init__(config_json, callbacks, async_mode=True)
         self._tools = None
         self._messages = []
-        self._init_chat_assistant_client(self._config_data, is_create, timeout=timeout)
+        self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
+        # Init with base settings, leaving async init for the factory method
+
+    async def _async_init(
+            self, 
+            is_create: bool, 
+            timeout: Optional[float]
+    ):
+        """
+        An asynchronous initialization method that loads and sets up the assistant configuration.
+
+        :param is_create: A flag to indicate if the assistant client is being created.
+        :type is_create: bool
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+        """
+        await self._init_chat_assistant_client(self._config_data, is_create, timeout=timeout)
 
     @classmethod
-    def from_json(
+    async def from_json(
         cls,
         config_json: str,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
-    ) -> "ChatAssistantClient":
+    ) -> "AsyncChatAssistantClient":
         """
-        Creates a ChatAssistantClient instance from JSON configuration data.
+        Creates a AsyncChatAssistantClient instance from JSON configuration data.
 
         :param config_json: JSON string containing the configuration for the chat assistant.
         :type config_json: str
@@ -55,26 +71,28 @@ class ChatAssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-        :return: An instance of ChatAssistantClient.
-        :rtype: ChatAssistantClient
+        :return: An instance of AsyncChatAssistantClient.
+        :rtype: AsyncChatAssistantClient
         """
         try:
+            instance = cls(config_json, callbacks)  # Instance creation without async init
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
+            await instance._async_init(is_create, timeout)  # Perform async initialization
+            return instance
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     @classmethod
-    def from_config(
+    async def from_config(
         cls,
         config: AssistantConfig,
         callbacks: Optional[AssistantClientCallbacks] = None,
         timeout: Optional[float] = None
-    ) -> "ChatAssistantClient":
+    ) -> "AsyncChatAssistantClient":
         """
-        Creates a ChatAssistantClient instance from an AssistantConfig object.
+        Creates a AsyncChatAssistantClient instance from an AssistantConfig object.
 
         :param config: AssistantConfig object containing the configuration for the chat assistant.
         :type config: AssistantConfig
@@ -82,18 +100,19 @@ class ChatAssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
-        :return: An instance of ChatAssistantClient.
-        :rtype: ChatAssistantClient
+        :return: An instance of AsyncChatAssistantClient.
+        :rtype: AsyncChatAssistantClient
         """
         try:
-            config_json = config.to_json()
+            instance = cls(config.to_json(), callbacks)  # Instance creation without async init
             is_create = not config.assistant_id
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
+            await instance._async_init(is_create, timeout)  # Perform async initialization
+            return instance
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")
 
-    def _init_chat_assistant_client(
+    async def _init_chat_assistant_client(
             self, 
             config_data: dict,
             is_create: bool = True,
@@ -106,7 +125,7 @@ class ChatAssistantClient(BaseAssistantClient):
                 assistant_config.assistant_id = str(uuid.uuid4())
             self._messages = [{"role": "system", "content": assistant_config.instructions}]
             self._update_tools(assistant_config)
-            self._load_selected_functions(assistant_config)
+            await asyncio.to_thread(self._load_selected_functions, assistant_config)
             self._assistant_config = assistant_config
 
             # Update the local configuration using AssistantConfigManager
@@ -146,7 +165,7 @@ class ChatAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to purge chat assistant with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge chat assistant with name: {self.name}: {e}")
 
-    def process_messages(
+    async def process_messages(
             self, 
             thread_name: Optional[str] = None,
             user_request: Optional[str] = None,
@@ -189,8 +208,8 @@ class ChatAssistantClient(BaseAssistantClient):
             self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
 
             if thread_name:
-                conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-                conversation = conversation_thread_client.retrieve_conversation(thread_name)
+                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
+                conversation = await conversation_thread_client.retrieve_conversation(thread_name)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
                         self._messages.append({"role": "user", "content": message.content})
@@ -210,7 +229,7 @@ class ChatAssistantClient(BaseAssistantClient):
                     self._user_input_processing_cancel_requested = False
                     break
 
-                response = self._ai_client.chat.completions.create(
+                response = await self._async_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,
                     tools=self._tools,
@@ -222,9 +241,9 @@ class ChatAssistantClient(BaseAssistantClient):
                 )
 
                 if response and stream:
-                    continue_processing = self._handle_streaming_response(response, thread_name, run_id)
+                    continue_processing = await self._handle_streaming_response(response, thread_name, run_id)
                 elif response:
-                    continue_processing = self._handle_non_streaming_response(response, thread_name, run_id)
+                    continue_processing = await self._handle_non_streaming_response(response, thread_name, run_id)
                 else:
                     # If there's no response, stop the loop
                     continue_processing = False
@@ -244,15 +263,15 @@ class ChatAssistantClient(BaseAssistantClient):
             logger.error(f"Error occurred during processing run: {e}")
             raise EngineError(f"Error occurred during processing run: {e}")
 
-    def _handle_non_streaming_response(self, response, thread_name, run_id):
+    async def _handle_non_streaming_response(self, response, thread_name, run_id):
         response_message = response.choices[0].message
         self._messages.append(response_message)
 
         if response_message.content:
             # extend conversation with assistant's reply
             if thread_name:
-                conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-                conversation_thread_client.create_conversation_thread_message(
+                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
+                await conversation_thread_client.create_conversation_thread_message(
                     response_message.content,
                     thread_name,
                     metadata={"chat_assistant": self._name}
@@ -274,25 +293,25 @@ class ChatAssistantClient(BaseAssistantClient):
                 )
             return True
 
-    def _handle_streaming_response(self, response, thread_name, run_id):
-        tool_calls, collected_messages = self._process_response_chunks(response, thread_name, run_id)
-        self._process_tool_calls(tool_calls, run_id)
-        self._update_conversation_with_messages(collected_messages, thread_name)
+    async def _handle_streaming_response(self, response, thread_name, run_id):
+        tool_calls, collected_messages = await self._process_response_chunks(response, thread_name, run_id)
+        await self._process_tool_calls(tool_calls, run_id)
+        await self._update_conversation_with_messages(collected_messages, thread_name)
         return bool(tool_calls)  # Return True if there were tool calls processed, otherwise False
 
-    def _process_response_chunks(self, response, thread_name, run_id):
+    async def _process_response_chunks(self, response, thread_name, run_id):
         tool_calls = []
         collected_messages = []
         is_first_message = True
 
-        for chunk in response:
+        async for chunk in response:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
                 self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, delta.content)
                 collected_messages.append(delta.content)
                 is_first_message = False
             if delta and delta.tool_calls:
-                tool_calls = self._append_tool_calls(tool_calls, delta.tool_calls)
+                tool_calls = await asyncio.to_thread(self._append_tool_calls, tool_calls, delta.tool_calls)
 
         return tool_calls, collected_messages
 
@@ -306,7 +325,7 @@ class ChatAssistantClient(BaseAssistantClient):
             tc["function"]["arguments"] += tcchunk.function.arguments or ""
         return tool_calls
 
-    def _process_tool_calls(self, tool_calls, run_id):
+    async def _process_tool_calls(self, tool_calls, run_id):
         if tool_calls:
             logger.info(f"Tool calls: {tool_calls}")
             self._messages.append({
@@ -315,8 +334,9 @@ class ChatAssistantClient(BaseAssistantClient):
             })
     
         for tool_call in tool_calls:
-            function_response = self._handle_function_call(
-                tool_call['function']['name'],
+            function_response = await asyncio.to_thread(
+                self._handle_function_call, 
+                tool_call['function']['name'], 
                 tool_call['function']['arguments']
             )
             self._callbacks.on_function_call_processed(
@@ -334,11 +354,11 @@ class ChatAssistantClient(BaseAssistantClient):
                 "content": str(function_response),  # Ensure content is stringified if necessary
             })
 
-    def _update_conversation_with_messages(self, collected_messages, thread_name):
+    async def _update_conversation_with_messages(self, collected_messages, thread_name):
         full_response = ''.join(filter(None, collected_messages))
         if full_response and thread_name:
-            conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            conversation_thread_client.create_conversation_thread_message(
+            conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
+            await conversation_thread_client.create_conversation_thread_message(
                 message=full_response, 
                 thread_name=thread_name, 
                 metadata={"chat_assistant": self._name}
