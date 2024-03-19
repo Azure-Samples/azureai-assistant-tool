@@ -22,6 +22,8 @@ class AsyncChatAssistantClient(BaseAssistantClient):
     """
     A class that manages an chat assistant client.
 
+    Use the `from_json` or `from_config` factory methods to create an instance of this class.
+
     :param config_json: The configuration data to use to create the chat client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.

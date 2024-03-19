@@ -26,6 +26,8 @@ class AsyncAssistantClient(BaseAssistantClient):
     The assistant client is used to create, retrieve, update, and delete assistants in the cloud service 
     using the given AI client type and json configuration data.
 
+    Use the `from_json` or `from_config` factory methods to create an instance of this class.
+
     :param config_json: The configuration data to use to create the assistant client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.

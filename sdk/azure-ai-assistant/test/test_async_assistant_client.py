@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 import pytest
 import json
 import os
@@ -7,14 +10,6 @@ from azure.ai.assistant.management.async_conversation_thread_client import Async
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from test_assistant_client import generate_test_config
 
-
-@pytest.mark.asyncio
-async def skip_test_async_assistant_client_init():
-    config = generate_test_config()  # Assuming this does not need to be async
-    config_json = json.dumps(config)
-
-    client = AsyncAssistantClient(config_json)
-    # raise exception if the client is not initialized properly
 
 @pytest.mark.asyncio
 async def test_async_assistant_client_from_json():
