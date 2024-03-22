@@ -9,6 +9,8 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from typing import Optional
+from typing_extensions import Literal, TypedDict
+from openai.types.chat.completion_create_params import ResponseFormat
 from datetime import datetime
 import json, uuid
 import copy
@@ -152,9 +154,7 @@ class ChatAssistantClient(BaseAssistantClient):
             user_request: Optional[str] = None,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = False,
-            temperature: Optional[float] = None,
-            seed: Optional[int] = None
+            stream: Optional[bool] = False
     ) -> Optional[str]:
         """
         Process the messages in given thread.
@@ -190,7 +190,7 @@ class ChatAssistantClient(BaseAssistantClient):
 
             if thread_name:
                 conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-                conversation = conversation_thread_client.retrieve_conversation(thread_name)
+                conversation = conversation_thread_client.retrieve_conversation(thread_name, self._assistant_config.max_text_messages)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
                         self._messages.append({"role": "user", "content": message.content})
@@ -210,14 +210,22 @@ class ChatAssistantClient(BaseAssistantClient):
                     self._user_input_processing_cancel_requested = False
                     break
 
+                response_format: ResponseFormat = {'type': self._assistant_config.text_completion_config.response_format}
+
                 response = self._ai_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,
                     tools=self._tools,
                     tool_choice=None if self._tools is None else "auto",
                     stream=stream,
-                    temperature=temperature,
-                    seed=seed,
+                    temperature=self._assistant_config.text_completion_config.temperature,
+                    seed=self._assistant_config.text_completion_config.seed,
+                    frequency_penalty=self._assistant_config.text_completion_config.frequency_penalty,
+                    max_tokens=self._assistant_config.text_completion_config.max_tokens,
+                    presence_penalty=self._assistant_config.text_completion_config.presence_penalty,
+                    response_format=response_format,
+                    top_logprobs=self._assistant_config.text_completion_config.top_logprobs,
+                    top_p=self._assistant_config.text_completion_config.top_p,
                     timeout=timeout
                 )
 

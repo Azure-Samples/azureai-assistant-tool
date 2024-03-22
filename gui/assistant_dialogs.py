@@ -5,8 +5,8 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6 import QtGui
-from PySide6.QtWidgets import QDialog, QComboBox, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtWidgets import QDialog, QComboBox, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QIcon, QTextOption
 
 import json, os, shutil, threading
@@ -23,6 +23,8 @@ from gui.utils import resource_path
 
 
 class AssistantConfigDialog(QDialog):
+    assistantConfigSubmitted = Signal(dict, str)
+
     def __init__(
             self, 
             parent=None, 
@@ -93,6 +95,11 @@ class AssistantConfigDialog(QDialog):
         toolsTab = self.create_tools_tab()
         tabWidget.addTab(toolsTab, "Tools")
 
+        # Add Completion tab if assistant_type is chat_assistant
+        if self.assistant_type == "chat_assistant":
+            completionTab = self.create_completion_tab()
+            tabWidget.addTab(completionTab, "Completion")
+
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
         tabWidget.addTab(instructionsEditorTab, "Instructions Editor")
@@ -100,6 +107,11 @@ class AssistantConfigDialog(QDialog):
         # Set the main layout
         mainLayout = QVBoxLayout(self)
         mainLayout.addWidget(tabWidget)
+
+        # Save Button
+        self.saveButton = QPushButton('Save Configuration')
+        self.saveButton.clicked.connect(self.save_configuration)
+        mainLayout.addWidget(self.saveButton)
 
         # setup status bar
         self.status_bar = StatusBar(self)
@@ -207,11 +219,14 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.outputFolderPathLabel)
         configLayout.addLayout(outputFolderPathLayout)
 
-        # Save Button
-        self.saveButton = QPushButton('Save Configuration')
-        self.saveButton.clicked.connect(self.save_configuration)
-        configLayout.addWidget(self.saveButton)
-
+        if self.assistant_type == "chat_assistant":
+            self.maxMessagesLayout = QHBoxLayout()
+            self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context:')
+            self.maxMessagesEdit = QLineEdit()
+            self.maxMessagesEdit.setPlaceholderText("256")
+            self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
+            self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
+            configLayout.addLayout(self.maxMessagesLayout)
         return configTab
 
     def create_tools_tab(self):
@@ -277,6 +292,85 @@ class AssistantConfigDialog(QDialog):
             self.knowledgeFileRemoveButton.setEnabled(False)
             self.knowledgeRetrievalCheckBox.setEnabled(False)
         return toolsTab
+
+    def create_completion_tab(self):
+        completionTab = QWidget()
+        completionLayout = QVBoxLayout(completionTab)
+        
+        # Frequency Penalty
+        self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
+        self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
+        self.frequencyPenaltySlider.setMinimum(-200)
+        self.frequencyPenaltySlider.setMaximum(200)
+        self.frequencyPenaltySlider.setValue(0)  # Default value
+        self.frequencyPenaltyValueLabel = QLabel('0.0')
+        self.frequencyPenaltySlider.valueChanged.connect(lambda: self.frequencyPenaltyValueLabel.setText(f"{self.frequencyPenaltySlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.frequencyPenaltyLabel)
+        completionLayout.addWidget(self.frequencyPenaltySlider)
+        completionLayout.addWidget(self.frequencyPenaltyValueLabel)
+        
+        # Max Tokens
+        self.maxTokensLabel = QLabel('Max Tokens:')
+        self.maxTokensEdit = QLineEdit()
+        completionLayout.addWidget(self.maxTokensLabel)
+        completionLayout.addWidget(self.maxTokensEdit)
+        
+        # Presence Penalty
+        self.presencePenaltyLabel = QLabel('Presence Penalty:')
+        self.presencePenaltySlider = QSlider(Qt.Horizontal)
+        self.presencePenaltySlider.setMinimum(-200)
+        self.presencePenaltySlider.setMaximum(200)
+        self.presencePenaltySlider.setValue(0)  # Default value
+        self.presencePenaltyValueLabel = QLabel('0.0')
+        self.presencePenaltySlider.valueChanged.connect(lambda: self.presencePenaltyValueLabel.setText(f"{self.presencePenaltySlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.presencePenaltyLabel)
+        completionLayout.addWidget(self.presencePenaltySlider)
+        completionLayout.addWidget(self.presencePenaltyValueLabel)
+        
+        # Response Format
+        self.responseFormatLabel = QLabel('Response Format:')
+        self.responseFormatComboBox = QComboBox()
+        self.responseFormatComboBox.addItems(["text", "json_object"])
+        completionLayout.addWidget(self.responseFormatLabel)
+        completionLayout.addWidget(self.responseFormatComboBox)
+        
+        # Temperature
+        self.temperatureLabel = QLabel('Temperature:')
+        self.temperatureSlider = QSlider(Qt.Horizontal)
+        self.temperatureSlider.setMinimum(0)
+        self.temperatureSlider.setMaximum(100)
+        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
+        self.temperatureValueLabel = QLabel('0.7')
+        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.temperatureLabel)
+        completionLayout.addWidget(self.temperatureSlider)
+        completionLayout.addWidget(self.temperatureValueLabel)
+        
+        # Top Logprobs
+        self.topLogprobsLabel = QLabel('Top Logprobs:')
+        self.topLogprobsEdit = QLineEdit()
+        completionLayout.addWidget(self.topLogprobsLabel)
+        completionLayout.addWidget(self.topLogprobsEdit)
+        
+        # Top P
+        self.topPLabel = QLabel('Top P:')
+        self.topPSlider = QSlider(Qt.Horizontal)
+        self.topPSlider.setMinimum(0)
+        self.topPSlider.setMaximum(100)
+        self.topPSlider.setValue(10)  # Default value as 0.1 for illustration
+        self.topPValueLabel = QLabel('0.1')
+        self.topPSlider.valueChanged.connect(lambda: self.topPValueLabel.setText(f"{self.topPSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.topPLabel)
+        completionLayout.addWidget(self.topPSlider)
+        completionLayout.addWidget(self.topPValueLabel)
+
+        # Seed
+        self.seedLabel = QLabel('Seed:')
+        self.seedEdit = QLineEdit()
+        completionLayout.addWidget(self.seedLabel)
+        completionLayout.addWidget(self.seedEdit)
+
+        return completionTab
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
@@ -378,10 +472,6 @@ class AssistantConfigDialog(QDialog):
         checkInstructionsButton.clicked.connect(self.check_instructions)
         instructionsEditorLayout.addWidget(checkInstructionsButton)
 
-        # 'Save Instructions' button
-        saveInstructionsButton = QPushButton('Save Instructions')
-        saveInstructionsButton.clicked.connect(self.save_instructions)
-        instructionsEditorLayout.addWidget(saveInstructionsButton)
         return instructionsEditorTab
 
     def select_output_folder_path(self):
@@ -453,11 +543,6 @@ class AssistantConfigDialog(QDialog):
         except Exception as e:
             logger.error(f"Error displaying reviewed instructions: {e}")
 
-    def save_instructions(self):
-        # Get instructions and set them to the instructionsEdit in the Configuration tab
-        instructions = self.newInstructionsEdit.toPlainText()
-        self.instructionsEdit.setText(instructions)
-
     def pre_load_assistant_config(self, name):
         # If an assistant_config is provided, pre-fill the fields
         self.assistant_config = AssistantConfigManager.get_instance().get_config(name)
@@ -489,6 +574,19 @@ class AssistantConfigDialog(QDialog):
                 self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
                 # enable code interpreter checkbox
                 self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
+            elif self.assistant_type == "chat_assistant":
+                self.maxMessagesEdit.setText(str(self.assistant_config.max_text_messages))
+                # pre-fill completion settings
+                completion_settings = self.assistant_config.text_completion_config.to_dict()
+                if completion_settings:
+                    self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
+                    self.maxTokensEdit.setText(str(completion_settings.get('max_tokens', 100)))
+                    self.presencePenaltySlider.setValue(completion_settings.get('presence_penalty', 0) * 100)
+                    self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
+                    self.seedEdit.setText(str(completion_settings.get('seed', 'None')))
+                    self.temperatureSlider.setValue(completion_settings.get('temperature', 0.7) * 100)
+                    self.topLogprobsEdit.setText(str(completion_settings.get('top_logprobs', 0)))
+                    self.topPSlider.setValue(completion_settings.get('top_p', 0.1) * 100)
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
@@ -547,6 +645,23 @@ class AssistantConfigDialog(QDialog):
             self.knowledgeFileList.takeItem(self.knowledgeFileList.row(item))
 
     def save_configuration(self):
+        # Conditional setup for completion settings based on assistant_type
+        if self.assistant_type == "chat_assistant":
+            max_text_messages = int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else 256  # Ensure it's an integer and provide a default
+            completion_settings = {
+                'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
+                'max_tokens': int(self.maxTokensEdit.text()) if self.maxTokensEdit.text().isdigit() else 100,  # Ensure it's an integer and provide a default
+                'presence_penalty': self.presencePenaltySlider.value() / 100,
+                'response_format': self.responseFormatComboBox.currentText(),
+                'seed': int(self.seedEdit.text()) if self.seedEdit.text().isdigit() else None,  # Ensure it's an integer or None
+                'temperature': self.temperatureSlider.value() / 100,
+                'top_logprobs': int(self.topLogprobsEdit.text()) if self.topLogprobsEdit.text().isdigit() else 0,  # Ensure it's an integer
+                'top_p': self.topPSlider.value() / 100
+            }
+        else:
+            max_text_messages = None
+            completion_settings = None
+
         config = {
             'name': self.nameEdit.text(),
             'instructions': self.instructionsEdit.toPlainText(),
@@ -559,14 +674,16 @@ class AssistantConfigDialog(QDialog):
             'code_interpreter': self.code_interpreter,
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
-            'assistant_type': self.assistant_type
+            'assistant_type': self.assistant_type,
+            'completion_settings': completion_settings,
+            'max_text_messages': max_text_messages
         }
         # if name, instructions, and model are empty, show an error message
         if not config['name'] or not config['instructions'] or not config['model']:
             QMessageBox.information(self, "Missing Fields", "Name, Instructions, and Model are required fields.")
             return
-        self.assistant_config_json = json.dumps(config, indent=4)
-        self.accept()
+        assistant_config_json = json.dumps(config, indent=4)
+        self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText())
 
 
 class ExportAssistantDialog(QDialog):

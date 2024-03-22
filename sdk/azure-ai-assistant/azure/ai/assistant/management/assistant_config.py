@@ -5,6 +5,105 @@ import json
 from azure.ai.assistant.management.function_config import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
 import os
+from typing import Optional
+
+
+class TextCompletionConfig:
+    def __init__(self, 
+                 frequency_penalty: float, 
+                 max_tokens: int, 
+                 presence_penalty: float,
+                 response_format: str,
+                 temperature: float, 
+                 top_logprobs: int, 
+                 top_p: float,
+                 seed: Optional[int] = None
+        ) -> None:
+        self.frequency_penalty = frequency_penalty
+        self.max_tokens = max_tokens
+        self.presence_penalty = presence_penalty
+        self.response_format = response_format
+        self.temperature = temperature
+        self.top_logprobs = top_logprobs
+        self.top_p = top_p
+        self.seed = seed
+
+
+    def to_dict(self):
+        return {
+            'frequency_penalty': self.frequency_penalty,
+            'max_tokens': self.max_tokens,
+            'presence_penalty': self.presence_penalty,
+            'response_format': self.response_format,
+            'temperature': self.temperature,
+            'top_logprobs': self.top_logprobs,
+            'top_p': self.top_p,
+            'seed': self.seed
+        }
+
+    @property
+    def frequency_penalty(self) -> float:
+        return self._frequency_penalty
+    
+    @frequency_penalty.setter
+    def frequency_penalty(self, value) -> None:
+        self._frequency_penalty = value
+
+    @property
+    def max_tokens(self) -> int:
+        return self._max_tokens
+    
+    @max_tokens.setter
+    def max_tokens(self, value) -> None:
+        self._max_tokens = value
+
+    @property
+    def presence_penalty(self) -> float:
+        return self._presence_penalty
+    
+    @presence_penalty.setter
+    def presence_penalty(self, value) -> None:
+        self._presence_penalty = value
+
+    @property
+    def response_format(self) -> str:
+        return self._response_format
+    
+    @response_format.setter
+    def response_format(self, value) -> None:
+        self._response_format = value
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
+    
+    @temperature.setter
+    def temperature(self, value) -> None:
+        self._temperature = value
+
+    @property
+    def top_logprobs(self) -> int:
+        return self._top_logprobs
+    
+    @top_logprobs.setter
+    def top_logprobs(self, value) -> None:
+        self._top_logprobs = value
+
+    @property
+    def top_p(self) -> float:
+        return self._top_p
+    
+    @top_p.setter
+    def top_p(self, value) -> None:
+        self._top_p = value
+
+    @property
+    def seed(self) -> Optional[int]:
+        return self._seed
+    
+    @seed.setter
+    def seed(self, value) -> None:
+        self._seed = value
 
 
 class AssistantConfig:
@@ -44,6 +143,34 @@ class AssistantConfig:
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
+        self._max_text_messages = None
+
+        if self._assistant_type == 'chat_assistant':
+            self._max_text_messages = config_data.get('max_text_messages', 256)
+            completion_data = config_data.get('completion_settings', {
+                'frequency_penalty': 0.0,
+                'max_tokens': 100,
+                'presence_penalty': 0.0,
+                'response_format': 'text',
+                'temperature': 0.7,
+                'top_logprobs': 0,
+                'top_p': 0.1,
+                'seed': None,
+            })
+            
+            # Constructing TextCompletionConfig from the dictionary
+            self._text_completion_config = TextCompletionConfig(
+                frequency_penalty=completion_data['frequency_penalty'],
+                max_tokens=completion_data['max_tokens'],
+                presence_penalty=completion_data['presence_penalty'],
+                response_format=completion_data['response_format'],
+                temperature=completion_data['temperature'],
+                top_logprobs=completion_data['top_logprobs'],
+                top_p=completion_data['top_p'],
+                seed=completion_data['seed']
+            )
+        else:
+            self._text_completion_config = None
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -96,6 +223,9 @@ class AssistantConfig:
         self._config_data['output_folder_path'] = self._output_folder_path
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
+        if self._assistant_type == 'chat_assistant':
+            self._config_data['completion_settings'] = self._text_completion_config.to_dict()
+            self._config_data['max_text_messages'] = self._max_text_messages
         return self._config_data
 
     def _get_function_configs(self):
@@ -306,3 +436,25 @@ class AssistantConfig:
         :rtype: str
         """
         return self._assistant_role
+
+    @property
+    def text_completion_config(self) -> TextCompletionConfig:
+        """Get the text completion config.
+        
+        :return: The completion config.
+        :rtype: TextCompletionConfig
+        """
+        return self._text_completion_config
+    
+    @property
+    def max_text_messages(self) -> Optional[int]:
+        """Get the max text messages.
+        
+        Returns `None` if the assistant type is not 'chat_assistant'.
+        
+        :return: The max text messages or None.
+        """
+        if self._assistant_type == 'chat_assistant':
+            return self._max_text_messages
+        else:
+            return None
