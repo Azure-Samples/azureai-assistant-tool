@@ -23,12 +23,13 @@ from gui.utils import resource_path
 
 
 class AssistantConfigDialog(QDialog):
-    assistantConfigSubmitted = Signal(str, str)
+    assistantConfigSubmitted = Signal(str, str, str)
 
     def __init__(
             self, 
             parent=None, 
             assistant_type : str = "assistant",
+            assistant_name : str = None,
             function_config_manager : FunctionConfigManager = None
     ):
         super().__init__(parent)
@@ -37,6 +38,7 @@ class AssistantConfigDialog(QDialog):
             self.instructions_reviewer = self.main_window.instructions_reviewer
         self.assistant_config_manager = self.main_window.assistant_config_manager
         self.assistant_type = assistant_type
+        self.assistant_name = assistant_name
         self.function_config_manager = function_config_manager
 
         self.init_variables()
@@ -405,7 +407,6 @@ class AssistantConfigDialog(QDialog):
             assistant_config = assistant_config_manager.get_config(assistant_name)
             if assistant_config.assistant_type == self.assistant_type:
                 self.assistantComboBox.addItem(assistant_name)
-        self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
         self.modelComboBox.clear()
         try:
@@ -422,6 +423,13 @@ class AssistantConfigDialog(QDialog):
                 self.modelComboBox.setToolTip("Select a model ID supported for assistant from the list")
             elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
                 self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")
+
+        # If assistant_name is provided, set the assistantComboBox to the assistant_name
+        index = self.assistantComboBox.findText(self.assistant_name)
+        if index >= 0:
+            self.assistantComboBox.setCurrentIndex(index)
+        else:
+            self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
     def assistant_selection_changed(self):
         self.reset_fields()
@@ -726,7 +734,7 @@ class AssistantConfigDialog(QDialog):
             QMessageBox.information(self, "Missing Fields", "Name, Instructions, and Model are required fields.")
             return
         assistant_config_json = json.dumps(config, indent=4)
-        self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText())
+        self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText(), self.assistant_type)
 
 
 class ExportAssistantDialog(QDialog):

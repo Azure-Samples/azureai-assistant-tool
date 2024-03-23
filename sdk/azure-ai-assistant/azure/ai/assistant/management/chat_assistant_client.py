@@ -9,8 +9,6 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from typing import Optional
-from typing_extensions import Literal, TypedDict
-from openai.types.chat.completion_create_params import ResponseFormat
 from datetime import datetime
 import json, uuid
 import copy
@@ -212,7 +210,6 @@ class ChatAssistantClient(BaseAssistantClient):
 
                 text_completion_config = self._assistant_config.text_completion_config
 
-                # Using a conditional expression to check if text_completion_config is not None before accessing its attributes
                 temperature = None if text_completion_config is None else text_completion_config.temperature
                 seed = None if text_completion_config is None else text_completion_config.seed
                 frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
@@ -221,7 +218,6 @@ class ChatAssistantClient(BaseAssistantClient):
                 top_p = None if text_completion_config is None else text_completion_config.top_p
                 response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
 
-                # Now, use these variables in your API call
                 response = self._ai_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,

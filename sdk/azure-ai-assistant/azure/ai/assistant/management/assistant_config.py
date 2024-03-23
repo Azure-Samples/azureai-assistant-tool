@@ -26,7 +26,6 @@ class TextCompletionConfig:
         self.top_p = top_p
         self.seed = seed
 
-
     def to_dict(self):
         return {
             'frequency_penalty': self.frequency_penalty,

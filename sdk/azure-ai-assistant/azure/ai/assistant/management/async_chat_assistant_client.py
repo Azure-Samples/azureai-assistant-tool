@@ -171,9 +171,7 @@ class AsyncChatAssistantClient(BaseAssistantClient):
             user_request: Optional[str] = None,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = False,
-            temperature: Optional[float] = None,
-            seed: Optional[int] = None
+            stream: Optional[bool] = False
     ) -> Optional[str]:
         """
         Process the messages in given thread.
@@ -229,6 +227,16 @@ class AsyncChatAssistantClient(BaseAssistantClient):
                     self._user_input_processing_cancel_requested = False
                     break
 
+                text_completion_config = self._assistant_config.text_completion_config
+
+                temperature = None if text_completion_config is None else text_completion_config.temperature
+                seed = None if text_completion_config is None else text_completion_config.seed
+                frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
+                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
+                presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
+                top_p = None if text_completion_config is None else text_completion_config.top_p
+                response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
+
                 response = await self._async_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,
@@ -237,6 +245,11 @@ class AsyncChatAssistantClient(BaseAssistantClient):
                     stream=stream,
                     temperature=temperature,
                     seed=seed,
+                    frequency_penalty=frequency_penalty,
+                    max_tokens=max_tokens,
+                    presence_penalty=presence_penalty,
+                    response_format=response_format,
+                    top_p=top_p,
                     timeout=timeout
                 )
 

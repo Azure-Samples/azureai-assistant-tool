@@ -18,6 +18,7 @@ from azure.ai.assistant.management.chat_assistant_client import ChatAssistantCli
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
+from gui.assistant_dialogs import AssistantConfigDialog
 from gui.utils import resource_path
 
 
@@ -262,6 +263,8 @@ class ConversationSidebar(QWidget):
         self.assistantList = QListWidget(self)
         self.assistantList.setFont(QFont("Arial", 11))
         self.assistantList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.assistantList.itemDoubleClicked.connect(self.on_assistant_double_clicked)
+        self.assistantList.setToolTip("Select assistants to use in the conversation or double-click to edit the selected assistant.")
         self.threadList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.aiClientComboBox = QComboBox()
@@ -292,6 +295,30 @@ class ConversationSidebar(QWidget):
                 self.delete_selected_assistant()
         else:
             super().keyPressEvent(event)
+
+    def on_assistant_double_clicked(self, item):
+        widget = self.assistantList.itemWidget(item)
+        assistant_name = widget.label.text()
+        assistant_config = self.assistant_config_manager.get_config(assistant_name)
+        if assistant_config:
+            if assistant_config.assistant_type == "assistant":
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+            else:
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+            self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
+            self.dialog.show()
+
+    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type):
+        try:
+            if assistant_type == "chat_assistant":
+                assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            else:
+                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+            client_type = AIClientType[ai_client_type]
+            self.main_window.conversation_sidebar.load_assistant_list(client_type)
+        except Exception as e:
+            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
 
     def delete_selected_assistant(self):
         current_item = self.assistantList.currentItem()

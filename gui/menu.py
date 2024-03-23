@@ -54,32 +54,26 @@ class AssistantsMenu:
         # Show the dialog non-modally
         self.dialog.show()
 
-    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type):
-        try:
-            assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
-            client_type = AIClientType[ai_client_type]
-            self.main_window.conversation_sidebar.load_assistant_list(client_type)
-        except Exception as e:
-            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating the assistant: {e}")
-
     def create_new_edit_chat_assistant(self):
         self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", function_config_manager=self.function_config_manager)
         
         # Connect the custom signal to a method to process the submitted data
-        self.dialog.assistantConfigSubmitted.connect(self.on_chat_assistant_config_submitted)
+        self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
         
         # Show the dialog non-modally
         self.dialog.show()
 
-    def on_chat_assistant_config_submitted(self, assistant_config_json, ai_client_type):
+    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type):
         try:
-            assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            if assistant_type == "chat_assistant":
+                assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            else:
+                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
         except Exception as e:
-            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating the assistant: {e}")
+            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
 
     def export_assistant(self):
         dialog = ExportAssistantDialog()
