@@ -596,6 +596,7 @@ class AssistantConfigDialog(QDialog):
 
                 # Check if text_completion_config exists, otherwise use default values directly
                 if text_completion_config is not None:
+                    self.useDefaultSettingsCheckBox.setChecked(False)
                     completion_settings = text_completion_config.to_dict()
                     frequency_penalty = completion_settings.get('frequency_penalty', 0) * 100
                     max_tokens = str(completion_settings.get('max_tokens', 100))

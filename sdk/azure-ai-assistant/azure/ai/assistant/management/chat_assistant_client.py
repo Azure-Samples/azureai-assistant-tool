@@ -218,7 +218,6 @@ class ChatAssistantClient(BaseAssistantClient):
                 frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
                 max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
                 presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
-                top_logprobs = None if text_completion_config is None else text_completion_config.top_logprobs
                 top_p = None if text_completion_config is None else text_completion_config.top_p
                 response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
 
@@ -235,7 +234,6 @@ class ChatAssistantClient(BaseAssistantClient):
                     max_tokens=max_tokens,
                     presence_penalty=presence_penalty,
                     response_format=response_format,
-                    top_logprobs=top_logprobs,
                     top_p=top_p,
                     timeout=timeout
                 )
