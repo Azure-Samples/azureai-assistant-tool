@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
@@ -57,7 +58,8 @@ class AssistantsMenu:
         try:
             assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
-            self.main_window.conversation_sidebar.load_assistant_list(ai_client_type)
+            client_type = AIClientType[ai_client_type]
+            self.main_window.conversation_sidebar.load_assistant_list(client_type)
         except Exception as e:
             QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating the assistant: {e}")
 
@@ -74,7 +76,8 @@ class AssistantsMenu:
         try:
             assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
-            self.main_window.conversation_sidebar.load_assistant_list(ai_client_type)
+            client_type = AIClientType[ai_client_type]
+            self.main_window.conversation_sidebar.load_assistant_list(client_type)
         except Exception as e:
             QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating the assistant: {e}")
 

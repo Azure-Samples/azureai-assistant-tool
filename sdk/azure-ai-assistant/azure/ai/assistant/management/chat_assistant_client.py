@@ -210,22 +210,33 @@ class ChatAssistantClient(BaseAssistantClient):
                     self._user_input_processing_cancel_requested = False
                     break
 
-                response_format: ResponseFormat = {'type': self._assistant_config.text_completion_config.response_format}
+                text_completion_config = self._assistant_config.text_completion_config
 
+                # Using a conditional expression to check if text_completion_config is not None before accessing its attributes
+                temperature = None if text_completion_config is None else text_completion_config.temperature
+                seed = None if text_completion_config is None else text_completion_config.seed
+                frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
+                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
+                presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
+                top_logprobs = None if text_completion_config is None else text_completion_config.top_logprobs
+                top_p = None if text_completion_config is None else text_completion_config.top_p
+                response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
+
+                # Now, use these variables in your API call
                 response = self._ai_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,
                     tools=self._tools,
                     tool_choice=None if self._tools is None else "auto",
                     stream=stream,
-                    temperature=self._assistant_config.text_completion_config.temperature,
-                    seed=self._assistant_config.text_completion_config.seed,
-                    frequency_penalty=self._assistant_config.text_completion_config.frequency_penalty,
-                    max_tokens=self._assistant_config.text_completion_config.max_tokens,
-                    presence_penalty=self._assistant_config.text_completion_config.presence_penalty,
+                    temperature=temperature,
+                    seed=seed,
+                    frequency_penalty=frequency_penalty,
+                    max_tokens=max_tokens,
+                    presence_penalty=presence_penalty,
                     response_format=response_format,
-                    top_logprobs=self._assistant_config.text_completion_config.top_logprobs,
-                    top_p=self._assistant_config.text_completion_config.top_p,
+                    top_logprobs=top_logprobs,
+                    top_p=top_p,
                     timeout=timeout
                 )
 

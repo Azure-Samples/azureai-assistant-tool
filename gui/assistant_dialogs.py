@@ -23,7 +23,7 @@ from gui.utils import resource_path
 
 
 class AssistantConfigDialog(QDialog):
-    assistantConfigSubmitted = Signal(dict, str)
+    assistantConfigSubmitted = Signal(str, str)
 
     def __init__(
             self, 
@@ -296,7 +296,13 @@ class AssistantConfigDialog(QDialog):
     def create_completion_tab(self):
         completionTab = QWidget()
         completionLayout = QVBoxLayout(completionTab)
-        
+
+        # Use Default Settings Checkbox
+        self.useDefaultSettingsCheckBox = QCheckBox("Use Default Settings (when checked, the following settings will be ignored)")
+        self.useDefaultSettingsCheckBox.setChecked(True)
+        self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
+        completionLayout.addWidget(self.useDefaultSettingsCheckBox)
+
         # Frequency Penalty
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
@@ -346,12 +352,6 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.temperatureSlider)
         completionLayout.addWidget(self.temperatureValueLabel)
         
-        # Top Logprobs
-        self.topLogprobsLabel = QLabel('Top Logprobs:')
-        self.topLogprobsEdit = QLineEdit()
-        completionLayout.addWidget(self.topLogprobsLabel)
-        completionLayout.addWidget(self.topLogprobsEdit)
-        
         # Top P
         self.topPLabel = QLabel('Top P:')
         self.topPSlider = QSlider(Qt.Horizontal)
@@ -370,7 +370,22 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.seedLabel)
         completionLayout.addWidget(self.seedEdit)
 
+        self.toggleCompletionSettings()
+
         return completionTab
+
+    def toggleCompletionSettings(self):
+        # Determine if controls should be enabled based on the checkbox
+        isEnabled = not self.useDefaultSettingsCheckBox.isChecked()
+        
+        # Enable or disable controls based on the checkbox's state
+        self.frequencyPenaltySlider.setEnabled(isEnabled)
+        self.maxTokensEdit.setEnabled(isEnabled)
+        self.presencePenaltySlider.setEnabled(isEnabled)
+        self.responseFormatComboBox.setEnabled(isEnabled)
+        self.temperatureSlider.setEnabled(isEnabled)
+        self.topPSlider.setEnabled(isEnabled)
+        self.seedEdit.setEnabled(isEnabled)
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
@@ -577,16 +592,37 @@ class AssistantConfigDialog(QDialog):
             elif self.assistant_type == "chat_assistant":
                 self.maxMessagesEdit.setText(str(self.assistant_config.max_text_messages))
                 # pre-fill completion settings
-                completion_settings = self.assistant_config.text_completion_config.to_dict()
-                if completion_settings:
-                    self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
-                    self.maxTokensEdit.setText(str(completion_settings.get('max_tokens', 100)))
-                    self.presencePenaltySlider.setValue(completion_settings.get('presence_penalty', 0) * 100)
-                    self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
-                    self.seedEdit.setText(str(completion_settings.get('seed', 'None')))
-                    self.temperatureSlider.setValue(completion_settings.get('temperature', 0.7) * 100)
-                    self.topLogprobsEdit.setText(str(completion_settings.get('top_logprobs', 0)))
-                    self.topPSlider.setValue(completion_settings.get('top_p', 0.1) * 100)
+                text_completion_config = self.assistant_config.text_completion_config
+
+                # Check if text_completion_config exists, otherwise use default values directly
+                if text_completion_config is not None:
+                    completion_settings = text_completion_config.to_dict()
+                    frequency_penalty = completion_settings.get('frequency_penalty', 0) * 100
+                    max_tokens = str(completion_settings.get('max_tokens', 100))
+                    presence_penalty = completion_settings.get('presence_penalty', 0) * 100
+                    response_format = completion_settings.get('response_format', 'text')
+                    seed = str(completion_settings.get('seed', ''))  # Assuming '' represents no seed, as 'None' as a string might be misleading
+                    temperature = completion_settings.get('temperature', 0.7) * 100
+                    top_p = completion_settings.get('top_p', 0.1) * 100
+                else:
+                    # Default values if text_completion_config is None
+                    frequency_penalty = 0
+                    max_tokens = "100"
+                    presence_penalty = 0
+                    response_format = "text"
+                    seed = ""
+                    temperature = 70
+                    top_p = 10
+
+                # Apply the values to UI elements
+                self.frequencyPenaltySlider.setValue(frequency_penalty)
+                self.maxTokensEdit.setText(max_tokens)
+                self.presencePenaltySlider.setValue(presence_penalty)
+                self.responseFormatComboBox.setCurrentText(response_format)
+                self.seedEdit.setText(seed)
+                self.temperatureSlider.setValue(temperature)
+                self.topPSlider.setValue(top_p)
+
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
@@ -646,21 +682,20 @@ class AssistantConfigDialog(QDialog):
 
     def save_configuration(self):
         # Conditional setup for completion settings based on assistant_type
+        max_text_messages = None
+        completion_settings = None
         if self.assistant_type == "chat_assistant":
             max_text_messages = int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else 256  # Ensure it's an integer and provide a default
-            completion_settings = {
-                'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
-                'max_tokens': int(self.maxTokensEdit.text()) if self.maxTokensEdit.text().isdigit() else 100,  # Ensure it's an integer and provide a default
-                'presence_penalty': self.presencePenaltySlider.value() / 100,
-                'response_format': self.responseFormatComboBox.currentText(),
-                'seed': int(self.seedEdit.text()) if self.seedEdit.text().isdigit() else None,  # Ensure it's an integer or None
-                'temperature': self.temperatureSlider.value() / 100,
-                'top_logprobs': int(self.topLogprobsEdit.text()) if self.topLogprobsEdit.text().isdigit() else 0,  # Ensure it's an integer
-                'top_p': self.topPSlider.value() / 100
-            }
-        else:
-            max_text_messages = None
-            completion_settings = None
+            if not self.useDefaultSettingsCheckBox.isChecked():
+                completion_settings = {
+                    'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
+                    'max_tokens': int(self.maxTokensEdit.text()) if self.maxTokensEdit.text().isdigit() else 100,  # Ensure it's an integer and provide a default
+                    'presence_penalty': self.presencePenaltySlider.value() / 100,
+                    'response_format': self.responseFormatComboBox.currentText(),
+                    'seed': int(self.seedEdit.text()) if self.seedEdit.text().isdigit() else None,  # Ensure it's an integer or None
+                    'temperature': self.temperatureSlider.value() / 100,
+                    'top_p': self.topPSlider.value() / 100
+                }
 
         config = {
             'name': self.nameEdit.text(),
