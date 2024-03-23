@@ -46,6 +46,7 @@ class AssistantConfigDialog(QDialog):
         self.init_ui()
 
     def init_variables(self):
+        self.file_references_dict = {}  # Dictionary to store file reference paths and IDs
         self.knowledge_files_dict = {}  # Dictionary to store knowledge file paths and IDs
         self.selected_functions = []  # Store the selected functions
         self.code_interpreter = False  # Store the code interpreter setting
@@ -86,29 +87,29 @@ class AssistantConfigDialog(QDialog):
 
     def init_ui(self):
         self.setWindowTitle("Assistant Configuration")
-        tabWidget = QTabWidget(self)
-        tabWidget.currentChanged.connect(self.on_tab_changed)
+        self.tabWidget = QTabWidget(self)
+        self.tabWidget.currentChanged.connect(self.on_tab_changed)
 
         # Create General Configuration tab
         configTab = self.create_config_tab()
-        tabWidget.addTab(configTab, "General")
+        self.tabWidget.addTab(configTab, "General")
 
         # Create Tools tab
         toolsTab = self.create_tools_tab()
-        tabWidget.addTab(toolsTab, "Tools")
+        self.tabWidget.addTab(toolsTab, "Tools")
 
         # Add Completion tab if assistant_type is chat_assistant
         if self.assistant_type == "chat_assistant":
             completionTab = self.create_completion_tab()
-            tabWidget.addTab(completionTab, "Completion")
+            self.tabWidget.addTab(completionTab, "Completion")
 
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
-        tabWidget.addTab(instructionsEditorTab, "Instructions Editor")
+        self.tabWidget.addTab(instructionsEditorTab, "Instructions Editor")
 
         # Set the main layout
         mainLayout = QVBoxLayout(self)
-        mainLayout.addWidget(tabWidget)
+        mainLayout.addWidget(self.tabWidget)
 
         # Save Button
         self.saveButton = QPushButton('Save Configuration')
@@ -186,6 +187,30 @@ class AssistantConfigDialog(QDialog):
         self.instructionsEdit.setMinimumHeight(100)
         configLayout.addWidget(self.instructionsLabel)
         configLayout.addWidget(self.instructionsEdit)
+
+        # Knowledge Files, Add File, and Remove File buttons
+        self.fileReferenceLabel = QLabel('File References:')
+        self.fileReferenceList = QListWidget()
+        self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:YourFile.yaml}")
+        self.fileReferenceList.setStyleSheet(
+            "QListWidget {"
+            "  border-style: solid;"
+            "  border-width: 1px;"
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
+            "}"
+        )
+        self.fileReferenceAddButton = QPushButton('Add File...')
+        self.fileReferenceAddButton.clicked.connect(self.add_reference_file)
+        self.fileReferenceRemoveButton = QPushButton('Remove File')
+        self.fileReferenceRemoveButton.clicked.connect(self.remove_reference_file)
+
+        fileButtonLayout = QHBoxLayout()
+        fileButtonLayout.addWidget(self.fileReferenceAddButton)
+        fileButtonLayout.addWidget(self.fileReferenceRemoveButton)
+
+        configLayout.addWidget(self.fileReferenceLabel)
+        configLayout.addWidget(self.fileReferenceList)
+        configLayout.addLayout(fileButtonLayout)
 
         # Model selection
         self.modelLabel = QLabel('Model:')
@@ -268,9 +293,9 @@ class AssistantConfigDialog(QDialog):
             "}"
         )
         self.knowledgeFileButton = QPushButton('Add File...')
-        self.knowledgeFileButton.clicked.connect(self.add_file)
+        self.knowledgeFileButton.clicked.connect(self.add_knowledge_file)
         self.knowledgeFileRemoveButton = QPushButton('Remove File')
-        self.knowledgeFileRemoveButton.clicked.connect(self.remove_file)
+        self.knowledgeFileRemoveButton.clicked.connect(self.remove_knowledge_file)
 
         fileButtonLayout = QHBoxLayout()
         fileButtonLayout.addWidget(self.knowledgeFileButton)
@@ -677,26 +702,40 @@ class AssistantConfigDialog(QDialog):
         elif state == Qt.CheckState.Unchecked.value:
             self.selected_functions = [f for f in self.selected_functions if f['function']['name'] != functionConfig.name]
 
-    def add_file(self):
-        options = QFileDialog.Options()
-        filePath, _ = QFileDialog.getOpenFileName(self, "Select File", "",
-                                                "All Files (*)", options=options)
-        if filePath:
-            if filePath in self.knowledge_files_dict:
-                QMessageBox.warning(self, "File Already Added", f"The file '{filePath}' is already in the list.")
-            else:
-                self.knowledge_files_dict[filePath] = None  # Initialize the file ID as None
-                self.knowledgeFileList.addItem(filePath)
+    def add_reference_file(self):
+        self.add_file(self.file_references_dict, self.fileReferenceList)
 
-    def remove_file(self):
-        selected_items = self.knowledgeFileList.selectedItems()
+    def remove_reference_file(self):
+        self.remove_file(self.file_references_dict, self.fileReferenceList)
+
+    def add_knowledge_file(self):
+        self.add_file(self.knowledge_files_dict, self.knowledgeFileList)
+
+    def remove_knowledge_file(self):
+        self.remove_file(self.knowledge_files_dict, self.knowledgeFileList)
+
+    def add_file(self, file_dict, list_widget):
+        options = QFileDialog.Options()
+        filePath, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
+        if filePath:
+            if filePath in file_dict:
+                QMessageBox.warning(None, "File Already Added", f"The file '{filePath}' is already in the list.")
+            else:
+                file_dict[filePath] = None  # Initialize the file ID as None or any default value you wish
+                list_widget.addItem(filePath)
+
+    def remove_file(self, file_dict, list_widget):
+        selected_items = list_widget.selectedItems()
         if not selected_items:
             return
         for item in selected_items:
-            del self.knowledge_files_dict[item.text()]
-            self.knowledgeFileList.takeItem(self.knowledgeFileList.row(item))
+            del file_dict[item.text()]
+            list_widget.takeItem(list_widget.row(item))
 
     def save_configuration(self):
+        # if on instructions tab, copy the instructions from the Instructions Editor tab
+        if self.tabWidget.currentIndex() == 2:
+            self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
         # Conditional setup for completion settings based on assistant_type
         max_text_messages = None
         completion_settings = None
