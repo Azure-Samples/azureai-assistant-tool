@@ -163,7 +163,7 @@ class ConversationThreadClient:
         :type thread_name: str
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
-        :param max_text_messages: Specifies the maximum number of the most recent text messages to use for context. If None, all messages are considered.
+        :param max_text_messages: Specifies the maximum number of the most recent text messages to retrieve. If None, all messages are retrieved.
         :type max_text_messages: int, optional
 
         :return: The conversation.
