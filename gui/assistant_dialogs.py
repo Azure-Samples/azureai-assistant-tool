@@ -306,6 +306,7 @@ class AssistantConfigDialog(QDialog):
         # Frequency Penalty
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
+        self.frequencyPenaltySlider.setToolTip("Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.")
         self.frequencyPenaltySlider.setMinimum(-200)
         self.frequencyPenaltySlider.setMaximum(200)
         self.frequencyPenaltySlider.setValue(0)  # Default value
@@ -318,12 +319,14 @@ class AssistantConfigDialog(QDialog):
         # Max Tokens
         self.maxTokensLabel = QLabel('Max Tokens:')
         self.maxTokensEdit = QLineEdit()
+        self.maxTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
         completionLayout.addWidget(self.maxTokensLabel)
         completionLayout.addWidget(self.maxTokensEdit)
         
         # Presence Penalty
         self.presencePenaltyLabel = QLabel('Presence Penalty:')
         self.presencePenaltySlider = QSlider(Qt.Horizontal)
+        self.presencePenaltySlider.setToolTip("Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.")
         self.presencePenaltySlider.setMinimum(-200)
         self.presencePenaltySlider.setMaximum(200)
         self.presencePenaltySlider.setValue(0)  # Default value
@@ -336,6 +339,7 @@ class AssistantConfigDialog(QDialog):
         # Response Format
         self.responseFormatLabel = QLabel('Response Format:')
         self.responseFormatComboBox = QComboBox()
+        self.responseFormatComboBox.setToolTip("Select the format of the response from the AI model")
         self.responseFormatComboBox.addItems(["text", "json_object"])
         completionLayout.addWidget(self.responseFormatLabel)
         completionLayout.addWidget(self.responseFormatComboBox)
@@ -343,6 +347,7 @@ class AssistantConfigDialog(QDialog):
         # Temperature
         self.temperatureLabel = QLabel('Temperature:')
         self.temperatureSlider = QSlider(Qt.Horizontal)
+        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
         self.temperatureSlider.setMinimum(0)
         self.temperatureSlider.setMaximum(100)
         self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
@@ -355,6 +360,7 @@ class AssistantConfigDialog(QDialog):
         # Top P
         self.topPLabel = QLabel('Top P:')
         self.topPSlider = QSlider(Qt.Horizontal)
+        self.topPSlider.setToolTip("Controls the diversity of the generated text. Lower values make the text more deterministic, while higher values make it more diverse.")
         self.topPSlider.setMinimum(0)
         self.topPSlider.setMaximum(100)
         self.topPSlider.setValue(10)  # Default value as 0.1 for illustration
@@ -367,6 +373,7 @@ class AssistantConfigDialog(QDialog):
         # Seed
         self.seedLabel = QLabel('Seed:')
         self.seedEdit = QLineEdit()
+        self.seedEdit.setToolTip("If specified, system will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result. Determinism is not guaranteed, and you should refer to the system_fingerprint response parameter to monitor changes in the backend.")
         completionLayout.addWidget(self.seedLabel)
         completionLayout.addWidget(self.seedEdit)
 
