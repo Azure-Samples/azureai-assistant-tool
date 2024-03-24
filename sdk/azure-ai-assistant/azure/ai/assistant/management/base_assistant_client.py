@@ -214,7 +214,7 @@ class BaseAssistantClient:
             logger.info("Module path: {}".format(module_path))
         return module_path
 
-    def _replace_file_references_with_content(self, assistant_config: AssistantConfig):
+    def _replace_file_references_with_content(self, assistant_config: AssistantConfig) -> str:
         instructions = assistant_config.instructions
         file_references = assistant_config.file_references
         
@@ -229,11 +229,16 @@ class BaseAssistantClient:
                     file_path = file_references[index]
                     try:
                         with open(file_path, 'r') as file:
-                            if file_path.endswith('.yaml'):
-                                # Note: yaml.safe_load returns the full YAML document, so you might need additional
-                                # processing to convert it to a string if that's what you're expecting.
-                                return str(yaml.safe_load(file))
+                            if file_path.endswith('.yaml') or file_path.endswith('.yml'):
+                                try:
+                                    # yaml.safe_load returns the full document, handle as needed
+                                    yaml_content = yaml.safe_load(file)
+                                    # Convert YAML content to a string if necessary
+                                    return str(yaml_content)
+                                except Exception as e:
+                                    logger.warning(f"Failed to load YAML file '{file_path}': {e}")
                             else:
+                                # Read and return content for all other file types
                                 return file.read()
                     except Exception as e:
                         logger.warning(f"Failed to load file '{file_path}': {e}")
@@ -242,7 +247,7 @@ class BaseAssistantClient:
             # Replace all placeholders in the instructions with file content
             updated_instructions = pattern.sub(replacer, instructions)
         except Exception as e:
-            # If any error occurs during processing, print the error and return the original instructions unmodified.
+            # If any error occurs, log the error and return the original instructions unmodified
             logger.warning(f"Error processing file references in instructions: {e}")
             return instructions
 

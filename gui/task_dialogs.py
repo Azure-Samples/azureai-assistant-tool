@@ -392,7 +392,7 @@ class CreateTaskDialog(QDialog):
 
             folders_list = [self.src_folders_list.item(i).text() for i in range(self.src_folders_list.count())]
             user_request = user_request + " Input folders:" + " ".join(folders_list)
-            self.request_list = self.task_requests_creator.process_messages(user_request=user_request, stream=False, temperature=0.2)
+            self.request_list = self.task_requests_creator.process_messages(user_request=user_request, stream=False)
 
         except Exception as e:
             self.error_signal.error_signal.emit(str(e))
