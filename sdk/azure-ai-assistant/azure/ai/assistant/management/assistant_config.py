@@ -117,6 +117,7 @@ class AssistantConfig:
             self._assistant_id = config_data['assistant_id'] if config_data['assistant_id'] != "" else None
         self._ai_client_type = config_data['ai_client_type'] if 'ai_client_type' in config_data else "OPEN_AI"
         self._model = config_data['model']
+        self._file_references = config_data.get('file_references', [])
         # Process the knowledge_files to replace empty strings with None
         raw_knowledge_files = config_data.get('knowledge_files', {})
         self._knowledge_files = {k: (v if v != '' else None) for k, v in raw_knowledge_files.items()}
@@ -166,6 +167,7 @@ class AssistantConfig:
                 self._assistant_id == other._assistant_id and
                 self._ai_client_type == other._ai_client_type and
                 self._model == other._model and
+                self._file_references == other._file_references and
                 self._knowledge_files == other._knowledge_files and
                 self._selected_functions == other._selected_functions and
                 self._knowledge_retrieval == other._knowledge_retrieval and
@@ -201,6 +203,7 @@ class AssistantConfig:
         self._config_data['assistant_id'] = self._assistant_id
         self._config_data['ai_client_type'] = self._ai_client_type
         self._config_data['model'] = self._model
+        self._config_data['file_references'] = self._file_references
         self._config_data['knowledge_files'] = self._knowledge_files
         self._config_data['knowledge_retrieval'] = self._knowledge_retrieval
         self._config_data['code_interpreter'] = self._code_interpreter
@@ -284,6 +287,25 @@ class AssistantConfig:
         :type value: str
         """
         self._model = value
+
+    @property
+    def file_references(self) -> list:
+        """Get the file references.
+        
+        :return: The file references.
+        :rtype: list
+        """
+        return self._file_references
+    
+    @file_references.setter
+    def file_references(self, value) -> None:
+        """
+        Set the file references.
+        
+        :param value: The file references.
+        :type value: list
+        """
+        self._file_references = value
 
     @property
     def knowledge_files(self) -> dict:

@@ -46,7 +46,6 @@ class AssistantConfigDialog(QDialog):
         self.init_ui()
 
     def init_variables(self):
-        self.file_references_dict = {}  # Dictionary to store file reference paths and IDs
         self.knowledge_files_dict = {}  # Dictionary to store knowledge file paths and IDs
         self.selected_functions = []  # Store the selected functions
         self.code_interpreter = False  # Store the code interpreter setting
@@ -191,7 +190,7 @@ class AssistantConfigDialog(QDialog):
         # Knowledge Files, Add File, and Remove File buttons
         self.fileReferenceLabel = QLabel('File References:')
         self.fileReferenceList = QListWidget()
-        self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:YourFile.yaml}")
+        self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:0}, where 0 is the index of the file in the list")
         self.fileReferenceList.setStyleSheet(
             "QListWidget {"
             "  border-style: solid;"
@@ -621,6 +620,9 @@ class AssistantConfigDialog(QDialog):
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
             if self.assistant_type == "assistant":
+                # Pre-fill reference files
+                for file_path in self.assistant_config.file_references:
+                    self.fileReferenceList.addItem(file_path)
                 # Pre-fill knowledge files
                 for file_path, file_id in self.assistant_config.knowledge_files.items():
                     self.knowledge_files_dict[file_path] = file_id
@@ -703,10 +705,12 @@ class AssistantConfigDialog(QDialog):
             self.selected_functions = [f for f in self.selected_functions if f['function']['name'] != functionConfig.name]
 
     def add_reference_file(self):
-        self.add_file(self.file_references_dict, self.fileReferenceList)
+        self.fileReferenceList.addItem(QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)")[0])
 
     def remove_reference_file(self):
-        self.remove_file(self.file_references_dict, self.fileReferenceList)
+        selected_items = self.fileReferenceList.selectedItems()
+        for item in selected_items:
+            self.fileReferenceList.takeItem(self.fileReferenceList.row(item))
 
     def add_knowledge_file(self):
         self.add_file(self.knowledge_files_dict, self.knowledgeFileList)
@@ -758,6 +762,7 @@ class AssistantConfigDialog(QDialog):
             'model': self.modelComboBox.currentText(),
             # if is_create is True, then the assistant_id is empty
             'assistant_id': self.assistant_id if not self.is_create else '',
+            'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
             'knowledge_files': self.knowledge_files_dict,
             'selected_functions': self.selected_functions,
             'knowledge_retrieval': self.knowledge_retrieval,
