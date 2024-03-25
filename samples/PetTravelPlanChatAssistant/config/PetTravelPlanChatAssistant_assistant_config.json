@@ -4,7 +4,7 @@
     "model": "gpt-4-1106-preview",
     "assistant_id": "770c45f7-fd9e-4364-a3ab-ef4d5d861b4c",
     "file_references": [
-        "C:/Git4/forks/azureai-assistant-tool/samples/PetTravelPlanChatAssistant/FormTemplateForPetTransportationBoo.yaml"
+        "config/FormTemplateForPetTransportation.yaml"
     ],
     "knowledge_files": {},
     "selected_functions": [
@@ -86,7 +86,7 @@
     ],
     "knowledge_retrieval": false,
     "code_interpreter": false,
-    "output_folder_path": "C:\\Git4\\forks\\azureai-assistant-tool\\output",
+    "output_folder_path": "output",
     "ai_client_type": "AZURE_OPEN_AI",
     "assistant_type": "chat_assistant",
     "completion_settings": null,
