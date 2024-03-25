@@ -1,0 +1,94 @@
+{
+    "name": "PetTravelPlanChatAssistant",
+    "instructions": "## Pre-requisites for processing:\n- You have access to document form (yaml file) which contains questions that needs to be filled for travelling with pets.\n- Here is the form you need to follow and get answers to {file_reference:0}\n\n## Requirements\n1. You are required to ask only one question at the time from the form document and collect answers.\n2. You only ask same question more than once if you do not get satisfactory answer. The document form you have\nlists either possible answer options or accepts free form answers.\n3. To know what is the next question to ask from the from, you will always analyze the earlier questions and answers in the conversation\n4. After all questions has been answered and all questions from form have been answered successfully, you will provide a summary to user which contains all questions and answers.",
+    "model": "gpt-4-1106-preview",
+    "assistant_id": "770c45f7-fd9e-4364-a3ab-ef4d5d861b4c",
+    "file_references": [
+        "C:/Git4/forks/azureai-assistant-tool/samples/PetTravelPlanChatAssistant/FormTemplateForPetTransportationBoo.yaml"
+    ],
+    "knowledge_files": {},
+    "selected_functions": [
+        {
+            "type": "function",
+            "function": {
+                "name": "validate_booking_reference",
+                "module": "functions.user_functions",
+                "description": "Validates that the booking reference string is exactly 6 characters long and consists only of capital letters.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "booking_reference": {
+                            "type": "string",
+                            "description": "The booking reference string to validate."
+                        }
+                    },
+                    "required": [
+                        "booking_reference"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "send_email",
+                "module": "functions.user_functions",
+                "description": "Send the summary of the reservation and payment link via email.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "email_address": {
+                            "type": "string",
+                            "description": "The recipient's email address"
+                        },
+                        "reservation_summary": {
+                            "type": "string",
+                            "description": "The summary of the reservation details"
+                        },
+                        "payment_link": {
+                            "type": "string",
+                            "description": "The URL of the payment link"
+                        }
+                    },
+                    "required": [
+                        "email_address",
+                        "reservation_summary",
+                        "payment_link"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "send_sms",
+                "module": "functions.user_functions",
+                "description": "Send the summary of the reservation and payment link via SMS.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "phone_number": {
+                            "type": "string",
+                            "description": "The phone number to which the SMS will be sent"
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "The body of the SMS message containing the reservation summary and payment link"
+                        }
+                    },
+                    "required": [
+                        "phone_number",
+                        "message"
+                    ]
+                }
+            }
+        }
+    ],
+    "knowledge_retrieval": false,
+    "code_interpreter": false,
+    "output_folder_path": "C:\\Git4\\forks\\azureai-assistant-tool\\output",
+    "ai_client_type": "AZURE_OPEN_AI",
+    "assistant_type": "chat_assistant",
+    "completion_settings": null,
+    "assistant_role": "user"
+}
