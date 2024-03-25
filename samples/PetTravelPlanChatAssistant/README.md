@@ -35,4 +35,8 @@ file under config folder to use OpenAI Assistants.
 python main.py
 ```
 
+## Example run
+
+![Pets-Travel-Planner-screenshot](../../assets/PetsTravelPlannerAssistant.png)
+
 [Prerequisities]: ../../README.md

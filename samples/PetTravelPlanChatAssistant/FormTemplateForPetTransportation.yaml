@@ -5,8 +5,22 @@ FormTemplateForPetTransportationBookingInquiry:
       - Option: "Read information about traveling with pets"
       - Option: "Check the pet quota"
       - Option: "Book transportation for my pet"
-      - Option: "Check if my request has been confirmed"
-      - Option: "Inform about traveling with a service dog"
+      - Option: "Cancel my pet's transportation"
+
+  - Inquiry: "Please provide your booking reference in capital letters (e.g. XYXY56)."
+    ResponseType: "Open-ended"
+    Instructions: "Enter your booking reference."
+    Actions:
+      ValidateBookingReference:
+        Description: "Validate the booking reference format."
+        Function: "validate_booking_reference"
+        Parameters:
+          booking_reference: "{{user_input}}"
+        OnSuccess:
+          Description: "Proceed with the booking reference provided."
+        OnFailure:
+          Description: "Inform the user of the invalid booking reference and prompt for re-entry."
+          ErrorMessage: "Invalid booking reference. Please ensure it is in the correct format and in capital letters."
 
   - Inquiry: "Do you want to book transportation in the cabin or in the hold?"
     ResponseType: "Multiple Choice"
@@ -68,12 +82,6 @@ FormTemplateForPetTransportationBookingInquiry:
       - "Yes"
       - "No"
 
-  - Inquiry: "Is your flight operated by Finnair or Norra?"
-    ResponseType: "Multiple Choice"
-    Options:
-      - "Yes"
-      - "No"
-
   - Inquiry: "Is there at least 1 week to your flight departure?"
     ResponseType: "Multiple Choice"
     Options:
@@ -88,11 +96,7 @@ FormTemplateForPetTransportationBookingInquiry:
 
   - Inquiry: "Please answer the following questions."
     ResponseType: "Open-ended"
-    Instructions: "Enter your first name."
-
-  - Inquiry: "Please provide your family name."
-    ResponseType: "Open-ended"
-    Instructions: "Enter your family name."
+    Instructions: "Enter your first and last name."
 
   - Inquiry: "Please provide your mobile number in international format (e.g. +35850...)."
     ResponseType: "Open-ended"
@@ -102,28 +106,7 @@ FormTemplateForPetTransportationBookingInquiry:
     ResponseType: "Open-ended"
     Instructions: "Enter your email address."
 
-  - Inquiry: "Please provide your booking reference in capital letters (e.g. XYXY56)."
-    ResponseType: "Open-ended"
-    Instructions: "Enter your booking reference."
-    Actions:
-      ValidateBookingReference:
-        Description: "Validate the booking reference format."
-        Function: "validate_booking_reference"
-        Parameters:
-          booking_reference: "{{user_input}}"
-        OnSuccess:
-          Description: "Proceed with the booking reference provided."
-        OnFailure:
-          Description: "Inform the user of the invalid booking reference and prompt for re-entry."
-          ErrorMessage: "Invalid booking reference. Please ensure it is in the correct format and in capital letters."
-
   - Inquiry: "Is your flight destination in the United States?"
-    ResponseType: "Multiple Choice"
-    Options:
-      - "Yes"
-      - "No"
-
-  - Inquiry: "Is any of your flights to/from Madrid or Barcelona?"
     ResponseType: "Multiple Choice"
     Options:
       - "Yes"
