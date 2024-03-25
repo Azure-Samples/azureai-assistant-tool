@@ -35,6 +35,4 @@ file under config folder to use OpenAI Assistants.
 python main.py
 ```
 
-## Resources
-
 [Prerequisities]: ../../README.md
