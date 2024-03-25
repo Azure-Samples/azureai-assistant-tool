@@ -205,10 +205,11 @@ class AsyncAssistantClient(BaseAssistantClient):
             await self._upload_new_files(assistant_config, timeout=timeout)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
+            instructions = self._replace_file_references_with_content(assistant_config)
 
             assistant = await self._async_client.beta.assistants.create(
                 name=assistant_config.name,
-                instructions=assistant_config.instructions,
+                instructions=instructions,
                 tools=tools,
                 model=assistant_config.model,
                 file_ids=file_ids,
@@ -537,12 +538,13 @@ class AsyncAssistantClient(BaseAssistantClient):
             self._update_files(assistant_config)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
+            instructions = self._replace_file_references_with_content(assistant_config)
 
             # TODO update the assistant with the new configuration only if there are changes
             await self._async_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
-                instructions=assistant_config.instructions,
+                instructions=instructions,
                 tools=tools,
                 model=assistant_config.model,
                 file_ids=file_ids,

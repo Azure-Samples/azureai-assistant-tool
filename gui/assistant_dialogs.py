@@ -75,7 +75,7 @@ class AssistantConfigDialog(QDialog):
             self.toggle_mic()
 
         # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
-        if index == 2:
+        if (self.assistant_type, index) in (("assistant", 2), ("chat_assistant", 3)):
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
 
     def closeEvent(self, event):
@@ -245,14 +245,6 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.outputFolderPathLabel)
         configLayout.addLayout(outputFolderPathLayout)
 
-        if self.assistant_type == "chat_assistant":
-            self.maxMessagesLayout = QHBoxLayout()
-            self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context:')
-            self.maxMessagesEdit = QLineEdit()
-            self.maxMessagesEdit.setPlaceholderText("256")
-            self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
-            self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
-            configLayout.addLayout(self.maxMessagesLayout)
         return configTab
 
     def create_tools_tab(self):
@@ -402,6 +394,14 @@ class AssistantConfigDialog(QDialog):
         self.seedEdit.setToolTip("If specified, system will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result. Determinism is not guaranteed, and you should refer to the system_fingerprint response parameter to monitor changes in the backend.")
         completionLayout.addWidget(self.seedLabel)
         completionLayout.addWidget(self.seedEdit)
+
+        self.maxMessagesLayout = QHBoxLayout()
+        self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context:')
+        self.maxMessagesEdit = QLineEdit()
+        self.maxMessagesEdit.setToolTip("The maximum number of messages to include in the conversation thread context. If set to None, no limit will be applied.")
+        self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
+        self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
+        completionLayout.addLayout(self.maxMessagesLayout)
 
         self.toggleCompletionSettings()
 
@@ -619,10 +619,10 @@ class AssistantConfigDialog(QDialog):
             self.knowledge_retrieval = self.assistant_config.knowledge_retrieval
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
+            # Pre-fill reference files
+            for file_path in self.assistant_config.file_references:
+                self.fileReferenceList.addItem(file_path)
             if self.assistant_type == "assistant":
-                # Pre-fill reference files
-                for file_path in self.assistant_config.file_references:
-                    self.fileReferenceList.addItem(file_path)
                 # Pre-fill knowledge files
                 for file_path, file_id in self.assistant_config.knowledge_files.items():
                     self.knowledge_files_dict[file_path] = file_id
@@ -632,7 +632,6 @@ class AssistantConfigDialog(QDialog):
                 # enable code interpreter checkbox
                 self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
             elif self.assistant_type == "chat_assistant":
-                self.maxMessagesEdit.setText(str(self.assistant_config.max_text_messages))
                 # pre-fill completion settings
                 text_completion_config = self.assistant_config.text_completion_config
 
@@ -647,6 +646,7 @@ class AssistantConfigDialog(QDialog):
                     seed = str(completion_settings.get('seed', ''))  # Assuming '' represents no seed, as 'None' as a string might be misleading
                     temperature = completion_settings.get('temperature', 0.7) * 100
                     top_p = completion_settings.get('top_p', 0.1) * 100
+                    max_text_messages = completion_settings.get('max_text_messages', '') # Assuming '' represents no limit
                 else:
                     # Default values if text_completion_config is None
                     frequency_penalty = 0
@@ -656,6 +656,7 @@ class AssistantConfigDialog(QDialog):
                     seed = ""
                     temperature = 70
                     top_p = 10
+                    max_text_messages = ""
 
                 # Apply the values to UI elements
                 self.frequencyPenaltySlider.setValue(frequency_penalty)
@@ -665,6 +666,7 @@ class AssistantConfigDialog(QDialog):
                 self.seedEdit.setText(seed)
                 self.temperatureSlider.setValue(temperature)
                 self.topPSlider.setValue(top_p)
+                self.maxMessagesEdit.setText(str(max_text_messages))
 
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
@@ -738,13 +740,12 @@ class AssistantConfigDialog(QDialog):
 
     def save_configuration(self):
         # if on instructions tab, copy the instructions from the Instructions Editor tab
-        if self.tabWidget.currentIndex() == 2:
+        if ((self.assistant_type, self.tabWidget.currentIndex()) in (("assistant", 2), ("chat_assistant", 3))):
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
         # Conditional setup for completion settings based on assistant_type
         max_text_messages = None
         completion_settings = None
         if self.assistant_type == "chat_assistant":
-            max_text_messages = int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else 256  # Ensure it's an integer and provide a default
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
@@ -753,7 +754,8 @@ class AssistantConfigDialog(QDialog):
                     'response_format': self.responseFormatComboBox.currentText(),
                     'seed': int(self.seedEdit.text()) if self.seedEdit.text().isdigit() else None,  # Ensure it's an integer or None
                     'temperature': self.temperatureSlider.value() / 100,
-                    'top_p': self.topPSlider.value() / 100
+                    'top_p': self.topPSlider.value() / 100,
+                    'max_text_messages': int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else None  # Ensure it's an integer or None
                 }
 
         config = {
@@ -770,8 +772,7 @@ class AssistantConfigDialog(QDialog):
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
-            'completion_settings': completion_settings,
-            'max_text_messages': max_text_messages
+            'completion_settings': completion_settings
         }
         # if name, instructions, and model are empty, show an error message
         if not config['name'] or not config['instructions'] or not config['model']:

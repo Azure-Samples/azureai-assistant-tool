@@ -16,7 +16,8 @@ class TextCompletionConfig:
                  response_format: str,
                  temperature: float, 
                  top_p: float,
-                 seed: Optional[int] = None
+                 seed: Optional[int] = None,
+                 max_text_messages: Optional[int] = None
         ) -> None:
         self.frequency_penalty = frequency_penalty
         self.max_tokens = max_tokens
@@ -25,6 +26,7 @@ class TextCompletionConfig:
         self.temperature = temperature
         self.top_p = top_p
         self.seed = seed
+        self.max_text_messages = max_text_messages
 
     def to_dict(self):
         return {
@@ -34,7 +36,8 @@ class TextCompletionConfig:
             'response_format': self.response_format,
             'temperature': self.temperature,
             'top_p': self.top_p,
-            'seed': self.seed
+            'seed': self.seed,
+            'max_text_messages': self.max_text_messages
         }
 
     @property
@@ -132,11 +135,9 @@ class AssistantConfig:
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
-        self._max_text_messages = None
         self._text_completion_config = None
 
         if self._assistant_type == 'chat_assistant':
-            self._max_text_messages = config_data.get('max_text_messages', 256)
             if config_data.get('completion_settings', None) is not None:
                 completion_data = config_data.get('completion_settings', {
                     'frequency_penalty': 0.0,
@@ -146,6 +147,7 @@ class AssistantConfig:
                     'temperature': 0.7,
                     'top_p': 0.1,
                     'seed': None,
+                    'max_text_messages': None,
                 })
                 # Constructing TextCompletionConfig from the dictionary
                 self._text_completion_config = TextCompletionConfig(
@@ -155,7 +157,8 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     temperature=completion_data['temperature'],
                     top_p=completion_data['top_p'],
-                    seed=completion_data['seed']
+                    seed=completion_data['seed'],
+                    max_text_messages=completion_data['max_text_messages']
                 )
 
     def __eq__(self, other):
@@ -213,7 +216,6 @@ class AssistantConfig:
         self._config_data['assistant_role'] = self._assistant_role
         if self._assistant_type == 'chat_assistant':
             self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
-            self._config_data['max_text_messages'] = self._max_text_messages
         return self._config_data
 
     def _get_function_configs(self):
@@ -452,16 +454,4 @@ class AssistantConfig:
         :rtype: TextCompletionConfig
         """
         return self._text_completion_config
-    
-    @property
-    def max_text_messages(self) -> Optional[int]:
-        """Get the max text messages.
-        
-        Returns `None` if the assistant type is not 'chat_assistant'.
-        
-        :return: The max text messages or None.
-        """
-        if self._assistant_type == 'chat_assistant':
-            return self._max_text_messages
-        else:
-            return None
+
