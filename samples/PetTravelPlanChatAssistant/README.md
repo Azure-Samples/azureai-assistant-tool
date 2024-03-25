@@ -1,6 +1,6 @@
 # Sample: Plan pets travel using yaml form and ChatAssistantClient
 
-This sample demonstrates how to leverage a YAML form (alternatively, the form could be in some other text format) to create a chatbot experience tailored for pet travel planning. Utilizing the ChatAssistantClient, the application guides users through a series of inquiries and actions defined in a YAML configuration, helping pet owners plan travel with their pets seamlessly.
+This sample demonstrates how to leverage a YAML form (alternatively, the form could be in some other text format) to create a intelligent chatbot experience tailored for pet travel planning. Utilizing the ChatAssistantClient, the application guides users through a series of inquiries and actions defined in a YAML configuration, helping pet owners plan travel with their pets seamlessly.
 
 ## Prerequisites
 
