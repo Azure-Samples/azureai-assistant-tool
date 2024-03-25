@@ -439,7 +439,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             await self._async_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
             return False
 
-        tool_outputs = await asyncio.to_thread(self._process_tool_calls, name, run_id, tool_calls)
+        tool_outputs = await self._process_tool_calls(name, run_id, tool_calls)
         if not tool_outputs:
             return False
 
@@ -462,11 +462,12 @@ class AsyncAssistantClient(BaseAssistantClient):
             )
         return True
 
-    def _process_tool_calls(self, name, run_id, tool_calls):
+    async def _process_tool_calls(self, name, run_id, tool_calls):
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
-            function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
+            
+            function_response = await asyncio.to_thread(self._handle_function_call, tool_call.function.name, tool_call.function.arguments)
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")

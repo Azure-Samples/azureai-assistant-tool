@@ -18,6 +18,8 @@ class MyAssistantClientCallbacks(AssistantClientCallbacks):
         if run_status == "streaming":
             asyncio.create_task(self.handle_message("start" if is_first_message else "message", message))
 
+    def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
+        asyncio.create_task(self.handle_message("function", function_name))
 
 # Define a function to display streamed messages
 async def display_streamed_messages(message_queue, assistant_name):
@@ -29,6 +31,9 @@ async def display_streamed_messages(message_queue, assistant_name):
         elif message_type == "message":
             # Print the streamed part of the message; `flush=True` ensures it's immediately displayed
             print(message, end="", flush=True)
+        elif message_type == "function":
+            # Print assistant's name and calling the function on the new line
+            print(f"{assistant_name}: called {message} function.")
         message_queue.task_done()
 
 
