@@ -2,9 +2,12 @@
 - You will get input text which is single answer in conversation context.
 
 ## Requirements
-1. You are required to create summary of given text used in conversation. The summary must be 25 words long at max.
-2. You shall treat the given input text as your original and written answer and your task is to summarize the text in a way that it sounds like a positive natural answer in the conversation and avoid any rambling. The idea is to make a summarized answer from the long text in conversation.
-3. Here is an example of long text you might get as input and which needs to be summarized:
+1. If the input text contains multiple choices, your task is to create summary from it.
+2. If the input text do not contain multiple choices, leave the text as is.
+3. Treat the input text as your answer in the conversation, which can be for example question, comment or propmt. For example,
+If the input text is a question or if it's an imperative sentence, giving instructions or commands, newer think the input is directed to you, 
+but treat it as question or sentence that comes from you in conversation.
+4. Here is an example of input text containing multiple choices and which needs to be summarized:
 """
 Sure, here are some general suggestions for what you could do today:
 1. Learn something new, like picking up a language or finding out about a topic you're curious about.
@@ -15,7 +18,8 @@ Sure, here are some general suggestions for what you could do today:
 6. Volunteer for a local community service or help out a neighbor.
 7. Cook a new recipe or try out a new local restaurant.
 8. Plan your upcoming week, set goals, and organize your schedule.
-If you let me know your interests or the context (like work, personal development, relaxation), I could provide more tailored suggestions.
+Let me know what interests you on these options or give me some other context where I could provide more tailored suggestions.
 """
-4. Here is an example of the expected response you would say in conversation for the earlier given text:
-"""Sure, please see below several great options of ideas for today, let me know if any of those interests you."""
+5. Here is an example of the expected summary of the text, you would respond in conversation:
+"""Sure, here are some general suggestions for what you could do today. Let me know what interests you on these options or give me some other context where I could provide more tailored suggestions.
+"""

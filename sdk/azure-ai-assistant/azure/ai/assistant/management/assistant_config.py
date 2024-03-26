@@ -5,6 +5,96 @@ import json
 from azure.ai.assistant.management.function_config import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
 import os
+from typing import Optional
+
+
+class TextCompletionConfig:
+    def __init__(self, 
+                 frequency_penalty: float, 
+                 max_tokens: int, 
+                 presence_penalty: float,
+                 response_format: str,
+                 temperature: float, 
+                 top_p: float,
+                 seed: Optional[int] = None,
+                 max_text_messages: Optional[int] = None
+        ) -> None:
+        self.frequency_penalty = frequency_penalty
+        self.max_tokens = max_tokens
+        self.presence_penalty = presence_penalty
+        self.response_format = response_format
+        self.temperature = temperature
+        self.top_p = top_p
+        self.seed = seed
+        self.max_text_messages = max_text_messages
+
+    def to_dict(self):
+        return {
+            'frequency_penalty': self.frequency_penalty,
+            'max_tokens': self.max_tokens,
+            'presence_penalty': self.presence_penalty,
+            'response_format': self.response_format,
+            'temperature': self.temperature,
+            'top_p': self.top_p,
+            'seed': self.seed,
+            'max_text_messages': self.max_text_messages
+        }
+
+    @property
+    def frequency_penalty(self) -> float:
+        return self._frequency_penalty
+    
+    @frequency_penalty.setter
+    def frequency_penalty(self, value) -> None:
+        self._frequency_penalty = value
+
+    @property
+    def max_tokens(self) -> int:
+        return self._max_tokens
+    
+    @max_tokens.setter
+    def max_tokens(self, value) -> None:
+        self._max_tokens = value
+
+    @property
+    def presence_penalty(self) -> float:
+        return self._presence_penalty
+    
+    @presence_penalty.setter
+    def presence_penalty(self, value) -> None:
+        self._presence_penalty = value
+
+    @property
+    def response_format(self) -> str:
+        return self._response_format
+    
+    @response_format.setter
+    def response_format(self, value) -> None:
+        self._response_format = value
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
+    
+    @temperature.setter
+    def temperature(self, value) -> None:
+        self._temperature = value
+
+    @property
+    def top_p(self) -> float:
+        return self._top_p
+    
+    @top_p.setter
+    def top_p(self, value) -> None:
+        self._top_p = value
+
+    @property
+    def seed(self) -> Optional[int]:
+        return self._seed
+    
+    @seed.setter
+    def seed(self, value) -> None:
+        self._seed = value
 
 
 class AssistantConfig:
@@ -30,6 +120,7 @@ class AssistantConfig:
             self._assistant_id = config_data['assistant_id'] if config_data['assistant_id'] != "" else None
         self._ai_client_type = config_data['ai_client_type'] if 'ai_client_type' in config_data else "OPEN_AI"
         self._model = config_data['model']
+        self._file_references = config_data.get('file_references', [])
         # Process the knowledge_files to replace empty strings with None
         raw_knowledge_files = config_data.get('knowledge_files', {})
         self._knowledge_files = {k: (v if v != '' else None) for k, v in raw_knowledge_files.items()}
@@ -44,6 +135,31 @@ class AssistantConfig:
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
+        self._text_completion_config = None
+
+        if self._assistant_type == 'chat_assistant':
+            if config_data.get('completion_settings', None) is not None:
+                completion_data = config_data.get('completion_settings', {
+                    'frequency_penalty': 0.0,
+                    'max_tokens': 100,
+                    'presence_penalty': 0.0,
+                    'response_format': 'text',
+                    'temperature': 0.7,
+                    'top_p': 0.1,
+                    'seed': None,
+                    'max_text_messages': None,
+                })
+                # Constructing TextCompletionConfig from the dictionary
+                self._text_completion_config = TextCompletionConfig(
+                    frequency_penalty=completion_data['frequency_penalty'],
+                    max_tokens=completion_data['max_tokens'],
+                    presence_penalty=completion_data['presence_penalty'],
+                    response_format=completion_data['response_format'],
+                    temperature=completion_data['temperature'],
+                    top_p=completion_data['top_p'],
+                    seed=completion_data['seed'],
+                    max_text_messages=completion_data['max_text_messages']
+                )
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -54,6 +170,7 @@ class AssistantConfig:
                 self._assistant_id == other._assistant_id and
                 self._ai_client_type == other._ai_client_type and
                 self._model == other._model and
+                self._file_references == other._file_references and
                 self._knowledge_files == other._knowledge_files and
                 self._selected_functions == other._selected_functions and
                 self._knowledge_retrieval == other._knowledge_retrieval and
@@ -89,6 +206,7 @@ class AssistantConfig:
         self._config_data['assistant_id'] = self._assistant_id
         self._config_data['ai_client_type'] = self._ai_client_type
         self._config_data['model'] = self._model
+        self._config_data['file_references'] = self._file_references
         self._config_data['knowledge_files'] = self._knowledge_files
         self._config_data['knowledge_retrieval'] = self._knowledge_retrieval
         self._config_data['code_interpreter'] = self._code_interpreter
@@ -96,6 +214,8 @@ class AssistantConfig:
         self._config_data['output_folder_path'] = self._output_folder_path
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
+        if self._assistant_type == 'chat_assistant':
+            self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
         return self._config_data
 
     def _get_function_configs(self):
@@ -169,6 +289,25 @@ class AssistantConfig:
         :type value: str
         """
         self._model = value
+
+    @property
+    def file_references(self) -> list:
+        """Get the file references.
+        
+        :return: The file references.
+        :rtype: list
+        """
+        return self._file_references
+    
+    @file_references.setter
+    def file_references(self, value) -> None:
+        """
+        Set the file references.
+        
+        :param value: The file references.
+        :type value: list
+        """
+        self._file_references = value
 
     @property
     def knowledge_files(self) -> dict:
@@ -306,3 +445,13 @@ class AssistantConfig:
         :rtype: str
         """
         return self._assistant_role
+
+    @property
+    def text_completion_config(self) -> TextCompletionConfig:
+        """Get the text completion config.
+        
+        :return: The completion config.
+        :rtype: TextCompletionConfig
+        """
+        return self._text_completion_config
+

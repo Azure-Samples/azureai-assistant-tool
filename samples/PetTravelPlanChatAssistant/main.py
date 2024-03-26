@@ -1,6 +1,9 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 import json
 import asyncio
-from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
+from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
@@ -39,7 +42,7 @@ async def display_streamed_messages(message_queue, assistant_name):
 
 # Define the main function
 async def main():
-    assistant_name = "ASSISTANT_NAME"
+    assistant_name = "PetTravelPlanChatAssistant"
     config_path = f"config/{assistant_name}_assistant_config.json"
 
     try:
@@ -55,13 +58,8 @@ async def main():
         print(f"Missing key in configuration file for {assistant_name}: {e}")
         return
 
-    # Create a new assistant client
-    assistant_client = await AsyncAssistantClient.from_json(json.dumps(config_json), callbacks=callbacks)
-
-    # Create a new conversation thread client
+    assistant_client = await AsyncChatAssistantClient.from_json(json.dumps(config_json), callbacks=callbacks)
     conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
-
-    # Create a new conversation thread
     thread_name = await conversation_thread_client.create_conversation_thread()
 
     display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
@@ -73,21 +71,18 @@ async def main():
                 print("Exiting chat.")
                 break
 
-            # Create a message to the conversation thread
             await conversation_thread_client.create_conversation_thread_message(user_message, thread_name)
-
-            # Process the user messages (await the asynchronous call)
             await assistant_client.process_messages(thread_name=thread_name, stream=True)
 
-            print()  # Add a newline for better readability
+            print() # Add a newline for better readability
 
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        # Cleanup before exiting
         await message_queue.join()
         display_task.cancel()
         await conversation_thread_client.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
+

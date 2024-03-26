@@ -104,7 +104,7 @@ class ChatAssistantClient(BaseAssistantClient):
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
                 assistant_config.assistant_id = str(uuid.uuid4())
-            self._messages = [{"role": "system", "content": assistant_config.instructions}]
+            self._reset_system_messages(assistant_config)
             self._update_tools(assistant_config)
             self._load_selected_functions(assistant_config)
             self._assistant_config = assistant_config
@@ -152,9 +152,7 @@ class ChatAssistantClient(BaseAssistantClient):
             user_request: Optional[str] = None,
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None,
-            stream: Optional[bool] = False,
-            temperature: Optional[float] = None,
-            seed: Optional[int] = None
+            stream: Optional[bool] = False
     ) -> Optional[str]:
         """
         Process the messages in given thread.
@@ -190,7 +188,8 @@ class ChatAssistantClient(BaseAssistantClient):
 
             if thread_name:
                 conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
-                conversation = conversation_thread_client.retrieve_conversation(thread_name)
+                max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
+                conversation = conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
                         self._messages.append({"role": "user", "content": message.content})
@@ -210,6 +209,16 @@ class ChatAssistantClient(BaseAssistantClient):
                     self._user_input_processing_cancel_requested = False
                     break
 
+                text_completion_config = self._assistant_config.text_completion_config
+
+                temperature = None if text_completion_config is None else text_completion_config.temperature
+                seed = None if text_completion_config is None else text_completion_config.seed
+                frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
+                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
+                presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
+                top_p = None if text_completion_config is None else text_completion_config.top_p
+                response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
+
                 response = self._ai_client.chat.completions.create(
                     model=self._assistant_config.model,
                     messages=self._messages,
@@ -218,6 +227,11 @@ class ChatAssistantClient(BaseAssistantClient):
                     stream=stream,
                     temperature=temperature,
                     seed=seed,
+                    frequency_penalty=frequency_penalty,
+                    max_tokens=max_tokens,
+                    presence_penalty=presence_penalty,
+                    response_format=response_format,
+                    top_p=top_p,
                     timeout=timeout
                 )
 
@@ -234,8 +248,8 @@ class ChatAssistantClient(BaseAssistantClient):
             run_end_time = str(datetime.now())
             self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
 
-            # clear the messages for other than system messages
-            self._messages = [{"role": "system", "content": self._assistant_config.instructions}]
+            # Reset the system messages
+            self._reset_system_messages(self._assistant_config)
 
             if not stream:
                 return response.choices[0].message.content
@@ -243,6 +257,10 @@ class ChatAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Error occurred during processing run: {e}")
             raise EngineError(f"Error occurred during processing run: {e}")
+
+    def _reset_system_messages(self, assistant_config: AssistantConfig):
+        instructions = self._replace_file_references_with_content(assistant_config)
+        self._messages = [{"role": "system", "content": instructions}]
 
     def _handle_non_streaming_response(self, response, thread_name, run_id):
         response_message = response.choices[0].message

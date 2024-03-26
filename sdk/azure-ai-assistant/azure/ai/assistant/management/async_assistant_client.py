@@ -205,10 +205,11 @@ class AsyncAssistantClient(BaseAssistantClient):
             await self._upload_new_files(assistant_config, timeout=timeout)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
+            instructions = self._replace_file_references_with_content(assistant_config)
 
             assistant = await self._async_client.beta.assistants.create(
                 name=assistant_config.name,
-                instructions=assistant_config.instructions,
+                instructions=instructions,
                 tools=tools,
                 model=assistant_config.model,
                 file_ids=file_ids,
@@ -438,7 +439,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             await self._async_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run_id, timeout=timeout)
             return False
 
-        tool_outputs = await asyncio.to_thread(self._process_tool_calls, name, run_id, tool_calls)
+        tool_outputs = await self._process_tool_calls(name, run_id, tool_calls)
         if not tool_outputs:
             return False
 
@@ -461,11 +462,12 @@ class AsyncAssistantClient(BaseAssistantClient):
             )
         return True
 
-    def _process_tool_calls(self, name, run_id, tool_calls):
+    async def _process_tool_calls(self, name, run_id, tool_calls):
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
-            function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
+            
+            function_response = await asyncio.to_thread(self._handle_function_call, tool_call.function.name, tool_call.function.arguments)
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
@@ -537,12 +539,13 @@ class AsyncAssistantClient(BaseAssistantClient):
             self._update_files(assistant_config)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
+            instructions = self._replace_file_references_with_content(assistant_config)
 
             # TODO update the assistant with the new configuration only if there are changes
             await self._async_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
-                instructions=assistant_config.instructions,
+                instructions=instructions,
                 tools=tools,
                 model=assistant_config.model,
                 file_ids=file_ids,

@@ -13,6 +13,7 @@ from azure.ai.assistant.management.logger_module import logger
 from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
 from typing import Union
 
+import re, yaml
 import json, importlib, sys, os
 from typing import Optional
 
@@ -212,6 +213,45 @@ class BaseAssistantClient:
             module_path = os.path.join(module_name.replace('.', os.sep) + '.py')
             logger.info("Module path: {}".format(module_path))
         return module_path
+
+    def _replace_file_references_with_content(self, assistant_config: AssistantConfig) -> str:
+        instructions = assistant_config.instructions
+        file_references = assistant_config.file_references
+        
+        try:
+            # Regular expression to find all placeholders in the format {file_reference:X}
+            pattern = re.compile(r'\{file_reference:(\d+)\}')
+            
+            # Function to replace each match with the corresponding file content
+            def replacer(match):
+                index = int(match.group(1))
+                if 0 <= index < len(file_references):
+                    file_path = file_references[index]
+                    try:
+                        with open(file_path, 'r') as file:
+                            if file_path.endswith('.yaml') or file_path.endswith('.yml'):
+                                try:
+                                    # yaml.safe_load returns the full document, handle as needed
+                                    yaml_content = yaml.safe_load(file)
+                                    # Convert YAML content to a string if necessary
+                                    return str(yaml_content)
+                                except Exception as e:
+                                    logger.warning(f"Failed to load YAML file '{file_path}': {e}")
+                            else:
+                                # Read and return content for all other file types
+                                return file.read()
+                    except Exception as e:
+                        logger.warning(f"Failed to load file '{file_path}': {e}")
+                return "File not found or error reading file"
+            
+            # Replace all placeholders in the instructions with file content
+            updated_instructions = pattern.sub(replacer, instructions)
+        except Exception as e:
+            # If any error occurs, log the error and return the original instructions unmodified
+            logger.warning(f"Error processing file references in instructions: {e}")
+            return instructions
+
+        return updated_instructions
 
     @property
     def name(self) -> str:

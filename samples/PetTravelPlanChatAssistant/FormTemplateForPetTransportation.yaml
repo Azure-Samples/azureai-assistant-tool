@@ -1,0 +1,158 @@
+FormTemplateForPetTransportationBookingInquiry:
+  - Inquiry: "Happy to help you with questions about traveling with pets! What do you want to do?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - Option: "Read information about traveling with pets"
+      - Option: "Check the pet quota"
+      - Option: "Book transportation for my pet"
+      - Option: "Cancel my pet's transportation"
+
+  - Inquiry: "Please provide your booking reference in capital letters (e.g. XYXY56)."
+    ResponseType: "Open-ended"
+    Instructions: "Enter your booking reference."
+    Actions:
+      ValidateBookingReference:
+        Description: "Validate the booking reference format."
+        Function: "validate_booking_reference"
+        Parameters:
+          booking_reference: "{{user_input}}"
+        OnSuccess:
+          Description: "Proceed with the booking reference provided."
+        OnFailure:
+          Description: "Inform the user of the invalid booking reference and prompt for re-entry."
+          ErrorMessage: "Invalid booking reference. Please ensure it is in the correct format and in capital letters."
+
+  - Inquiry: "Do you want to book transportation in the cabin or in the hold?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - Option: "In the cabin"
+        FollowUp: 
+          - Inquiry: "Here you can book transportation for a pet in the cabin. Do you want to book the transportation now?"
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "Yes"
+              - Option: "No"
+          - Inquiry: "What is the weight of your pet including the carrier? (Cabin transportation requires the pet and carrier's combined weight to be under 8kg)"
+            ResponseType: "Open-ended"
+            Instructions: "Please enter the weight in kilograms."
+          - Inquiry: "Does your pet's carrier meet our cabin dimensions criteria? (Max dimensions: 45cm x 35cm x 25cm)"
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "Yes"
+              - Option: "No"
+      - Option: "In the hold"
+        FollowUp:
+          - Inquiry: "Here you can book transportation for a pet in hold. Do you want to book the transportation now?"
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "Yes"
+              - Option: "No"
+          - Inquiry: "Your transportation box must comply with the IATA regulations. How many transportation boxes are you using?"
+            ResponseType: "Open-ended"
+            Instructions: "Enter the number of transportation boxes."
+          - Inquiry: "Number of pets inside the transportation box."
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "1"
+              - Option: "2 or more"
+          - Inquiry: "What is the weight of your pet including the carrier? (Hold transportation requires the pet and carrier's combined weight to be under 75kg)"
+            ResponseType: "Open-ended"
+            Instructions: "Please enter the weight in kilograms."
+          - Inquiry: "Please provide the dimensions of the transportation box (Length x Width x Height in cm)."
+            ResponseType: "Open-ended"
+            Instructions: "Enter the dimensions of the box."
+          - Inquiry: "Do you want to book transportation for special baggage for outbound, inbound or both outbound and inbound?"
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "Outbound"
+              - Option: "Inbound"
+              - Option: "Both outbound and inbound"
+          - Inquiry: "Are the animals familiar with each other?"
+            ResponseType: "Multiple Choice"
+            Options:
+              - Option: "Yes"
+              - Option: "No"
+          - Inquiry: "Type of animal(s) you are travelling with."
+            ResponseType: "Open-ended"
+            Instructions: "Enter the type of animal(s)."
+
+  - Inquiry: "I confirm that the pet has all travel documents required by the destination authorities."
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "Is there at least 1 week to your flight departure?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "Do you travel on the same flight with your pet?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "Please answer the following questions."
+    ResponseType: "Open-ended"
+    Instructions: "Enter your first and last name."
+
+  - Inquiry: "Please provide your mobile number in international format (e.g. +35850...)."
+    ResponseType: "Open-ended"
+    Instructions: "Enter your mobile number."
+
+  - Inquiry: "Please provide your email address."
+    ResponseType: "Open-ended"
+    Instructions: "Enter your email address."
+
+  - Inquiry: "Is your flight destination in the United States?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "Please provide the departure date."
+    ResponseType: "Open-ended"
+    Instructions: "Enter the departure date."
+
+  - Inquiry: "Please provide the departure city."
+    ResponseType: "Open-ended"
+    Instructions: "Enter the departure city."
+
+  - Inquiry: "Please provide the destination city."
+    ResponseType: "Open-ended"
+    Instructions: "Enter the destination city."
+
+  - Inquiry: "Are you travelling from a destination outside of EU?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "I confirm that the person travelling with the pet is the owner."
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Yes"
+      - "No"
+
+  - Inquiry: "Do you want to receive the payment link via email or SMS?"
+    ResponseType: "Multiple Choice"
+    Options:
+      - "Email"
+      - "SMS"
+    Actions:
+      Email:
+        Description: "Send the summary of the reservation and payment link via email."
+        Function: "send_email"
+        Parameters:
+          email_address: "{{user_email}}"
+          reservation_summary: "{{reservation_summary}}"
+          payment_link: "{{payment_link_url}}"
+      SMS:
+        Description: "Send the summary of the reservation and payment link via SMS."
+        Function: "send_sms"
+        Parameters:
+          phone_number: "{{user_phone_number}}"
+          message: "Your reservation summary and payment link: {{payment_link_url}}"
+

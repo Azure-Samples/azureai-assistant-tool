@@ -152,8 +152,9 @@ class ConversationThreadClient:
 
     def retrieve_conversation(
             self,
-            thread_name : str,
-            timeout : Optional[float] = None
+            thread_name: str,
+            timeout: Optional[float] = None,
+            max_text_messages: Optional[int] = None
     ) -> Conversation:
         """
         Retrieves the conversation from the given thread name.
@@ -162,13 +163,15 @@ class ConversationThreadClient:
         :type thread_name: str
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
+        :param max_text_messages: Specifies the maximum number of the most recent text messages to retrieve. If None, all messages are retrieved.
+        :type max_text_messages: int, optional
 
         :return: The conversation.
         :rtype: Conversation
         """
         try:
             messages = self._get_conversation_thread_messages(thread_name, timeout)
-            conversation = self._retrieve_messages(messages)
+            conversation = self._retrieve_messages(messages, max_text_messages=max_text_messages)
             return conversation
         except Exception as e:
             error_message = f"Error retrieving messages content: Exception: {e}"
@@ -177,10 +180,12 @@ class ConversationThreadClient:
 
     def _retrieve_messages(
             self, 
-            messages: List[Message]
+            messages: List[Message],
+            max_text_messages: Optional[int] = None
     ) -> Conversation:
 
         conversation = Conversation(self._ai_client_type)
+        text_messages_count = 0
         for message in messages:
             logger.info(f"Processing message: {message}")
             if message.role == "assistant":
@@ -196,7 +201,13 @@ class ConversationThreadClient:
 
             for content_item in message.content:
                 if isinstance(content_item, TextContentBlock):
+                    if max_text_messages is not None and text_messages_count >= max_text_messages:
+                        # If we've reached the max number of text messages, return the conversation early
+                        return conversation
+                    # Add message to conversation and increment counter
                     conversation.add_message(content_item.text.value, message.role, sender_name)
+                    text_messages_count += 1
+
                     file_annotations = content_item.text.annotations
                     if file_annotations:
                         for annotation in file_annotations:
