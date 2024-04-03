@@ -2,7 +2,6 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.base_chat_assistant_client import BaseChatAssistantClient
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
@@ -15,7 +14,6 @@ from typing import Optional, Union
 from datetime import datetime
 import json, uuid
 import asyncio
-import yaml
 
 
 class AsyncChatAssistantClient(BaseChatAssistantClient):
@@ -83,33 +81,6 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     @classmethod
-    async def from_yaml(
-        cls,
-        config_yaml: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
-    ) -> "AsyncChatAssistantClient":
-        """
-        Creates an AsyncChatAssistantClient instance from YAML configuration data.
-
-        :param config_yaml: YAML string containing the configuration for the chat assistant.
-        :type config_yaml: str
-        :param callbacks: Optional callbacks for the chat assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
-        :param timeout: Optional timeout for HTTP requests.
-        :type timeout: Optional[float]
-        :return: An instance of AsyncChatAssistantClient.
-        :rtype: AsyncChatAssistantClient
-        """
-        try:
-            config_data = yaml.safe_load(config_yaml)
-            config_json = json.dumps(config_data)
-            return await cls.from_json(config_json, callbacks, timeout)
-        except yaml.YAMLError as e:
-            logger.error(f"Invalid YAML format: {e}")
-            raise EngineError(f"Invalid YAML format: {e}")
-
-    @classmethod
     async def from_config(
         cls,
         config: AssistantConfig,
@@ -134,6 +105,21 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")
+
+    async def purge(
+            self,
+            timeout: Optional[float] = None
+    )-> None:
+        """
+        Purges the chat assistant from the local configuration.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        await asyncio.to_thread(self._purge, timeout)
 
     async def process_messages(
             self, 

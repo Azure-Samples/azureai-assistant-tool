@@ -2,7 +2,6 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.base_chat_assistant_client import BaseChatAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -10,7 +9,7 @@ from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONErr
 from azure.ai.assistant.management.logger_module import logger
 from typing import Optional
 from datetime import datetime
-import json, uuid, yaml
+import json, uuid
 
 
 class ChatAssistantClient(BaseChatAssistantClient):
@@ -64,33 +63,6 @@ class ChatAssistantClient(BaseChatAssistantClient):
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     @classmethod
-    def from_yaml(
-        cls,
-        config_yaml: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
-    ) -> "ChatAssistantClient":
-        """
-        Creates an ChatAssistantClient instance from YAML configuration data.
-
-        :param config_yaml: YAML string containing the configuration for the chat assistant.
-        :type config_yaml: str
-        :param callbacks: Optional callbacks for the chat assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
-        :param timeout: Optional timeout for HTTP requests.
-        :type timeout: Optional[float]
-        :return: An instance of ChatAssistantClient.
-        :rtype: ChatAssistantClient
-        """
-        try:
-            config_data = yaml.safe_load(config_yaml)
-            config_json = json.dumps(config_data)
-            return cls.from_json(config_json, callbacks, timeout)
-        except yaml.YAMLError as e:
-            logger.error(f"Invalid YAML format: {e}")
-            raise EngineError(f"Invalid YAML format: {e}")
-
-    @classmethod
     def from_config(
         cls,
         config: AssistantConfig,
@@ -115,6 +87,21 @@ class ChatAssistantClient(BaseChatAssistantClient):
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")
+
+    def purge(
+            self,
+            timeout: Optional[float] = None
+    )-> None:
+        """
+        Purges the chat assistant from the local configuration.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        self._purge(timeout)
 
     def process_messages(
             self, 

@@ -15,7 +15,6 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI
 from typing import Optional, Union
 from datetime import datetime
 import json, time
-import copy
 import asyncio
 
 
@@ -422,6 +421,7 @@ class AsyncAssistantClient(BaseAssistantClient):
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
+                additional_instructions=additional_instructions,
                 event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
@@ -554,25 +554,3 @@ class AsyncAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
             raise EngineError(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
-
-    def _update_tools(self, assistant_config: AssistantConfig):
-        tools = []
-        logger.info(f"Updating tools for assistant: {assistant_config.name}")
-        # Add the retrieval tool to the tools list if there are knowledge files
-        if assistant_config.knowledge_retrieval:
-            tools.append({"type": "retrieval"})
-        # Process and add the functions to the tools list if there are functions
-        if assistant_config.selected_functions:
-            modified_functions = []
-            for function in assistant_config.selected_functions:
-                # Create a copy of the function spec to avoid modifying the original
-                modified_function = copy.deepcopy(function)
-                # Remove the module field from the function spec
-                if "function" in modified_function and "module" in modified_function["function"]:
-                    del modified_function["function"]["module"]
-                modified_functions.append(modified_function)
-            tools.extend(modified_functions)
-        # Add the code interpreter to the tools list if there is a code interpreter
-        if assistant_config.code_interpreter:
-            tools.append({"type": "code_interpreter"})
-        return tools

@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import json
 import asyncio
 from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
@@ -42,36 +41,43 @@ async def display_streamed_messages(message_queue, assistant_name):
 
 # Define the main function
 async def main():
-    assistant_name = "PetTravelPlanChatAssistant"
-    config_path = f"config/{assistant_name}_assistant_config.json"
 
+    assistant_name = "PetTravelPlanChatAssistant"
     try:
-        with open(config_path, "r") as file:
-            config_json = json.load(file)
-        ai_client_type = AsyncAIClientType[config_json["ai_client_type"]]
-        message_queue = asyncio.Queue()
-        callbacks = MyAssistantClientCallbacks(message_queue)
+        with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
+            config_json = file.read()
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         return
-    except KeyError as e:
-        print(f"Missing key in configuration file for {assistant_name}: {e}")
-        return
-
-    assistant_client = await AsyncChatAssistantClient.from_json(json.dumps(config_json), callbacks=callbacks)
-    conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
-    thread_name = await conversation_thread_client.create_conversation_thread()
-
-    display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
 
     try:
+        # Create a message queue to store streamed messages and a custom callback class
+        message_queue = asyncio.Queue()
+        callbacks = MyAssistantClientCallbacks(message_queue)
+
+        # Create an instance of the AsyncChatAssistantClient
+        assistant_client = await AsyncChatAssistantClient.from_json(config_json, callbacks=callbacks)
+        ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
+
+        # Create an instance of the AsyncConversationThreadClient
+        conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
+
+        # Create a new conversation thread
+        thread_name = await conversation_thread_client.create_conversation_thread()
+
+        # Create a task to display streamed messages
+        display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
+
         while True:
             user_message = input("user: ").strip()
             if user_message.lower() == 'exit':
                 print("Exiting chat.")
                 break
 
+            # Create a new message in the conversation thread
             await conversation_thread_client.create_conversation_thread_message(user_message, thread_name)
+
+            # Process messages in the conversation thread
             await assistant_client.process_messages(thread_name=thread_name, stream=True)
 
             print() # Add a newline for better readability

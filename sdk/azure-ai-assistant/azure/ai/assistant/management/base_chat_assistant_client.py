@@ -9,7 +9,7 @@ from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
-import copy, uuid
+import uuid
 
 
 class BaseChatAssistantClient(BaseAssistantClient):
@@ -45,7 +45,8 @@ class BaseChatAssistantClient(BaseAssistantClient):
             if is_create:
                 assistant_config.assistant_id = str(uuid.uuid4())
             self._reset_system_messages(assistant_config)
-            self._update_tools(assistant_config)
+            tools = self._update_tools(assistant_config)
+            self._tools = tools if tools else None
             self._load_selected_functions(assistant_config)
             self._assistant_config = assistant_config
 
@@ -58,19 +59,10 @@ class BaseChatAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to initialize assistant instance: {e}")
             raise EngineError(f"Failed to initialize assistant instance: {e}")
 
-    def purge(
+    def _purge(
             self,
             timeout: Optional[float] = None
     )-> None:
-        """
-        Purges the chat assistant from the local configuration.
-
-        :param timeout: The HTTP request timeout in seconds.
-        :type timeout: Optional[float]
-
-        :return: None
-        :rtype: None
-        """
         try:
             logger.info(f"Purging chat assistant with name: {self.name}")
             # retrieve the assistant configuration
@@ -95,22 +87,6 @@ class BaseChatAssistantClient(BaseAssistantClient):
             tc["function"]["name"] += tcchunk.function.name or ""
             tc["function"]["arguments"] += tcchunk.function.arguments or ""
         return tool_calls
-
-    def _update_tools(self, assistant_config: AssistantConfig):
-        logger.info(f"Updating tools for assistant: {assistant_config.name}")
-        if assistant_config.selected_functions:
-            self._tools = []
-            modified_functions = []
-            for function in assistant_config.selected_functions:
-                # Create a copy of the function spec to avoid modifying the original
-                modified_function = copy.deepcopy(function)
-                # Remove the module field from the function spec
-                if "function" in modified_function and "module" in modified_function["function"]:
-                    del modified_function["function"]["module"]
-                modified_functions.append(modified_function)
-            self._tools.extend(modified_functions)
-        else:
-            self._tools = None
 
     def _reset_system_messages(self, assistant_config: AssistantConfig):
         instructions = self._replace_file_references_with_content(assistant_config)
