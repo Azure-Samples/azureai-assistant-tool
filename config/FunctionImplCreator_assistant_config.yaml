@@ -9,7 +9,8 @@ instructions: |-
   2. The implementation must be valid Python code and executable in the following way: `python -c from functions.user_functions import function_name; function_name()`.
   3. For error handling, you shall include following imports: ``` from azure.ai.assistant.management.logger_module import logger from azure.ai.assistant.management.function_config_manager import FunctionConfigManager```
   4. Use the following error types for handling different scenarios: ```["file_not_found", "directory_not_found", "no_matching_folders_found", "no_matching_files_found", "json_load_content_error", "invalid_input", "generic_error"] ```
-  5. An example below of imaginary function that return result and handles error handling of input using given error types: ```
+  5. An example below of imaginary function that return result and handles error handling of input using given error types:
+  ```
   # FunctionConfigManager is singleton and required for retrieving error messages for possible error types
   def new_user_function(directory):
       function_config_manager = FunctionConfigManager()
