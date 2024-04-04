@@ -12,7 +12,7 @@ from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
 from datetime import datetime
-import json, time
+import json, time, yaml
 
 
 class AssistantClient(BaseAssistantClient):
@@ -67,6 +67,33 @@ class AssistantClient(BaseAssistantClient):
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
+
+    @classmethod
+    def from_yaml(
+        cls,
+        config_yaml: str,
+        callbacks: Optional[AssistantClientCallbacks] = None,
+        timeout: Optional[float] = None
+    ) -> "AssistantClient":
+        """
+        Creates an AssistantClient instance from YAML configuration data.
+
+        :param config_yaml: YAML string containing the configuration for the assistant.
+        :type config_yaml: str
+        :param callbacks: Optional callbacks for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
+        :param timeout: Optional timeout for HTTP requests.
+        :type timeout: Optional[float]
+        :return: An instance of AssistantClient.
+        :rtype: AssistantClient
+        """
+        try:
+            config_data = yaml.safe_load(config_yaml)
+            config_json = json.dumps(config_data)
+            return cls.from_json(config_json, callbacks, timeout)
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML format: {e}")
+            raise EngineError(f"Invalid YAML format: {e}")
 
     @classmethod
     def from_config(

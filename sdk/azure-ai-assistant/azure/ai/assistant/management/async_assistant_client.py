@@ -14,7 +14,7 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from typing import Optional, Union
 from datetime import datetime
-import json, time
+import json, time, yaml
 import asyncio
 
 
@@ -84,6 +84,33 @@ class AsyncAssistantClient(BaseAssistantClient):
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
+
+    @classmethod
+    async def from_yaml(
+        cls,
+        config_yaml: str,
+        callbacks: Optional[AssistantClientCallbacks] = None,
+        timeout: Optional[float] = None
+    ) -> "AsyncAssistantClient":
+        """
+        Creates an AsyncAssistantClient instance from YAML configuration data.
+
+        :param config_yaml: YAML string containing the configuration for the assistant.
+        :type config_yaml: str
+        :param callbacks: Optional callbacks for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
+        :param timeout: Optional timeout for HTTP requests.
+        :type timeout: Optional[float]
+        :return: An instance of AsyncAssistantClient.
+        :rtype: AsyncAssistantClient
+        """
+        try:
+            config_data = yaml.safe_load(config_yaml)
+            config_json = json.dumps(config_data)
+            return await cls.from_json(config_json, callbacks, timeout)
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML format: {e}")
+            raise EngineError(f"Invalid YAML format: {e}")
 
     @classmethod
     async def from_config(

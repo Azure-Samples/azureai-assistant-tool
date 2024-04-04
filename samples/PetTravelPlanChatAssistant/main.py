@@ -44,8 +44,8 @@ async def main():
 
     assistant_name = "PetTravelPlanChatAssistant"
     try:
-        with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
-            config_json = file.read()
+        with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+            config = file.read()
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         return
@@ -56,7 +56,7 @@ async def main():
         callbacks = MyAssistantClientCallbacks(message_queue)
 
         # Create an instance of the AsyncChatAssistantClient
-        assistant_client = await AsyncChatAssistantClient.from_json(config_json, callbacks=callbacks)
+        assistant_client = await AsyncChatAssistantClient.from_yaml(config, callbacks=callbacks)
         ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
 
         # Create an instance of the AsyncConversationThreadClient

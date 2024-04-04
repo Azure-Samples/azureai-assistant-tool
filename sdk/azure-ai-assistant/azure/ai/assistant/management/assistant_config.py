@@ -112,7 +112,7 @@ class AssistantConfig:
     ) -> None:
         self._name = name
         self._config_data = config_data
-        self._instructions = config_data['instructions']
+        self._instructions = self.remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
         if 'assistant_id' not in config_data:
             logger.info("assistant_id not found in config. Setting assistant_id to None.")
             self._assistant_id = None
@@ -455,3 +455,5 @@ class AssistantConfig:
         """
         return self._text_completion_config
 
+    def remove_trailing_spaces(self, text):
+        return '\n'.join(line.rstrip() for line in text.splitlines())
