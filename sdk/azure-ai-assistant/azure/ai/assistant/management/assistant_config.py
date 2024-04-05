@@ -5,7 +5,7 @@ import json
 from azure.ai.assistant.management.function_config import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
 import os
-from typing import Optional
+from typing import Optional, Union
 
 
 class TextCompletionConfig:
@@ -97,6 +97,22 @@ class TextCompletionConfig:
         self._seed = value
 
 
+class AssistantTextCompletionConfig:
+    def __init__(self, temperature: float) -> None:
+        self.temperature = temperature
+
+    def to_dict(self):
+        return {'temperature': self.temperature}
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
+    
+    @temperature.setter
+    def temperature(self, value) -> None:
+        self._temperature = value
+
+
 class AssistantConfig:
     """
     A class representing the configuration for an assistant.
@@ -135,10 +151,10 @@ class AssistantConfig:
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
-        self._text_completion_config = None
+        self._text_completion_config: Union[TextCompletionConfig, AssistantTextCompletionConfig, None] = None
 
-        if self._assistant_type == 'chat_assistant':
-            if config_data.get('completion_settings', None) is not None:
+        if config_data.get('completion_settings', None) is not None:
+            if self._assistant_type == 'chat_assistant':
                 completion_data = config_data.get('completion_settings', {
                     'frequency_penalty': 0.0,
                     'max_tokens': 100,
@@ -159,6 +175,14 @@ class AssistantConfig:
                     top_p=completion_data['top_p'],
                     seed=completion_data['seed'],
                     max_text_messages=completion_data['max_text_messages']
+                )
+            elif self._assistant_type == 'assistant':
+                completion_data = config_data.get('completion_settings', {
+                    'temperature': 0.7
+                })
+                # Constructing AssistantTextCompletionConfig from the dictionary
+                self._text_completion_config = AssistantTextCompletionConfig(
+                    temperature=completion_data['temperature']
                 )
 
     def __eq__(self, other):
@@ -214,8 +238,7 @@ class AssistantConfig:
         self._config_data['output_folder_path'] = self._output_folder_path
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
-        if self._assistant_type == 'chat_assistant':
-            self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
+        self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
         return self._config_data
 
     def _get_function_configs(self):
@@ -447,11 +470,11 @@ class AssistantConfig:
         return self._assistant_role
 
     @property
-    def text_completion_config(self) -> TextCompletionConfig:
+    def text_completion_config(self) -> Union[TextCompletionConfig, AssistantTextCompletionConfig, None]:
         """Get the text completion config.
         
         :return: The completion config.
-        :rtype: TextCompletionConfig
+        :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, None]
         """
         return self._text_completion_config
 

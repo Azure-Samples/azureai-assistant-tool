@@ -426,7 +426,7 @@ class AssistantClient(BaseAssistantClient):
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
             # Start the streaming process
-            with self._ai_client.beta.threads.runs.create_and_stream(
+            with self._ai_client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
