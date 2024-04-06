@@ -77,6 +77,9 @@ class AssistantConfigDialog(QDialog):
         # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
         if index == 3:
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
+        # If the Configuration tab is selected, copy the instructions from the Instructions Editor tab
+        elif index == 0 and hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText() != "":
+            self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
     def closeEvent(self, event):
         # Check if the microphone is on when closing the window
@@ -761,7 +764,7 @@ class AssistantConfigDialog(QDialog):
 
     def save_configuration(self):
         if self.tabWidget.currentIndex() == 3:
-            self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
+            self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
         # Conditional setup for completion settings based on assistant_type
         max_text_messages = None
