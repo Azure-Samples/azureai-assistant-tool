@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -338,8 +339,12 @@ class AssistantClient(BaseAssistantClient):
         :param timeout: The HTTP request timeout in seconds.
         """
         try:
+            text_completion_config = self._assistant_config.text_completion_config
+            temperature = None if text_completion_config is None else text_completion_config.temperature
+        
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
-            if additional_instructions is None:
+            # Azure OpenAI does not support additional instructions or temperature currently
+            if self.assistant_config.ai_client_type == AIClientType.AZURE_OPEN_AI.name:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
@@ -350,6 +355,7 @@ class AssistantClient(BaseAssistantClient):
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
+                    temperature=temperature,
                     timeout=timeout
                 )
 
@@ -425,12 +431,15 @@ class AssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
-            # Start the streaming process
+            text_completion_config = self._assistant_config.text_completion_config
+            temperature = None if text_completion_config is None else text_completion_config.temperature
+
             with self._ai_client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
                 additional_instructions=additional_instructions,
+                temperature=temperature,
                 event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:

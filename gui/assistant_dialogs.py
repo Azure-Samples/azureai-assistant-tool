@@ -319,6 +319,31 @@ class AssistantConfigDialog(QDialog):
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
+        if self.assistant_type == "assistant":
+            self.init_temperature_settings(completionLayout)
+        elif self.assistant_type == "chat_assistant":
+            self.init_full_completion_settings(completionLayout)
+
+        self.toggleCompletionSettings()
+
+        return completionTab
+
+    def init_temperature_settings(self, completionLayout):
+        # Temperature
+        self.temperatureLabel = QLabel('Temperature:')
+        self.temperatureSlider = QSlider(Qt.Horizontal)
+        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
+        self.temperatureSlider.setMinimum(0)
+        self.temperatureSlider.setMaximum(200)
+        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
+        self.temperatureValueLabel = QLabel('0.7')
+        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.temperatureLabel)
+        completionLayout.addWidget(self.temperatureSlider)
+        completionLayout.addWidget(self.temperatureValueLabel)
+
+    def init_full_completion_settings(self, completionLayout):
+
         # Frequency Penalty
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
@@ -360,19 +385,8 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.responseFormatLabel)
         completionLayout.addWidget(self.responseFormatComboBox)
         
-        # Temperature
-        self.temperatureLabel = QLabel('Temperature:')
-        self.temperatureSlider = QSlider(Qt.Horizontal)
-        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
-        self.temperatureSlider.setMinimum(0)
-        self.temperatureSlider.setMaximum(200)
-        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
-        self.temperatureValueLabel = QLabel('0.7')
-        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
-        completionLayout.addWidget(self.temperatureLabel)
-        completionLayout.addWidget(self.temperatureSlider)
-        completionLayout.addWidget(self.temperatureValueLabel)
-        
+        self.init_temperature_settings(completionLayout)
+
         # Top P
         self.topPLabel = QLabel('Top P:')
         self.topPSlider = QSlider(Qt.Horizontal)
@@ -400,31 +414,7 @@ class AssistantConfigDialog(QDialog):
         self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
         self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
 
-        if self.assistant_type == "assistant":
-            # For assistant type, hide all settings except for temperature
-            self.frequencyPenaltyLabel.hide()
-            self.frequencyPenaltySlider.hide()
-            self.frequencyPenaltyValueLabel.hide()
-            self.maxTokensLabel.hide()
-            self.maxTokensEdit.hide()
-            self.presencePenaltyLabel.hide()
-            self.presencePenaltySlider.hide()
-            self.presencePenaltyValueLabel.hide()
-            self.responseFormatLabel.hide()
-            self.responseFormatComboBox.hide()
-            self.topPLabel.hide()
-            self.topPSlider.hide()
-            self.topPValueLabel.hide()
-            self.seedLabel.hide()
-            self.seedEdit.hide()
-            self.maxMessagesLabel.setVisible(False)
-            self.maxMessagesEdit.setVisible(False)
-
         completionLayout.addLayout(self.maxMessagesLayout)
-
-        self.toggleCompletionSettings()
-
-        return completionTab
 
     def toggleCompletionSettings(self):
         # Determine if controls should be enabled based on the checkbox and assistant type
