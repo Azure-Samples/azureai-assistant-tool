@@ -1,4 +1,3 @@
-import json
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -8,20 +7,17 @@ assistant_name = "ASSISTANT_NAME"
 
 # open assistant configuration file
 try:
-    with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
-        config_json = json.load(file)
-    ai_client_type = AIClientType[config_json["ai_client_type"]]
+    with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+        config = file.read()
 except FileNotFoundError:
     print(f"Configuration file for {assistant_name} not found.")
     exit(1)
-except KeyError:
-    print(f"AI client type not found in the configuration file for {assistant_name}.")
-    exit(1)
 
 # retrieve the assistant client
-assistant_client = AssistantClient.from_json(json.dumps(config_json))
+assistant_client = AssistantClient.from_yaml(config)
 
 # create a new conversation thread client
+ai_client_type = AIClientType[assistant_client.assistant_config.ai_client_type]
 conversation_thread_client = ConversationThreadClient.get_instance(ai_client_type)
 
 # create a new conversation thread

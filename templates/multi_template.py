@@ -1,8 +1,6 @@
-import json, threading
+import threading
 from typing import Dict
 from azure.ai.assistant.management.assistant_client import AssistantClient
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.conversation import Conversation
 from azure.ai.assistant.management.message import TextMessage, FileMessage, ImageMessage
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -55,20 +53,15 @@ class MultiAgentOrchestrator(TaskManagerCallbacks):
 for assistant_name in assistant_names:
     try:
         # open assistant configuration file
-        with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
-            assistant_config = AssistantConfig.from_dict(json.load(file))
-            assistants[assistant_name] = AssistantClient.from_config(assistant_config)
-            ai_client_type = AIClientType[assistant_config.ai_client_type]
-
+        with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+            config = file.read()
+            assistants[assistant_name] = AssistantClient.from_yaml(config)
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         exit(1)
-    except KeyError:
-        print(f"AI client type not found in the configuration file for {assistant_name}.")
-        exit(1)
 
-# create multi agent orchestration
-orchestrator = MultiAgentOrchestrator(assistants, ai_client_type)
+# Create multi agent orchestration, assumed that all assistants are of AZURE_OPEN_AI type
+orchestrator = MultiAgentOrchestrator(assistants, AIClientType.AZURE_OPEN_AI)
 task_manager = TaskManager(orchestrator)
 tasks = [
     {

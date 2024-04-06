@@ -845,7 +845,7 @@ class ExportAssistantDialog(QDialog):
 
         # Copy the required JSON files
         try:
-            shutil.copyfile(f"config/{assistant_name}_assistant_config.json", os.path.join(config_path, f"{assistant_name}_assistant_config.json"))
+            shutil.copyfile(f"config/{assistant_name}_assistant_config.yaml", os.path.join(config_path, f"{assistant_name}_assistant_config.yaml"))
             shutil.copyfile("config/function_error_specs.json", os.path.join(config_path, "function_error_specs.json"))
         except FileNotFoundError as e:
             QMessageBox.critical(self, "Export Failed", f"Failed to copy configuration files: {e}")
