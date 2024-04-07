@@ -533,7 +533,7 @@ class AssistantConfigDialog(QDialog):
 
         # QTextEdit for entering instructions
         self.newInstructionsEdit = QTextEdit()
-        self.newInstructionsEdit.setText("1. Write Your Instructions Here")
+        self.newInstructionsEdit.setText("")
         instructionsEditorLayout.addWidget(self.newInstructionsEdit)
 
         # 'Check Instructions' button

@@ -228,16 +228,19 @@ class ChatAssistantClient(BaseChatAssistantClient):
                     # If there's no response, stop the loop
                     continue_processing = False
 
+            # Reset the system message
+            self._reset_system_messages(self._assistant_config)
+
             self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
 
             run_end_time = str(datetime.now())
+            if not thread_name and not stream:
+                # If there's no thread name, call the end_run callback and return the response
+                response_message = response.choices[0].message.content
+                self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name, response_message)
+                return response_message
+
             self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
-
-            # Reset the system messages
-            self._reset_system_messages(self._assistant_config)
-
-            if not stream:
-                return response.choices[0].message.content
 
         except Exception as e:
             logger.error(f"Error occurred during processing run: {e}")

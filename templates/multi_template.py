@@ -52,8 +52,8 @@ class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
                     print(f"{message.sender}: provided image {message.file_name}")
                     message.retrieve_image(assistant_client.assistant_config.output_folder_path)
 
-    def on_task_completed(self, task, schedule_id, result):
-        print(f"Task {task.name} completed with schedule ID: {schedule_id}. Result: {result}")
+    def on_task_completed(self, task : MultiTask, schedule_id, result):
+        print(f"Task {task.id} completed with schedule ID: {schedule_id}. Result: {result}")
         event = self.task_completion_events.get(schedule_id)
         if event:
             event.set()
