@@ -1,0 +1,86 @@
+name: TaskPlannerAgent
+instructions: |-
+  ## Pre-requisites for processing
+  - A user requests assistance with a software development task. For instance, they might say:
+    - "Please transform the main.py file in the current folder into an idiomatic Java version and save the resulting file in the output folder."
+  - Below are the details about the assistants you will coordinate to complete the task:
+    - Assistant 1: {file_reference:0}
+    - Assistant 2: {file_reference:1}
+
+  ## Requirements
+  1. Your task is to create a plan based on the information you have; the user request and knwoledged about the available assistants for the task
+  2. If the request contains working with the files, check the correctness of the file names by checking the required input files are found.
+  4. The returned plan must be valid a Python list, see an example below:
+  """
+  [
+      {
+          "assistant": "Name_Of_Assistant_1",
+          "task": "Convert main.py file in current folder to idiomatic Java implementation and create converted file in the output folder. Inform the full path of converted file at the end"
+      },
+      {
+          "assistant": "Name_Of_Assistant_2",
+          "task": "Review the converted Java file and inform about missing implementations and any improvements needed"
+      },
+      {
+          "assistant": "Name_Of_Assistant_1",
+          "task": "Implement the missing functionalities and create new file with updates in the output folder with the changes. Inform the full path of the new file at the end"
+      }
+  ]
+  """
+  3. The plan shall cover work for all the assistants and aims for quality output
+  4. You shall return always a result that is valid json string (see the requirement 4), newer return any other text than list content.
+  5. The returned result must not contain ```json code block, otherwise, it is considered a failure, for example, ```json[...]``` is not allowed.
+model: gpt-4-1106-preview
+assistant_id: 9d2d20e6-482f-46a0-a8d3-4d3322113b39
+file_references:
+- C:/Git/forks/azureai-assistant-tool/samples/MultiAgent/config/CodeConversionAgent_assistant_config.yaml
+- C:/Git/forks/azureai-assistant-tool/samples/MultiAgent/config/CodeInspectionAgent_assistant_config.yaml
+knowledge_files: {}
+selected_functions:
+- type: function
+  function:
+    name: find_files_by_name_in_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for files matching specific criteria by name in a directory
+      and its sub-directories (case-insensitive).
+    parameters:
+      type: object
+      properties:
+        directory:
+          type: string
+          description: The directory to search in.
+        file_name_contains:
+          type: string
+          description: A partial or full file name to search for.
+      required:
+      - directory
+      - file_name_contains
+- type: function
+  function:
+    name: find_all_folders_by_name_from_current_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for matching folders with a given name in the current directory
+      and its subdirectories. The search is case-sensitive and uses fuzzy matching.
+    parameters:
+      type: object
+      properties:
+        folder_name:
+          type: string
+          description: The name of the folder to search for.
+      required:
+      - folder_name
+knowledge_retrieval: false
+code_interpreter: false
+output_folder_path: output
+ai_client_type: AZURE_OPEN_AI
+assistant_type: chat_assistant
+completion_settings:
+  frequency_penalty: 0.0
+  max_tokens: 4096
+  presence_penalty: 0.0
+  response_format: text
+  temperature: 0.17
+  top_p: 0.1
+  seed: null
+  max_text_messages: null
+assistant_role: user
