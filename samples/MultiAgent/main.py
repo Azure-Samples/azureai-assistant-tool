@@ -1,7 +1,9 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
-from azure.ai.assistant.management.message import TextMessage, FileMessage, ImageMessage
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.task_manager import TaskManager, TaskManagerCallbacks, MultiTask
@@ -10,43 +12,6 @@ import threading
 from threading import Condition
 from typing import Dict, List
 import json, re
-
-
-def load_assistant_config(assistant_name: str) -> Dict:
-    """
-    Loads the YAML configuration for a given assistant.
-    """
-    try:
-        with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
-            return file.read()
-    except Exception as e:
-        print(f"Error loading assistant configuration for {assistant_name}: {e}")
-        return None
-
-
-def initialize_assistants(assistant_names: List[str], callback_provider) -> Dict[str, AssistantClient]:
-    """
-    Initializes all assistants based on their names and configuration files.
-    """
-    assistants = {}
-    for assistant_name in assistant_names:
-        config = load_assistant_config(assistant_name)
-        if config:
-            if assistant_name == "TaskPlannerAgent":
-                assistants[assistant_name] = ChatAssistantClient.from_yaml(config, callbacks=callback_provider)
-            else:
-                assistants[assistant_name] = AssistantClient.from_yaml(config, callbacks=callback_provider)
-    return assistants
-
-
-def extract_json_code_block(text):
-    """
-    Extracts and returns the content of the first JSON code block found in the given text.
-    If no JSON code block markers are found, returns the original input text.
-    """
-    pattern = r"```json\n([\s\S]*?)\n```"
-    match = re.search(pattern, text)
-    return match.group(1) if match else text
 
 
 class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
@@ -125,11 +90,48 @@ class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
         self._assistants = value
 
 
+def load_assistant_config(assistant_name: str) -> Dict:
+    """
+    Loads the YAML configuration for a given assistant.
+    """
+    try:
+        with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+            return file.read()
+    except Exception as e:
+        print(f"Error loading assistant configuration for {assistant_name}: {e}")
+        return None
+
+
+def initialize_assistants(assistant_names: List[str], orchestrator: MultiAgentOrchestrator) -> Dict[str, AssistantClient]:
+    """
+    Initializes all assistants based on their names and configuration files.
+    """
+    assistants = {}
+    for assistant_name in assistant_names:
+        config = load_assistant_config(assistant_name)
+        if config:
+            if assistant_name == "TaskPlannerAgent":
+                assistants[assistant_name] = ChatAssistantClient.from_yaml(config, callbacks=orchestrator)
+            else:
+                assistants[assistant_name] = AssistantClient.from_yaml(config, callbacks=orchestrator)
+    orchestrator.assistants = assistants
+    return assistants
+
+
+def extract_json_code_block(text):
+    """
+    Extracts and returns the content of the first JSON code block found in the given text.
+    If no JSON code block markers are found, returns the original input text.
+    """
+    pattern = r"```json\n([\s\S]*?)\n```"
+    match = re.search(pattern, text)
+    return match.group(1) if match else text
+
+
 def main():
     assistant_names = ["CodeConversionAgent", "CodeInspectionAgent", "TaskPlannerAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = initialize_assistants(assistant_names, orchestrator)
-    orchestrator.assistants = assistants
     task_manager = TaskManager(orchestrator)
 
     conversation_thread_client = ConversationThreadClient.get_instance(AIClientType.AZURE_OPEN_AI)
