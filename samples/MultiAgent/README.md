@@ -8,15 +8,22 @@ Please see the [Prerequisities] for details.
 
 ## Configure the sample
 
-Sample consists of following assistants:
+Sample consists of following agents and their roles:
 - TaskPlannerAgent
-  - Describe role of the assistant
+  - Creates plan (tasks) using CodeProgrammerAgent and CodeInspectionAgent to achieve the required SW engineering work.
+  - The input TaskPlannerAgent uses is the user request and knowledge about available assistants
+  - Uses own conversation thread with user
 - CodeProgrammerAgent
-  - Describe role of the assistant
+  - Configured to handle SW programming related tasks
+  - Uses shared conversation thread with CodeInspectionAgent
 - CodeInspectionAgent
-  - Describe role of the assistant
+  - Configured to handle SW inspection related tasks
+  - Uses shared conversation thread with CodeProgrammerAgent
 
-### Configure the Assistants
+### Configure the Agents
+
+TaskPlannerAgent knows the details about CodeProgrammerAgent and CodeInspectionAgent by given instructions as file references.
+NOTE: Check the file references paths are configured correctly in your environment, the file_references field in yaml requires absolute path.
 
 ## Run the sample
 
