@@ -8,10 +8,10 @@ Please see the [Prerequisities] for details.
 
 ## Configure the sample
 
-### Configure PetTravelPlanChatAssistant_assistant_config.json under config folder.
+### Configure PetTravelPlanChatAssistant_assistant_config.yaml under config folder.
 This sample provides example configuration file, you need to tailor it for your environment
 - Check the model to use your model deployment name
-- Check the file references path is setup with your own paths, NOTE: file_references field in json requires absolute path.
+- Check the file references path is setup with your own paths, NOTE: file_references field in yaml requires absolute path.
 
 ### Configure the YAML Form
 The core of this sample is the YAML form that defines the chatbot's logic. Here's a brief overview of configuring your YAML:
