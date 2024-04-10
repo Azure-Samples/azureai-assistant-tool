@@ -381,6 +381,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             run_start_time = str(datetime.now())
             self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
             self._user_input_processing_cancel_requested = False
+            is_first_message = True
 
             while True:
                 time.sleep(0.5)
@@ -404,7 +405,8 @@ class AsyncAssistantClient(BaseAssistantClient):
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
 
-                self._callbacks.on_run_update(self._name, run.id, run.status, thread_name)
+                self._callbacks.on_run_update(self._name, run.id, run.status, thread_name, is_first_message)
+                is_first_message = False
 
                 if run.status == "completed":
                     logger.info("Processing run status: completed")

@@ -10,7 +10,7 @@ instructions: |-
 
   Error Handling and Validation: Check for robust error handling and input validation. The code should not only handle expected paths but also unexpected inputs or states gracefully, providing informative error messages or fallbacks.
 model: gpt-4-1106-preview
-assistant_id: 
+assistant_id:
 file_references: []
 knowledge_files: {}
 selected_functions:

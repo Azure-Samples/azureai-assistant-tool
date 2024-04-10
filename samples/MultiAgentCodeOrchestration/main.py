@@ -57,7 +57,9 @@ class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
         self.task_started = False
 
     def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
-        if run_status == "in_progress":
+        if run_status == "in_progress" and is_first_message:
+            print(f"\n{assistant_name}: working on the task", end="", flush=True)
+        elif run_status == "in_progress":
             print(".", end="", flush=True)
 
     def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
@@ -128,8 +130,21 @@ def extract_json_code_block(text):
     return match.group(1) if match else text
 
 
+def requires_user_confirmation(assistant_response: str):
+    """
+    Checks if the response requires user confirmation.
+
+    NOTE: This is a very simple implementation and may not cover all cases.
+    Could be improved e.g. by using a ML model to detect the intent from the response and context.
+    """
+    # Remove text under json code block
+    assistant_response = re.sub(r"```json\n([\s\S]*?)\n```", "", assistant_response)
+    # if text contains question mark, return True
+    return "?" in assistant_response
+
+
 def main():
-    assistant_names = ["CodeConversionAgent", "CodeInspectionAgent", "TaskPlannerAgent"]
+    assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = initialize_assistants(assistant_names, orchestrator)
     task_manager = TaskManager(orchestrator)
@@ -150,6 +165,8 @@ def main():
             # Extract the JSON code block from the response for task scheduling
             conversation = conversation_thread_client.retrieve_conversation(planner_thread)
             response = conversation.get_last_text_message("TaskPlannerAgent")
+            if requires_user_confirmation(response.content):
+                continue
             tasks = json.loads(extract_json_code_block(response.content))
         except json.JSONDecodeError:
             continue
