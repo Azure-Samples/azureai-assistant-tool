@@ -90,24 +90,6 @@ selected_functions:
           description: The name of the folder to search for.
       required:
       - folder_name
-- type: function
-  function:
-    name: generate_random_number
-    module: functions.user_functions
-    description: Generates a random number between the specified minimum and maximum
-      values.
-    parameters:
-      type: object
-      properties:
-        min:
-          type: integer
-          description: The minimum value (inclusive) that the random number can be.
-        max:
-          type: integer
-          description: The maximum value (inclusive) that the random number can be.
-      required:
-      - min
-      - max
 knowledge_retrieval: false
 code_interpreter: false
 output_folder_path: output
