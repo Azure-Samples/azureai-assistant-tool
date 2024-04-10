@@ -73,10 +73,6 @@ async def test_async_assistant_client_add_fetch_current_datetime_function():
                         "type": "object",
                         "properties": {},
                         "required": []
-                    },
-                    "returns": {
-                        "type": "string",
-                        "description": "The current time in JSON format (YYYY-MM-DD HH:MM:SS)."
                     }
                 }
             },
