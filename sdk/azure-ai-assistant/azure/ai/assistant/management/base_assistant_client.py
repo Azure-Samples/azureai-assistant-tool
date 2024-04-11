@@ -13,7 +13,7 @@ from azure.ai.assistant.management.logger_module import logger
 from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
 from typing import Union
 
-import re, yaml
+import re, yaml, copy
 import json, importlib, sys, os
 from typing import Optional
 
@@ -252,6 +252,28 @@ class BaseAssistantClient:
             return instructions
 
         return updated_instructions
+
+    def _update_tools(self, assistant_config: AssistantConfig):
+        tools = []
+        logger.info(f"Updating tools for assistant: {assistant_config.name}")
+        # Add the retrieval tool to the tools list if there are knowledge files
+        if assistant_config.knowledge_retrieval:
+            tools.append({"type": "retrieval"})
+        # Process and add the functions to the tools list if there are functions
+        if assistant_config.selected_functions:
+            modified_functions = []
+            for function in assistant_config.selected_functions:
+                # Create a copy of the function spec to avoid modifying the original
+                modified_function = copy.deepcopy(function)
+                # Remove the module field from the function spec
+                if "function" in modified_function and "module" in modified_function["function"]:
+                    del modified_function["function"]["module"]
+                modified_functions.append(modified_function)
+            tools.extend(modified_functions)
+        # Add the code interpreter to the tools list if there is a code interpreter
+        if assistant_config.code_interpreter:
+            tools.append({"type": "code_interpreter"})
+        return tools
 
     @property
     def name(self) -> str:

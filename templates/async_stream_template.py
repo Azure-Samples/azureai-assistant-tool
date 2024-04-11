@@ -1,4 +1,3 @@
-import json
 import asyncio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
@@ -40,33 +39,30 @@ async def display_streamed_messages(message_queue, assistant_name):
 # Define the main function
 async def main():
     assistant_name = "ASSISTANT_NAME"
-    config_path = f"config/{assistant_name}_assistant_config.json"
 
     try:
-        with open(config_path, "r") as file:
-            config_json = json.load(file)
-        ai_client_type = AsyncAIClientType[config_json["ai_client_type"]]
-        message_queue = asyncio.Queue()
-        callbacks = MyAssistantClientCallbacks(message_queue)
+        with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+            config = file.read()
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         return
-    except KeyError as e:
-        print(f"Missing key in configuration file for {assistant_name}: {e}")
-        return
-
-    # Create a new assistant client
-    assistant_client = await AsyncAssistantClient.from_json(json.dumps(config_json), callbacks=callbacks)
-
-    # Create a new conversation thread client
-    conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
-
-    # Create a new conversation thread
-    thread_name = await conversation_thread_client.create_conversation_thread()
-
-    display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
 
     try:
+        message_queue = asyncio.Queue()
+        callbacks = MyAssistantClientCallbacks(message_queue)
+        
+        # Create a new assistant client
+        assistant_client = await AsyncAssistantClient.from_yaml(config, callbacks=callbacks)
+        ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
+        
+        # Create a new conversation thread client
+        conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
+        
+        # Create a new conversation thread
+        thread_name = await conversation_thread_client.create_conversation_thread()
+
+        display_task = asyncio.create_task(display_streamed_messages(message_queue, assistant_name))
+
         while True:
             user_message = input("user: ").strip()
             if user_message.lower() == 'exit':

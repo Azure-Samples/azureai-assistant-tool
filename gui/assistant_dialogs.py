@@ -75,8 +75,11 @@ class AssistantConfigDialog(QDialog):
             self.toggle_mic()
 
         # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
-        if (self.assistant_type, index) in (("assistant", 2), ("chat_assistant", 3)):
+        if index == 3:
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
+        # If the Configuration tab is selected, copy the instructions from the Instructions Editor tab
+        elif index == 0 and hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText() != "":
+            self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
     def closeEvent(self, event):
         # Check if the microphone is on when closing the window
@@ -97,10 +100,8 @@ class AssistantConfigDialog(QDialog):
         toolsTab = self.create_tools_tab()
         self.tabWidget.addTab(toolsTab, "Tools")
 
-        # Add Completion tab if assistant_type is chat_assistant
-        if self.assistant_type == "chat_assistant":
-            completionTab = self.create_completion_tab()
-            self.tabWidget.addTab(completionTab, "Completion")
+        completionTab = self.create_completion_tab()
+        self.tabWidget.addTab(completionTab, "Completion")
 
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
@@ -321,6 +322,31 @@ class AssistantConfigDialog(QDialog):
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
+        if self.assistant_type == "assistant":
+            self.init_temperature_settings(completionLayout)
+        elif self.assistant_type == "chat_assistant":
+            self.init_full_completion_settings(completionLayout)
+
+        self.toggleCompletionSettings()
+
+        return completionTab
+
+    def init_temperature_settings(self, completionLayout):
+        # Temperature
+        self.temperatureLabel = QLabel('Temperature:')
+        self.temperatureSlider = QSlider(Qt.Horizontal)
+        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
+        self.temperatureSlider.setMinimum(0)
+        self.temperatureSlider.setMaximum(200)
+        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
+        self.temperatureValueLabel = QLabel('0.7')
+        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.temperatureLabel)
+        completionLayout.addWidget(self.temperatureSlider)
+        completionLayout.addWidget(self.temperatureValueLabel)
+
+    def init_full_completion_settings(self, completionLayout):
+
         # Frequency Penalty
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
@@ -362,19 +388,8 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.responseFormatLabel)
         completionLayout.addWidget(self.responseFormatComboBox)
         
-        # Temperature
-        self.temperatureLabel = QLabel('Temperature:')
-        self.temperatureSlider = QSlider(Qt.Horizontal)
-        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
-        self.temperatureSlider.setMinimum(0)
-        self.temperatureSlider.setMaximum(100)
-        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
-        self.temperatureValueLabel = QLabel('0.7')
-        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
-        completionLayout.addWidget(self.temperatureLabel)
-        completionLayout.addWidget(self.temperatureSlider)
-        completionLayout.addWidget(self.temperatureValueLabel)
-        
+        self.init_temperature_settings(completionLayout)
+
         # Top P
         self.topPLabel = QLabel('Top P:')
         self.topPSlider = QSlider(Qt.Horizontal)
@@ -401,24 +416,24 @@ class AssistantConfigDialog(QDialog):
         self.maxMessagesEdit.setToolTip("The maximum number of messages to include in the conversation thread context. If set to None, no limit will be applied.")
         self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
         self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
+
         completionLayout.addLayout(self.maxMessagesLayout)
 
-        self.toggleCompletionSettings()
-
-        return completionTab
-
     def toggleCompletionSettings(self):
-        # Determine if controls should be enabled based on the checkbox
+        # Determine if controls should be enabled based on the checkbox and assistant type
         isEnabled = not self.useDefaultSettingsCheckBox.isChecked()
         
-        # Enable or disable controls based on the checkbox's state
-        self.frequencyPenaltySlider.setEnabled(isEnabled)
-        self.maxTokensEdit.setEnabled(isEnabled)
-        self.presencePenaltySlider.setEnabled(isEnabled)
-        self.responseFormatComboBox.setEnabled(isEnabled)
-        self.temperatureSlider.setEnabled(isEnabled)
-        self.topPSlider.setEnabled(isEnabled)
-        self.seedEdit.setEnabled(isEnabled)
+        if self.assistant_type == "assistant":
+            self.temperatureSlider.setEnabled(isEnabled)
+        elif self.assistant_type == "chat_assistant":
+            self.frequencyPenaltySlider.setEnabled(isEnabled)
+            self.maxTokensEdit.setEnabled(isEnabled)
+            self.presencePenaltySlider.setEnabled(isEnabled)
+            self.responseFormatComboBox.setEnabled(isEnabled)
+            self.topPSlider.setEnabled(isEnabled)
+            self.seedEdit.setEnabled(isEnabled)
+            self.maxMessagesEdit.setEnabled(isEnabled)
+            self.temperatureSlider.setEnabled(isEnabled)
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
@@ -518,7 +533,7 @@ class AssistantConfigDialog(QDialog):
 
         # QTextEdit for entering instructions
         self.newInstructionsEdit = QTextEdit()
-        self.newInstructionsEdit.setText("1. Write Your Instructions Here")
+        self.newInstructionsEdit.setText("")
         instructionsEditorLayout.addWidget(self.newInstructionsEdit)
 
         # 'Check Instructions' button
@@ -631,6 +646,15 @@ class AssistantConfigDialog(QDialog):
                 self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
                 # enable code interpreter checkbox
                 self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
+                # Load only the temperature setting for assistant type
+                text_completion_config = self.assistant_config.text_completion_config
+                if text_completion_config:
+                    self.useDefaultSettingsCheckBox.setChecked(False)
+                    completion_settings = text_completion_config.to_dict()
+                    temperature = completion_settings.get('temperature', 0.7) * 100
+                else:
+                    temperature = 70
+                self.temperatureSlider.setValue(temperature)
             elif self.assistant_type == "chat_assistant":
                 # pre-fill completion settings
                 text_completion_config = self.assistant_config.text_completion_config
@@ -739,9 +763,9 @@ class AssistantConfigDialog(QDialog):
             list_widget.takeItem(list_widget.row(item))
 
     def save_configuration(self):
-        # if on instructions tab, copy the instructions from the Instructions Editor tab
-        if ((self.assistant_type, self.tabWidget.currentIndex()) in (("assistant", 2), ("chat_assistant", 3))):
+        if self.tabWidget.currentIndex() == 3:
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
+
         # Conditional setup for completion settings based on assistant_type
         max_text_messages = None
         completion_settings = None
@@ -757,7 +781,12 @@ class AssistantConfigDialog(QDialog):
                     'top_p': self.topPSlider.value() / 100,
                     'max_text_messages': int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else None  # Ensure it's an integer or None
                 }
-
+        elif self.assistant_type == "assistant":
+            if not self.useDefaultSettingsCheckBox.isChecked():
+                # For assistant type, save only the temperature setting
+                completion_settings = {
+                    'temperature': self.temperatureSlider.value() / 100,
+                }
         config = {
             'name': self.nameEdit.text(),
             'instructions': self.instructionsEdit.toPlainText(),
@@ -819,7 +848,7 @@ class ExportAssistantDialog(QDialog):
 
         # Copy the required JSON files
         try:
-            shutil.copyfile(f"config/{assistant_name}_assistant_config.json", os.path.join(config_path, f"{assistant_name}_assistant_config.json"))
+            shutil.copyfile(f"config/{assistant_name}_assistant_config.yaml", os.path.join(config_path, f"{assistant_name}_assistant_config.yaml"))
             shutil.copyfile("config/function_error_specs.json", os.path.join(config_path, "function_error_specs.json"))
         except FileNotFoundError as e:
             QMessageBox.critical(self, "Export Failed", f"Failed to copy configuration files: {e}")

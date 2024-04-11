@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -14,8 +15,7 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from typing import Optional, Union
 from datetime import datetime
-import json, time
-import copy
+import json, time, yaml
 import asyncio
 
 
@@ -85,6 +85,33 @@ class AsyncAssistantClient(BaseAssistantClient):
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
+
+    @classmethod
+    async def from_yaml(
+        cls,
+        config_yaml: str,
+        callbacks: Optional[AssistantClientCallbacks] = None,
+        timeout: Optional[float] = None
+    ) -> "AsyncAssistantClient":
+        """
+        Creates an AsyncAssistantClient instance from YAML configuration data.
+
+        :param config_yaml: YAML string containing the configuration for the assistant.
+        :type config_yaml: str
+        :param callbacks: Optional callbacks for the assistant client.
+        :type callbacks: Optional[AssistantClientCallbacks]
+        :param timeout: Optional timeout for HTTP requests.
+        :type timeout: Optional[float]
+        :return: An instance of AsyncAssistantClient.
+        :rtype: AsyncAssistantClient
+        """
+        try:
+            config_data = yaml.safe_load(config_yaml)
+            config_json = json.dumps(config_data)
+            return await cls.from_json(config_json, callbacks, timeout)
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML format: {e}")
+            raise EngineError(f"Invalid YAML format: {e}")
 
     @classmethod
     async def from_config(
@@ -330,8 +357,12 @@ class AsyncAssistantClient(BaseAssistantClient):
         :param timeout: The HTTP request timeout in seconds.
         """
         try:
+            text_completion_config = self._assistant_config.text_completion_config
+            temperature = None if text_completion_config is None else text_completion_config.temperature
+        
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
-            if additional_instructions is None:
+            # Azure OpenAI does not support additional instructions or temperature currently
+            if self.assistant_config.ai_client_type == AsyncAIClientType.AZURE_OPEN_AI.name:
                 run = await self._async_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
@@ -342,6 +373,7 @@ class AsyncAssistantClient(BaseAssistantClient):
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
+                    temperature=temperature,
                     timeout=timeout
                 )
 
@@ -349,6 +381,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             run_start_time = str(datetime.now())
             self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
             self._user_input_processing_cancel_requested = False
+            is_first_message = True
 
             while True:
                 time.sleep(0.5)
@@ -372,7 +405,8 @@ class AsyncAssistantClient(BaseAssistantClient):
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
 
-                self._callbacks.on_run_update(self._name, run.id, run.status, thread_name)
+                self._callbacks.on_run_update(self._name, run.id, run.status, thread_name, is_first_message)
+                is_first_message = False
 
                 if run.status == "completed":
                     logger.info("Processing run status: completed")
@@ -417,11 +451,14 @@ class AsyncAssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
-            # Start the streaming process
-            async with self._async_client.beta.threads.runs.create_and_stream(
+            text_completion_config = self._assistant_config.text_completion_config
+            temperature = None if text_completion_config is None else text_completion_config.temperature
+            async with self._async_client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
+                additional_instructions=additional_instructions,
+                temperature=temperature,
                 event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
@@ -554,25 +591,3 @@ class AsyncAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
             raise EngineError(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
-
-    def _update_tools(self, assistant_config: AssistantConfig):
-        tools = []
-        logger.info(f"Updating tools for assistant: {assistant_config.name}")
-        # Add the retrieval tool to the tools list if there are knowledge files
-        if assistant_config.knowledge_retrieval:
-            tools.append({"type": "retrieval"})
-        # Process and add the functions to the tools list if there are functions
-        if assistant_config.selected_functions:
-            modified_functions = []
-            for function in assistant_config.selected_functions:
-                # Create a copy of the function spec to avoid modifying the original
-                modified_function = copy.deepcopy(function)
-                # Remove the module field from the function spec
-                if "function" in modified_function and "module" in modified_function["function"]:
-                    del modified_function["function"]["module"]
-                modified_functions.append(modified_function)
-            tools.extend(modified_functions)
-        # Add the code interpreter to the tools list if there is a code interpreter
-        if assistant_config.code_interpreter:
-            tools.append({"type": "code_interpreter"})
-        return tools

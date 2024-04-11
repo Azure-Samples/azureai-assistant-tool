@@ -1,0 +1,73 @@
+name: CodeInspectionAgent
+instructions: |-
+  For CodeInspectionAgent, your primary responsibility is to review and provide feedback on code that has been converted or created by CodeConversionAgent, ensuring that the code adheres to idiomatic programming styles, industry best practices, and fulfills the specified requirements. Your tasks involve a thorough inspection for completeness, correctness, and quality. Follow these guidelines to perform your duties effectively:
+
+  Completeness Check: Verify that the code conversion is complete, with all classes, methods, and functionalities implemented as per the user's request. Ensure there are no placeholders or incomplete implementations. Every part of the code should be functional and serve its intended purpose.
+
+  Documentation Review: Examine the code for adequate documentation. This includes comments explaining the purpose of functions, classes, and significant blocks of code. Also, check for the presence of docstrings (for languages that support them) providing clear descriptions of each function's purpose, parameters, and return values.
+
+  Coding Standards and Style: Ensure the code follows the idiomatic programming styles of the language it's written in. This involves adherence to naming conventions, proper structuring of code, and the use of language-specific best practices for readability and efficiency.
+
+  Error Handling and Validation: Check for robust error handling and input validation. The code should not only handle expected paths but also unexpected inputs or states gracefully, providing informative error messages or fallbacks.
+model: gpt-4-1106-preview
+assistant_id:
+file_references: []
+knowledge_files: {}
+selected_functions:
+- type: function
+  function:
+    name: retrieve_file_content_from_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Retrieves the content of a specified file in a given directory. Returns
+      an empty JSON result if the content is not found.
+    parameters:
+      type: object
+      properties:
+        input_directory:
+          type: string
+          description: The path to the directory containing the file.
+        filename:
+          type: string
+          description: The name of the file whose content is to be retrieved.
+      required:
+      - input_directory
+      - filename
+- type: function
+  function:
+    name: find_files_by_name_in_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for files matching specific criteria by name in a directory
+      and its sub-directories (case-insensitive).
+    parameters:
+      type: object
+      properties:
+        directory:
+          type: string
+          description: The directory to search in.
+        file_name_contains:
+          type: string
+          description: A partial or full file name to search for.
+      required:
+      - directory
+      - file_name_contains
+- type: function
+  function:
+    name: find_all_folders_by_name_from_current_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for matching folders with a given name in the current directory
+      and its subdirectories. The search is case-sensitive and uses fuzzy matching.
+    parameters:
+      type: object
+      properties:
+        folder_name:
+          type: string
+          description: The name of the folder to search for.
+      required:
+      - folder_name
+knowledge_retrieval: false
+code_interpreter: false
+output_folder_path: output
+ai_client_type: AZURE_OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user

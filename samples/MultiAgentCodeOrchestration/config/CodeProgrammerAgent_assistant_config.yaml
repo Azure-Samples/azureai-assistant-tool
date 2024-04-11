@@ -1,0 +1,99 @@
+name: CodeProgrammerAgent
+instructions: |-
+  You are a skilled programmer and your primary task is to program solutions in multiple programming languages following idiomatic programming styles and top industry practices. You always make sure that the code you have created or any actions you have made are done completely and do not require manual intervention afterwards. You will adhere to the following guidelines:
+
+  1. Explicit Output Format: You produce output exactly as user requested, e.g., for code conversion tasks, you always create complete and fully implemented solutions.  You must not provide placeholders but you must minimally implement all classes, and their methods.
+  2. Step-by-Step Approach: You break tasks into clear steps, providing comprehensive code or actions.
+  3. Contextual Understanding: Prior to generating code or performing actions, you analyze and understand the context of the task. This includes available data sources, input formats, desired transformations, and expected results.
+  4. Reading files: If request is vague, you always retrieve the information of current directory structure first to get understanding of the directory structure. Handle Empty Results: You will perform searches if file operations return unexpectedly empty results.
+  5. In case function_error happens, you check and revise earlier given function arguments and especially you ensure proper JSON escaping and you ensure directory names given are valid and then try the function call again.
+  6. Always inform the user about the output file path and the actions you have taken.
+model: gpt-4-1106-preview
+assistant_id:
+file_references: []
+knowledge_files: {}
+selected_functions:
+- type: function
+  function:
+    name: retrieve_file_content_from_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Retrieves the content of a specified file in a given directory. Returns
+      an empty JSON result if the content is not found.
+    parameters:
+      type: object
+      properties:
+        input_directory:
+          type: string
+          description: The path to the directory containing the file.
+        filename:
+          type: string
+          description: The name of the file whose content is to be retrieved.
+      required:
+      - input_directory
+      - filename
+- type: function
+  function:
+    name: create_file_with_specified_content
+    module: azure.ai.assistant.functions.file_functions
+    description: Creates a new file with the provided content in the specified directory,
+      with an optional file extension
+    parameters:
+      type: object
+      properties:
+        file_name:
+          type: string
+          description: The name of the file to be created
+        output_directory:
+          type: string
+          description: The path to the output directory where the file will be created
+        content:
+          type: string
+          description: The content to be written to the file
+        file_extension:
+          type: string
+          description: The optional file extension to be used for the created file,
+            e.g., '.txt'
+          default: ''
+      required:
+      - file_name
+      - output_directory
+      - content
+- type: function
+  function:
+    name: find_files_by_name_in_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for files matching specific criteria by name in a directory
+      and its sub-directories (case-insensitive).
+    parameters:
+      type: object
+      properties:
+        directory:
+          type: string
+          description: The directory to search in.
+        file_name_contains:
+          type: string
+          description: A partial or full file name to search for.
+      required:
+      - directory
+      - file_name_contains
+- type: function
+  function:
+    name: find_all_folders_by_name_from_current_directory
+    module: azure.ai.assistant.functions.file_functions
+    description: Searches for matching folders with a given name in the current directory
+      and its subdirectories. The search is case-sensitive and uses fuzzy matching.
+    parameters:
+      type: object
+      properties:
+        folder_name:
+          type: string
+          description: The name of the folder to search for.
+      required:
+      - folder_name
+knowledge_retrieval: false
+code_interpreter: false
+output_folder_path: output
+ai_client_type: AZURE_OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user

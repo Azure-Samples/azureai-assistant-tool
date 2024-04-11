@@ -184,7 +184,7 @@ def create_file_with_specified_content(file_name, output_directory, content, fil
         os.makedirs(output_directory, exist_ok=True)
         with open(full_path, 'w') as file:
             file.write(content)
-        return json.dumps({file_name: content})
+        return json.dumps({"success": True, "message": f"File '{file_name}' created successfully."})
     except Exception as e:
         logger.error(f"An error occurred during file creation: {str(e)}")
         return json.dumps({"function_error": "An error occurred during file creation"})

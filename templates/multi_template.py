@@ -1,8 +1,7 @@
-import json, threading
+import threading
 from typing import Dict
 from azure.ai.assistant.management.assistant_client import AssistantClient
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.conversation import Conversation
+from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.message import TextMessage, FileMessage, ImageMessage
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -10,15 +9,24 @@ from azure.ai.assistant.management.task_manager import TaskManager, TaskManagerC
 
 
 assistant_names = ["ASSISTANT_NAME1", "ASSISTANT_NAME2"]
-ai_client_type : AIClientType = None
-assistants: Dict[str, AssistantClient] = {}
 
-class MultiAgentOrchestrator(TaskManagerCallbacks):
-    def __init__(self, assistants : Dict[str, AssistantClient], ai_client_type : AIClientType):
+class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
+    def __init__(self, assistant_names, ai_client_type : AIClientType):
         self.task_completion_events = {}
-        self.assistants: Dict[str, AssistantClient] = assistants
-        self.conversation_thread_client = ConversationThreadClient(ai_client_type)
+        self.assistants: Dict[str, AssistantClient] = {}
+        self.init_assistants(assistant_names)
+        self.conversation_thread_client = ConversationThreadClient.get_instance(ai_client_type)
         super().__init__()
+
+    def init_assistants(self, assistant_names):
+        # create assistant clients from configuration files
+        for assistant_name in assistant_names:
+            try:
+                with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
+                    config = file.read()
+                    self.assistants[assistant_name] = AssistantClient.from_yaml(config, callbacks=self)
+            except Exception as e:
+                raise Exception(f"Error loading assistant configuration for {assistant_name}: {e}")
 
     def on_task_started(self, task : MultiTask, schedule_id):
         print(f"Task {task.id} started with schedule ID: {schedule_id}")
@@ -27,9 +35,10 @@ class MultiAgentOrchestrator(TaskManagerCallbacks):
 
     def on_task_execute(self, task : MultiTask, schedule_id):
         print(f"Task {task.id} execute with schedule ID: {schedule_id}")
-        for assistant_name in task.requests.keys():
+        for request in task.requests:
+            assistant_name = request["assistant"]
             assistant_client = self.assistants[assistant_name]
-            self.conversation_thread_client.create_conversation_thread_message(task.requests[assistant_name], self.thread_name)
+            self.conversation_thread_client.create_conversation_thread_message(request["task"], self.thread_name)
             assistant_client.process_messages(self.thread_name)
             conversation = self.conversation_thread_client.retrieve_conversation(self.thread_name)
             for message in reversed(conversation.messages):
@@ -37,47 +46,46 @@ class MultiAgentOrchestrator(TaskManagerCallbacks):
                     if message.sender == assistant_name:
                         print(f"{message.sender}: {message.content}")
                 elif isinstance(message, FileMessage):
+                    print(f"{message.sender}: provided file {message.file_name}")
                     message.retrieve_file(assistant_client.assistant_config.output_folder_path)
                 elif isinstance(message, ImageMessage):
+                    print(f"{message.sender}: provided image {message.file_name}")
                     message.retrieve_image(assistant_client.assistant_config.output_folder_path)
 
-    def on_task_completed(self, task, schedule_id, result):
-        print(f"Task {task.name} completed with schedule ID: {schedule_id}. Result: {result}")
+    def on_task_completed(self, task : MultiTask, schedule_id, result):
+        print(f"Task {task.id} completed with schedule ID: {schedule_id}. Result: {result}")
         event = self.task_completion_events.get(schedule_id)
         if event:
             event.set()
+    
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+        if run_status == "in_progress":
+            print(".", end="", flush=True)
+        elif run_status == "completed":
+            print(f"\n{assistant_name}: run {run_identifier} completed")
+
+    def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
+        print(f"\nFunction call {function_name} with arguments {arguments} processed by {assistant_name}")
 
     def wait_for_all_tasks(self):
         for event in self.task_completion_events.values():
             event.wait()
 
-# create assistant clients from configuration files
-for assistant_name in assistant_names:
-    try:
-        # open assistant configuration file
-        with open(f"config/{assistant_name}_assistant_config.json", "r") as file:
-            assistant_config = AssistantConfig.from_dict(json.load(file))
-            assistants[assistant_name] = AssistantClient.from_config(assistant_config)
-            ai_client_type = AIClientType[assistant_config.ai_client_type]
-
-    except FileNotFoundError:
-        print(f"Configuration file for {assistant_name} not found.")
-        exit(1)
-    except KeyError:
-        print(f"AI client type not found in the configuration file for {assistant_name}.")
-        exit(1)
-
-# create multi agent orchestration
-orchestrator = MultiAgentOrchestrator(assistants, ai_client_type)
+# Create multi agent orchestration, assumed that all assistants are of AZURE_OPEN_AI type
+orchestrator = MultiAgentOrchestrator(assistant_names, AIClientType.AZURE_OPEN_AI)
 task_manager = TaskManager(orchestrator)
 tasks = [
     {
-        "assistant": "ASSISTANT_NAME1",
-        "task": "Convert Main.java file in input folder to idiomatic Python implementation and create converted file in the same folder. Inform the full path of converted file at the end"
+        "assistant": assistant_names[0],
+        "task": "Convert main.py file in current folder to idiomatic Java implementation and create converted file in the output folder. Inform the full path of converted file at the end"
     },
     {
-        "assistant": "ASSISTANT_NAME2",
-        "task": "Review the converted Python file and inform about any missing implementations"
+        "assistant": assistant_names[1],
+        "task": "Review the converted Java file and inform about missing implementations and any improvements needed"
+    },
+    {
+        "assistant": assistant_names[0],
+        "task": "Implement the missing functionalities and create new file with updates in the output folder with the changes. Inform the full path of the new file at the end"
     }
 ]
 multi_task = MultiTask(tasks)

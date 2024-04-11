@@ -98,7 +98,7 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
+    def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
         """Callback for when a run completes.
         
         :param assistant_name: The name of the assistant.
@@ -109,6 +109,8 @@ class AssistantClientCallbacks:
         :type run_end_time: datetime
         :param thread_name: The name of the thread.
         :type thread_name: str
+        :param response: The response to the user request, if applicable.
+        :type response: str, optional
 
         :return: None
         :rtype: None
