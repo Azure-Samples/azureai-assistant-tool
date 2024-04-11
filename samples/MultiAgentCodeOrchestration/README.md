@@ -28,6 +28,8 @@ Sample consists of following agents and their roles:
 TaskPlannerAgent get the details about CodeProgrammerAgent and CodeInspectionAgent by file references in the yaml configuration.
 NOTE: Check the file references paths are configured correctly for your environment, the file_references field in yaml config files 
 require absolute path.
+- IMPORTANT: If you are not seeing `CodeProgrammerAgent` or `CodeInspectionAgent` in the task list assistant provided, then it means your file
+references are not correct in TaskPlannerAgent yaml configuration.
 
 ## Run the sample
 
@@ -38,131 +40,307 @@ python main.py
 ## Example run
 
 ```
-C:\Git4\forks\azureai-assistant-tool\samples\MultiAgentCodeOrchestration>python main.py
+C:\Git\forks\azureai-assistant-tool\samples\MultiAgentCodeOrchestration>python main.py
 user: hello
 
-TaskPlannerAgent: Hello! How can I assist you with your software development tasks today? If you have any specific requests or questions, feel free to let me know!
+TaskPlannerAgent: Hello! How can I assist you with your software development tasks today? If you have any specific requests or need guidance, feel free to let me know!
+
 user: create basic CLI program in Java for chat between user and assistant
 
 TaskPlannerAgent: To create a basic Command Line Interface (CLI) program in Java for a chat between a user and an assistant, we'll need to follow these steps:
 
-1. Set up the Java project structure with the necessary files.
-2. Write the Java code to handle user input and output to the console.
-3. Implement the logic to simulate a chat with the assistant.
-4. Compile and run the Java program to test the CLI chat functionality.
+1. Set up the Java project structure with the necessary classes.
+2. Implement a main class that will handle the CLI input and output.
+3. Create a method to process user input and generate responses from the assistant.
+4. Implement a loop to allow continuous conversation until the user decides to exit.
+5. Ensure proper error handling and user experience considerations.
 
-Here's a plan that outlines the tasks for the assistants to create this CLI program:
-
-[
-    {
-        "assistant": "CodeProgrammerAgent",
-        "task": "Create a basic Java CLI program that simulates a chat between a user and an assistant. The program should include a main class with a main method to handle the command line input and output. It should prompt the user for input, then respond with a predefined message. Ensure the program is well-documented with comments explaining the code and adheres to Java coding standards. Save the Java file in the 'output' folder and inform the user about the file path."
-    },
-    {
-        "assistant": "CodeInspectionAgent",
-        "task": "Review the Java CLI program created by CodeProgrammerAgent for chat simulation. Ensure the code is complete, correct, and follows idiomatic Java programming styles. Check for adequate documentation, coding standards, error handling, and input validation. Provide feedback for any necessary improvements."
-    },
-    {
-        "assistant": "CodeProgrammerAgent",
-        "task": "Revise the Java CLI program based on the feedback provided by CodeInspectionAgent. Make sure all suggested improvements are implemented, and the program is fully functional. Save the updated Java file in the 'output' folder and inform the user about the updated file path."
-    }
-]
-
-Before proceeding with this plan, I would like to confirm with you: Would you like me to go ahead with this?
-user: that looks good, proceed
-
-TaskPlannerAgent: Great! I'll proceed with the plan. Here it is again for your reference:
+Here's a plan to accomplish this task:
 
 [
     {
         "assistant": "CodeProgrammerAgent",
-        "task": "Create a basic Java CLI program that simulates a chat between a user and an assistant. The program should include a main class with a main method to handle the command line input and output. It should prompt the user for input, then respond with a predefined message. Ensure the program is well-documented with comments explaining the code and adheres to Java coding standards. Save the Java file in the 'output' folder and inform the user about the file path."
+        "task": "Create a Java CLI application that allows a user to chat with an assistant. The application should include a main class with a method to handle user input and output, a loop for continuous conversation, and proper error handling. The conversation should continue until the user types 'exit'. Please save the Java file in the 'output' folder and inform the user about the file path once completed."
     },
     {
         "assistant": "CodeInspectionAgent",
-        "task": "Review the Java CLI program created by CodeProgrammerAgent for chat simulation. Ensure the code is complete, correct, and follows idiomatic Java programming styles. Check for adequate documentation, coding standards, error handling, and input validation. Provide feedback for any necessary improvements."
+        "task": "Review the Java CLI application code created by CodeProgrammerAgent for chat functionality. Ensure the code is idiomatic, follows best practices, and includes adequate documentation and error handling. Provide feedback for any necessary improvements."
     },
     {
         "assistant": "CodeProgrammerAgent",
-        "task": "Revise the Java CLI program based on the feedback provided by CodeInspectionAgent. Make sure all suggested improvements are implemented, and the program is fully functional. Save the updated Java file in the 'output' folder and inform the user about the updated file path."
+        "task": "Implement the improvements suggested by CodeInspectionAgent in the Java CLI chat application. Ensure all feedback is addressed and the application is functioning as expected. Update the file in the 'output' folder and inform the user about the updated file path."
     }
 ]
 
-The assistants will now begin working on their respective tasks. Once completed, you will be informed of the output file path and any actions taken.
+Before we proceed with this plan, could you please confirm if this aligns with your expectations?
+user: yes, looks good
 
-Task 811a9829-d7d5-4726-8567-a46458b05771 started with schedule ID: 7fc53c57-7c9f-4ed2-b1ff-f854cf7ee7a9
+TaskPlannerAgent: Great! Here's the plan based on your confirmation:
 
-Task 811a9829-d7d5-4726-8567-a46458b05771 execute with schedule ID: 7fc53c57-7c9f-4ed2-b1ff-f854cf7ee7a9
+[
+    {
+        "assistant": "CodeProgrammerAgent",
+        "task": "Create a Java CLI application that allows a user to chat with an assistant. The application should include a main class with a method to handle user input and output, a loop for continuous conversation, and proper error handling. The conversation should continue until the user types 'exit'. Please save the Java file in the 'output' folder and inform the user about the file path once completed."
+    },
+    {
+        "assistant": "CodeInspectionAgent",
+        "task": "Review the Java CLI application code created by CodeProgrammerAgent for chat functionality. Ensure the code is idiomatic, follows best practices, and includes adequate documentation and error handling. Provide feedback for any necessary improvements."
+    },
+    {
+        "assistant": "CodeProgrammerAgent",
+        "task": "Implement the improvements suggested by CodeInspectionAgent in the Java CLI chat application. Ensure all feedback is addressed and the application is functioning as expected. Update the file in the 'output' folder and inform the user about the updated file path."
+    }
+]
 
-CodeProgrammerAgent: working on the task.............
-CodeProgrammerAgent: Function call create_file_with_specified_content with arguments {
-  "file_name": "ChatSimulator",
-  "output_directory": "output",
-  "content": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\n/**\n * A simple chat simulator program that interacts with the user.\n */\npublic class ChatSimulator {\n\n    public static void main(String[] args) {\n        // Create a BufferedReader to handle console input\n        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));\n        String userInput;\n        System.out.println(\"Welcome to ChatSimulator!\");\n\n        try {\n            while (true) {\n                // Prompt for user input\n                System.out.print(\"You: \");\n                userInput = reader.readLine();\n                if (userInput.equalsIgnoreCase(\"exit\")) {\n                    System.out.println(\"Assistant: Goodbye!\");\n                    break;\n                }\n                // Respond with a predefined message\n                System.out.println(\"Assistant: Hello, I am your assistant. How can I help you today?\");\n            }\n        } catch (IOException e) {\n            e.printStackTrace();\n        }\n    }\n}\n",
-  "file_extension": ".java"
-}, result OK.
-.......
-CodeProgrammerAgent: I have created the basic Java CLI program that simulates a chat between a user and an assistant. The program is saved as `ChatSimulator.java` in the 'output' folder.
+The assistants will now begin working on the tasks as outlined. You will be informed about the progress and the output file path once the tasks are completed.
 
-Here is the file path to the Java program:
+Task d6c7f964-110c-417a-9e1c-d27f675b3728 started with schedule ID: 8e1ac77b-ca51-400d-8ca6-03954e500067
 
-output/ChatSimulator.java
+Task d6c7f964-110c-417a-9e1c-d27f675b3728 execute with schedule ID: 8e1ac77b-ca51-400d-8ca6-03954e500067
 
-You can compile and run the program using a Java compiler and interact with the simple chat simulation. Type 'exit' to terminate the chat session.
+CodeProgrammerAgent: working on the task..............................
+CodeProgrammerAgent: To create the Java CLI application that enables a user to chat with an assistant, we need to build a simple command-line program with a main class that includes a method for handling user input and output. The application will run a loop that facilitates continuous conversation until the user decides to terminate it by typing 'exit'. Additionally, the program should handle potential input errors gracefully.
 
-CodeInspectionAgent: working on the task.....
-CodeInspectionAgent: Function call retrieve_file_content_from_directory with arguments {"input_directory":"output","filename":"ChatSimulator.java"}, result OK.
-.........................................
-CodeInspectionAgent: Upon reviewing the `ChatSimulator.java` file, I've noticed the following aspects that adhere to good practices and those where improvement could be made:
+Below are the steps and the Java code that meets the specified requirements:
 
-### Adherence to Good Practices
-1. The program includes a main class `ChatSimulator` with a `main` method which is the entry point for Java applications.
-2. The program makes use of `BufferedReader` for handling command-line input, which is suitable for reading text from an InputStream, such as System.in.
-3. The program has a loop for continuously reading user input until the user types "exit".
-4. Appropriate comments are provided for meaningful blocks of code.
-5. The class is documented with a Javadoc comment describing the purpose of the program.
-6. Exception handling is present to catch `IOException` which may be thrown by `readLine()`.
+1. Define a `ChatAssistant` class with a `main` method.
+2. Inside the `main` method, implement a loop to handle the continuous conversation.
+3. Use `Scanner` class to read user input from the terminal.
+4. Handle user input and provide responses accordingly.
+5. Include error handling and an option to exit the loop.
+6. Save the file in the 'output' directory.
+7. Notify the user about the file path once the code is written.
 
-### Possible Improvements
-1. While the overall structure of the program is correct, it's usually a good Java practice to refactor input reading and the associated logic into their own methods. This would increase the readability and maintainability of the code.
+Here is the code for the `ChatAssistant.java` class:
 
-2. To close system resources, it is a good practice to close the `BufferedReader` object at the end of the program.
+import java.util.Scanner;
 
-3. Adding additional error handling and validation could improve the robustness of the application. For instance, checking if `userInput` is null before performing operations on it, which might occur if end-of-file (EOF) is reached.
+public class ChatAssistant {
 
-4. The actual "chat" between the user and the assistant isn't dynamic—it's predefined. While this satisfies the basic requirement, expanding upon this to include more interactivity or using conditional responses based on the user's input could enhance the simulation experience.
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Welcome to the Chat Assistant. Type 'exit' to end the conversation.");
 
-5. There's no package declaration. While not necessarily an issue for single-file programs, it's a best practice in Java to define a package, as this organizes classes into namespaces and avoids class naming conflicts.
+        while(true) {
+            try {
+                System.out.print("You: ");
+                String userInput = scanner.nextLine();
 
-6. The code doesn't follow a consistent bracket style (e.g., K&R, BSD/Allman). It's a trivial matter but adhering consistently to one style throughout a project enhances readability.
+                if("exit".equalsIgnoreCase(userInput)) {
+                    System.out.println("Assistant: Goodbye!");
+                    break;
+                }
 
-Given that these points are improvements and not critical issues, I would consider the provided code to be correct and complete regarding the defined task. However, enhancements could be made to align with best practices and to potentially increase the program's usefulness and maintainability.
+                // Handle the user input here. For simplicity, we'll echo the user input.
+                // This could be replaced with more sophisticated response logic.
+                String response = "Assistant: You said '" + userInput + "'";
+                System.out.println(response);
 
-CodeProgrammerAgent: working on the task..................................
-CodeProgrammerAgent: Function call create_file_with_specified_content with arguments {
-  "file_name": "ChatSimulator",
-  "output_directory": "output",
-  "content": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\n/**\n * A simple chat simulator program that interacts with the user.\n * The program prompts the user for input and provides a predefined response.\n */\npublic class ChatSimulator {\n\n    /**\n     * The main method that is the entry point of the program.\n     * @param args Command line arguments\n     */\n    public static void main(String[] args) {\n        BufferedReader reader = null;\n        try {\n            reader = createReader();\n            runChat(reader);\n        } catch (IOException e) {\n            System.err.println(\"An error occurred while trying to read input or write output.\");\n            e.printStackTrace();\n        } finally {\n            if (reader != null) {\n                try {\n                    reader.close();\n                } catch (IOException e) {\n                    System.err.println(\"Failed to close the BufferedReader.\");\n                    e.printStackTrace();\n                }\n            }\n        }\n    }\n\n    /**\n     * Creates a BufferedReader for handling console input.\n     * @return A BufferedReader for System.in\n     */\n    private static BufferedReader createReader() {\n        return new BufferedReader(new InputStreamReader(System.in));\n    }\n\n    /**\n     * Runs the chat simulation by prompting the user for input and responding.\n     * @param reader The BufferedReader to read console input\n     * @throws IOException If an input or output exception occurred\n     */\n    private static void runChat(BufferedReader reader) throws IOException {\n        String userInput;\n        System.out.println(\"Welcome to ChatSimulator!\");\n\n        while (true) {\n            System.out.print(\"You: \");\n            userInput = reader.readLine();\n            if (userInput == null || userInput.equalsIgnoreCase(\"exit\")) {\n                System.out.println(\"Assistant: Goodbye!\");\n                break;\n            }\n            System.out.println(\"Assistant: Hello, I am your assistant. How can I help you today?\");\n        }\n    }\n}\n",
-  "file_extension": ".java"
-}, result OK.
-..............
-CodeProgrammerAgent: The Java CLI program has been revised based on the provided feedback and is now updated with the following improvements:
+            } catch (Exception e) {
+                System.err.println("Error handling the input: " + e.getMessage());
+            }
+        }
+        scanner.close();
+    }
+}
 
-1. Refactoring the input reading and response logic into separate methods for better readability and maintainability.
-2. Closing the `BufferedReader` object at the end of the program to properly release system resources.
-3. Adding additional error handling and validation for `null` user input, which can occur if end-of-file (EOF) is reached.
-4. Enhancing the chat functionality remains outside the scope of the basic simulation as requested, and adding dynamic responses can be considered for future improvements.
+Now, I will save the above Java class in a file named `ChatAssistant.java` inside the directory `output`. Since my capabilities do not allow me to perform file operations directly, I will provide the instructions to guide you on how to save this code.
 
-The updated program is saved as `ChatSimulator.java` in the 'output' folder.
+Assuming you have a Java development environment set up, here's what you would do:
 
-Here is the updated file path to the Java program:
+1. Open your preferred text editor or Integrated Development Environment (IDE).
+2. Copy the provided Java class code.
+3. Paste the code into a new file.
+4. Save the file as `ChatAssistant.java` inside a folder named `output` that you've created in a directory of your choice.
 
-output/ChatSimulator.java
+After saving the file, you would compile and run the Java program like this:
 
-You may compile and run this updated Java program to enjoy the improved chat simulation. Type 'exit' or send an EOF signal (Ctrl-D or Ctrl-Z depending on the operating system) to terminate the chat session.
+javac output/ChatAssistant.java
+java -cp output ChatAssistant
 
-Task 811a9829-d7d5-4726-8567-a46458b05771 completed with schedule ID: 7fc53c57-7c9f-4ed2-b1ff-f854cf7ee7a9. Result: Success
-user:
+Once the file is saved and the program is running, you can have a text-based conversation with the assistant in your terminal. To exit the conversation, simply type 'exit' when prompted for input.
+
+The path to the saved Java file for the user will depend on where you have your `output` directory. For example, if you have the `output` folder on your desktop, the path would be something like:
+
+C:\Users\YourUsername\Desktop\output\ChatAssistant.java
+
+Replace `YourUsername` with your actual username, and ensure the path matches your file system's structure.
+
+CodeInspectionAgent: working on the task........................................
+CodeInspectionAgent: The Java CLI application code provided for the chat functionality is a good start, but there are a number of enhancements and best practices that can be applied to improve its idiomatic nature, robustness, and documentation.
+
+Let's go through the feedback for improvements:
+
+1. Use Try-with-Resources:
+Instead of manually closing the `Scanner`, use the try-with-resources statement. This ensures that the resource is closed automatically after use and also handles exceptions gracefully.
+
+2. Documentation:
+Add a class-level Javadoc comment explaining the purpose of the `ChatAssistant` class and a method-level Javadoc for `main`.
+
+3. Error Handling:
+While there is a basic error handling mechanism, it would be more idiomatic to separate business logic from exception handling.
+
+4. Response Logic Placeholder:
+It would be helpful to include a placeholder method for future response generation logic, which separates the concerns and makes the code more maintainable.
+
+5. User Prompt:
+Consider extracting the user prompt into a separate method for better structure and potentially to support localization in the future.
+
+Here's the improved Java code:
+
+import java.util.Scanner;
+
+/**
+ * ChatAssistant is a command-line application that enables users to have a text-based
+ * conversation with an assistant. The conversation continues until the user types 'exit'.
+ */
+public class ChatAssistant {
+
+    /**
+     * The starting point of the chat application.
+     *
+     * @param args Command line arguments (not used).
+     */
+    public static void main(String[] args) {
+        // Using try-with-resources to ensure the scanner is closed automatically
+        try (Scanner scanner = new Scanner(System.in)) {
+            System.out.println("Welcome to the Chat Assistant. Type 'exit' to end the conversation.");
+
+            while (true) {
+                String userInput = promptUserInput(scanner);
+
+                if ("exit".equalsIgnoreCase(userInput)) {
+                    System.out.println("Assistant: Goodbye!");
+                    break;
+                }
+
+                // Placeholder for future sophisticated response logic
+                String response = generateResponse(userInput);
+                System.out.println(response);
+            }
+        } catch (Exception e) {
+            System.err.println("An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Prompts the user for input and returns the user's input as a string.
+     *
+     * @param scanner The scanner object to read the input.
+     * @return The user's input as a string.
+     */
+    private static String promptUserInput(Scanner scanner) {
+        System.out.print("You: ");
+        return scanner.nextLine();
+    }
+
+    /**
+     * Generates a response based on user input. Currently, it echoes back the input.
+     *
+     * @param userInput The input provided by the user.
+     * @return A string response to be displayed to the user.
+     */
+    private static String generateResponse(String userInput) {
+        // Logic for generating a response can be implemented here
+        return "Assistant: You said '" + userInput + "'";
+    }
+}
+
+These changes provide better error handling, code structure, readability, and maintainability. The new methods `promptUserInput` and `generateResponse` improve separation of concerns and allow for easier updates to the input prompting and response logic respectively.
+
+Please remember that the above code is an improved version, but for an actual chat functionality, you'd likely integrate with a back-end service or AI platform that processes the user input and generates meaningful responses. This is simply a skeleton to be fleshed out according to the actual requirements of the chat functionality.
+
+CodeProgrammerAgent: working on the task.....................................................
+CodeProgrammerAgent: Let's apply the suggested improvements to the Java CLI chat application. This involves:
+
+1. Adding try-with-resources for the `Scanner`.
+2. Documenting the code with Javadoc comments.
+3. Extracting user input prompt and response generation into separate methods.
+4. Providing clearer error handling.
+
+The updated Java class `ChatAssistant` will now look like this:
+
+import java.util.Scanner;
+
+/**
+ * The ChatAssistant class represents a command-line interface application that
+ * facilitates a text-based conversation with an assistant. The user can interact
+ * with the assistant until the command 'exit' is entered.
+ */
+public class ChatAssistant {
+
+    /**
+     * Main method that serves as the entry point of the application.
+     * It initializes a conversation loop that continues until the user exits.
+     *
+     * @param args Command line arguments (not currently used).
+     */
+    public static void main(String[] args) {
+        System.out.println("Welcome to the Chat Assistant. Type 'exit' to end the conversation.");
+
+        // Use try-with-resources to ensure the Scanner is closed properly
+        try (Scanner scanner = new Scanner(System.in)) {
+            while (true) {
+                String userInput = promptUserInput(scanner);
+
+                if ("exit".equalsIgnoreCase(userInput)) {
+                    System.out.println("Assistant: Goodbye!");
+                    break;
+                }
+
+                String response = generateResponse(userInput);
+                System.out.println(response);
+            }
+        } catch (Exception e) {
+            System.err.println("An unexpected error occurred: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Prompts the user for their input and reads the next line from the console.
+     *
+     * @param scanner A Scanner object for reading user input.
+     * @return The user input as a string.
+     */
+    private static String promptUserInput(Scanner scanner) {
+        System.out.print("You: ");
+        return scanner.nextLine();
+    }
+
+    /**
+     * Generates a response to the user input. In this template, it simply echoes the input.
+     * This method can be expanded with more complex logic in the future.
+     *
+     * @param userInput The user's input string.
+     * @return A response string to be displayed to the user.
+     */
+    private static String generateResponse(String userInput) {
+        return "Assistant: You said '" + userInput + "'";
+    }
+}
+
+To save this as a Java file, you would need to create a file named `ChatAssistant.java` in the `output` folder manually, as I don't have the capability to interact with the file system directly. Follow these steps:
+
+1. Open a text editor or an IDE on your computer.
+2. Copy the updated code from above.
+3. Paste the code into the editor.
+4. Save the file with the name `ChatAssistant.java` in an `output` directory that you have created.
+
+For example, if you placed the 'output' folder on your desktop, you would save the file at the following path (assuming you're using Windows):
+
+C:\Users\YourUsername\Desktop\output\ChatAssistant.java
+
+Once saved, compile and run the Java program as before:
+
+javac output/ChatAssistant.java
+java -cp output ChatAssistant
+
+Remember to replace `YourUsername` with your actual user name. Adjust the path accordingly if your `output` folder is located elsewhere. The path is relative to where you've chosen to store it.
+
+Task d6c7f964-110c-417a-9e1c-d27f675b3728 completed with schedule ID: 8e1ac77b-ca51-400d-8ca6-03954e500067. Result: Success
+
+user: exit
+Exiting chat.
 ```
 
 [Prerequisities]: ../../README.md
