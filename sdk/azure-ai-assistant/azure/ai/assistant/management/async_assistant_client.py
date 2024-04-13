@@ -2,7 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
-from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
@@ -31,12 +31,12 @@ class AsyncAssistantClient(BaseAssistantClient):
     :param config_json: The configuration data to use to create the assistant client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
-    :type callbacks: Optional[AssistantClientCallbacks]
+    :type callbacks: Optional[AsyncAssistantClientCallbacks]
     """
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None
+            callbacks: Optional[AsyncAssistantClientCallbacks] = None
     ) -> None:
         super().__init__(config_json, callbacks, async_mode=True)
         self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
@@ -61,7 +61,7 @@ class AsyncAssistantClient(BaseAssistantClient):
     async def from_json(
         cls,
         config_json: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncAssistantClient":
         """
@@ -70,7 +70,7 @@ class AsyncAssistantClient(BaseAssistantClient):
         :param config_json: JSON string containing the configuration for the assistant.
         :type config_json: str
         :param callbacks: Optional callbacks for the assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncAssistantClient.
@@ -90,7 +90,7 @@ class AsyncAssistantClient(BaseAssistantClient):
     async def from_yaml(
         cls,
         config_yaml: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncAssistantClient":
         """
@@ -99,7 +99,7 @@ class AsyncAssistantClient(BaseAssistantClient):
         :param config_yaml: YAML string containing the configuration for the assistant.
         :type config_yaml: str
         :param callbacks: Optional callbacks for the assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncAssistantClient.
@@ -117,7 +117,7 @@ class AsyncAssistantClient(BaseAssistantClient):
     async def from_config(
         cls,
         config: AssistantConfig,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncAssistantClient":
         """
@@ -126,7 +126,7 @@ class AsyncAssistantClient(BaseAssistantClient):
         :param config: AssistantConfig object containing the configuration for the assistant.
         :type config: AssistantConfig
         :param callbacks: Optional callbacks for the assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncAssistantClient.
@@ -379,7 +379,7 @@ class AsyncAssistantClient(BaseAssistantClient):
 
             # call the start_run callback
             run_start_time = str(datetime.now())
-            self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
+            await self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
             self._user_input_processing_cancel_requested = False
             is_first_message = True
 
@@ -405,23 +405,23 @@ class AsyncAssistantClient(BaseAssistantClient):
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
 
-                self._callbacks.on_run_update(self._name, run.id, run.status, thread_name, is_first_message)
+                await self._callbacks.on_run_update(self._name, run.id, run.status, thread_name, is_first_message)
                 is_first_message = False
 
                 if run.status == "completed":
                     logger.info("Processing run status: completed")
                     run_end_time = str(datetime.now())
-                    self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
+                    await self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
                     return None
                 elif run.status == "failed":
                     logger.warning(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
                     run_end_time = str(datetime.now())
-                    self._callbacks.on_run_failed(self._name, run.id, run_end_time, run.last_error.code, run.last_error.message, thread_name)
+                    await self._callbacks.on_run_failed(self._name, run.id, run_end_time, run.last_error.code, run.last_error.message, thread_name)
                     return None
                 elif run.status == "cancelled" or run.status == "expired":
                     logger.info("Processing run status: cancelled")
                     run_end_time = str(datetime.now())
-                    self._callbacks.on_run_cancelled(self._name, run.id, run_end_time, thread_name)
+                    await self._callbacks.on_run_cancelled(self._name, run.id, run_end_time, thread_name)
                     return None
                 if run.status == "requires_action":
                     tool_calls = run.required_action.submit_tool_outputs.tool_calls
@@ -509,7 +509,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
             # call the on_function_call_processed callback
-            self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
+            await self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
             tool_output = {
                 "tool_call_id": tool_call.id,
                 "output": function_response,

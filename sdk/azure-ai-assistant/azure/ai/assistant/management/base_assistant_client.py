@@ -5,6 +5,7 @@ from azure.ai.assistant.functions.system_function_mappings import system_functio
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AsyncAIClientType
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
@@ -25,7 +26,7 @@ class BaseAssistantClient:
     :param config_json: The configuration data to use to create the assistant client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
-    :type callbacks: Optional[AssistantClientCallbacks]
+    :type callbacks: Optional[Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]]
     :param is_create: A flag to indicate if the assistant client is being created.
     :type is_create: bool
     :param timeout: The HTTP request timeout in seconds.
@@ -34,7 +35,7 @@ class BaseAssistantClient:
     def __init__(
             self,
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None,
+            callbacks: Optional[Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]] = None,
             async_mode: bool = False
         ) -> None:
         self._initialize_client(config_json, callbacks, async_mode)
@@ -51,7 +52,10 @@ class BaseAssistantClient:
             self._name = self._config_data["name"]
             self._ai_client_type = self._get_ai_client_type(self._config_data["ai_client_type"], async_mode)
             self._ai_client : Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI] = self._get_ai_client(self._ai_client_type)
-            self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
+            if async_mode:
+                self._callbacks = callbacks if callbacks is not None else AsyncAssistantClientCallbacks()
+            else:
+                self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
             self._functions = {}
             self._user_input_processing_cancel_requested = False
             self._assistant_config = AssistantConfig.from_dict(self._config_data)
