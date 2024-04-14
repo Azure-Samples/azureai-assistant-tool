@@ -6,7 +6,6 @@ from azure.ai.assistant.management.assistant_client_callbacks import AssistantCl
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
-from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
@@ -311,7 +310,7 @@ class AssistantClient(BaseAssistantClient):
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._ai_client_type).get_config()
+        threads_config : ConversationThreadConfig = self._conversation_thread_client.get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
@@ -361,7 +360,8 @@ class AssistantClient(BaseAssistantClient):
 
             # call the start_run callback
             run_start_time = str(datetime.now())
-            self._callbacks.on_run_start(self._name, run.id, run_start_time, "Processing user input")
+            user_request = self._conversation_thread_client.retrieve_conversation(thread_name).get_last_text_message("user").content
+            self._callbacks.on_run_start(self._name, run.id, run_start_time, user_request)
             self._user_input_processing_cancel_requested = False
             is_first_message = True
 

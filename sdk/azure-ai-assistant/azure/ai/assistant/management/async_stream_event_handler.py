@@ -3,7 +3,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
-from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.logger_module import logger
 
@@ -39,7 +39,8 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
         self._is_first_message = True
         self._is_started = False
         self._is_submit_tool_call = is_submit_tool_call
-        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._parent._ai_client_type).get_config()
+        self._conversation_thread_client = AsyncConversationThreadClient.get_instance(self._parent._ai_client_type)
+        threads_config : ConversationThreadConfig = self._conversation_thread_client.get_config()
         self._thread_name = threads_config.get_thread_name_by_id(thread_id)
         self._thread_id = thread_id
         self._timeout = timeout
@@ -75,7 +76,9 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     async def on_text_created(self, text) -> None:
         logger.info(f"on_text_created called, text: {text}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            conversation = await self._conversation_thread_client.retrieve_conversation(self._thread_name)
+            user_request = conversation.get_last_text_message("user").content
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
 
     @override
@@ -92,7 +95,9 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     async def on_tool_call_created(self, tool_call):
         logger.info(f"on_tool_call_created called, tool_call: {tool_call}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            conversation = await self._conversation_thread_client.retrieve_conversation(self._thread_name)
+            user_request = conversation.get_last_text_message("user").content
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
         if self.current_run.required_action:
             logger.info(f"create, run.required_action.type: {self.current_run.required_action.type}")

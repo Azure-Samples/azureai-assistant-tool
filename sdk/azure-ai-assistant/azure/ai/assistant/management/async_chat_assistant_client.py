@@ -4,7 +4,6 @@
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.base_chat_assistant_client import BaseChatAssistantClient
-from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 
@@ -183,15 +182,9 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             if additional_instructions:
                 self._messages.append({"role": "system", "content": additional_instructions})
 
-            # call the start_run callback
-            run_start_time = str(datetime.now())
-            run_id = str(uuid.uuid4())
-            await self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
-
             if thread_name:
-                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
-                conversation = await conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
+                conversation = await self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
                         self._messages.append({"role": "user", "content": message.content})
@@ -199,6 +192,14 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                         self._messages.append({"role": "assistant", "content": message.content})
             elif user_request:
                 self._messages.append({"role": "user", "content": user_request})
+
+            # call the start_run callback
+            run_start_time = str(datetime.now())
+            run_id = str(uuid.uuid4())
+            if thread_name:
+                conversation = await self._conversation_thread_client.retrieve_conversation(thread_name)
+                user_request = conversation.get_last_text_message("user").content
+            await self._callbacks.on_run_start(self._name, run_id, run_start_time, user_request)
 
             continue_processing = True
             self._user_input_processing_cancel_requested = False
@@ -267,8 +268,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         if response_message.content:
             # extend conversation with assistant's reply
             if thread_name:
-                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
-                await conversation_thread_client.create_conversation_thread_message(
+                await self._conversation_thread_client.create_conversation_thread_message(
                     response_message.content,
                     thread_name,
                     metadata={"chat_assistant": self._name}
@@ -348,8 +348,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     async def _update_conversation_with_messages(self, collected_messages, thread_name):
         full_response = ''.join(filter(None, collected_messages))
         if full_response and thread_name:
-            conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
-            await conversation_thread_client.create_conversation_thread_message(
+            await self._conversation_thread_client.create_conversation_thread_message(
                 message=full_response, 
                 thread_name=thread_name, 
                 metadata={"chat_assistant": self._name}

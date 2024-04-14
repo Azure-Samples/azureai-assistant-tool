@@ -6,6 +6,8 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
+from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AsyncAIClientType
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
@@ -54,8 +56,10 @@ class BaseAssistantClient:
             self._ai_client : Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI] = self._get_ai_client(self._ai_client_type)
             if async_mode:
                 self._callbacks = callbacks if callbacks is not None else AsyncAssistantClientCallbacks()
+                self._conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
             else:
                 self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
+                self._conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
             self._functions = {}
             self._user_input_processing_cancel_requested = False
             self._assistant_config = AssistantConfig.from_dict(self._config_data)
