@@ -39,8 +39,7 @@ instructions: |-
   - {Description of the task} - Replace this with a detailed description of the task that the assistant should perform. This description is part of the plan that the assistants will execute.
 
   Additional instructions for creating the plan:
-  - Information about file paths: Ensure that plan instructs assistants to inform the file path details of the output.
-  - Review of implementation and follow-up using the review feedback: Ensure that each review task has follow-up implementation task by using the review feedback.
+  - Review feedback follow-up: Ensure that each review/inspection task has follow-up implementation task by using the review feedback as input.
   - Multiple Files: If the plan involves multiple files, create a separate set of tasks for each file, ensuring each assistant processes only one file at a time.
   - Non-Software Development Requests: If a user request does not pertain to software development, kindly inform the user with a casual message and always with question how you can assist further.
     - Example response: "It seems your request isn't related to software development. I'm here to help with a wide range of questions and tasks, any specific area you'd like assistance with?"

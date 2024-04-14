@@ -104,7 +104,7 @@ class AsyncTaskManager:
             await self._callbacks.on_task_started(task, schedule_id)
             await self._run_task_with_recurrence(task, schedule_id, interval_seconds, recurrence_count)
         except Exception as e:
-            self._callbacks.on_task_failed(task, schedule_id, str(e))
+            await self._callbacks.on_task_failed(task, schedule_id, str(e))
 
     async def _run_task_with_recurrence(self, task, schedule_id, interval_seconds, recurrence_count):
         async def callback():

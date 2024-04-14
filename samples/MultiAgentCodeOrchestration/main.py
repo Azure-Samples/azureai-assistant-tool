@@ -9,8 +9,6 @@ from azure.ai.assistant.management.async_conversation_thread_client import Async
 from azure.ai.assistant.management.async_task_manager import AsyncTaskManager, AsyncMultiTask
 from azure.ai.assistant.management.async_task_manager_callbacks import AsyncTaskManagerCallbacks
 
-import threading
-from threading import Condition
 from typing import Dict, List
 import json, re
 import asyncio
@@ -58,6 +56,12 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
             event.set()
         self.task_started = False
 
+    async def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
+        if assistant_name == "CodeProgrammerAgent" or assistant_name == "CodeInspectionAgent":
+            print(f"\n{assistant_name}: starting the task with input: {user_input}")
+        elif assistant_name == "FileCreatorAgent":
+            print(f"\n{assistant_name}: analyzing the CodeProgrammerAgent output for file creation")
+
     async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "in_progress" and is_first_message:
             print(f"\n{assistant_name}: working on the task", end="", flush=True)
@@ -69,7 +73,11 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
             print(f"{assistant_name}: {response}")
         else:
             conversation = await self.conversation_thread_client.retrieve_conversation(thread_name)
-            print(f"\n{conversation.get_last_text_message(assistant_name)}")
+            message = conversation.get_last_text_message(assistant_name)
+            print(f"\n{message}")
+            if assistant_name == "CodeProgrammerAgent":
+                # Extract the JSON code block from the response by using the FileCreatorAgent
+                await self._assistants["FileCreatorAgent"].process_messages(user_request=message.content)
 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response = None):
         if "error" in response:
@@ -113,7 +121,7 @@ async def initialize_assistants(assistant_names: List[str], orchestrator: MultiA
     for assistant_name in assistant_names:
         config = load_assistant_config(assistant_name)
         if config:
-            if assistant_name == "TaskPlannerAgent":
+            if assistant_name == "TaskPlannerAgent" or assistant_name == "FileCreatorAgent":
                 assistants[assistant_name] = await AsyncChatAssistantClient.from_yaml(config, callbacks=orchestrator)
             else:
                 assistants[assistant_name] = await AsyncAssistantClient.from_yaml(config, callbacks=orchestrator)
@@ -145,7 +153,7 @@ def requires_user_confirmation(assistant_response: str):
 
 
 async def main():
-    assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent"]
+    assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent", "FileCreatorAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = await initialize_assistants(assistant_names, orchestrator)
     task_manager = AsyncTaskManager(orchestrator)
@@ -154,7 +162,7 @@ async def main():
     planner_thread = await conversation_thread_client.create_conversation_thread()
 
     while True:
-        user_request = input("user: ").strip()
+        user_request = input("\nuser: ").strip()
         if user_request.lower() == 'exit':  # Allow the user to exit the chat
             print("Exiting chat.")
             break
