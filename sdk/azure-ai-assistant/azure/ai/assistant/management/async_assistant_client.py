@@ -573,7 +573,7 @@ class AsyncAssistantClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
-            self._update_files(assistant_config)
+            await self._update_files(assistant_config)
             file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
