@@ -42,19 +42,19 @@ class Conversation:
 
     def get_last_text_message(
             self, 
-            assitant_name : str
+            sender : str
     ) -> Optional[TextMessage]:
         """
         Returns the last text message sent by the assistant.
 
-        :param assitant_name: The name of the assistant.
-        :type assitant_name: str
+        :param sender: The name of the sender.
+        :type sender: str
 
         :return: The last text message sent by the assistant.
         :rtype: Optional[TextMessage]
         """
         for msg in self.text_messages:
-            if msg.sender == assitant_name:
+            if msg.sender == sender:
                 return msg
         return None
 

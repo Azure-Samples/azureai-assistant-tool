@@ -27,13 +27,10 @@ class ConversationThreadClient:
     :param ai_client_type: The type of the AI client to use.
     :type ai_client_type: AIClientType
     """
-    def __init__(
-            self, 
-            ai_client_type : AIClientType
-    ) -> None:
+    def __init_private(self, ai_client_type):
         self._ai_client_type = ai_client_type
         self._ai_client : Union[OpenAI, AzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type)
-        self._thread_config = ConversationThreadConfig(self._ai_client_type, f'config/threads.json')
+        self._thread_config = ConversationThreadConfig(self._ai_client_type, 'config/threads.json')
         self._assistant_config_manager = AssistantConfigManager.get_instance()
 
     @classmethod
@@ -53,7 +50,9 @@ class ConversationThreadClient:
         if ai_client_type not in cls._instances:
             with cls._lock:
                 if ai_client_type not in cls._instances:
-                    cls._instances[ai_client_type] = cls(ai_client_type)
+                    instance = cls.__new__(cls)
+                    instance.__init_private(ai_client_type)
+                    cls._instances[ai_client_type] = instance
         return cls._instances[ai_client_type]
 
     def create_conversation_thread(

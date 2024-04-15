@@ -39,7 +39,8 @@ class StreamEventHandler(AssistantEventHandler):
         self._is_first_message = True
         self._is_started = False
         self._is_submit_tool_call = is_submit_tool_call
-        threads_config : ConversationThreadConfig = ConversationThreadClient.get_instance(self._parent._ai_client_type).get_config()
+        self._conversation_thread_client = ConversationThreadClient.get_instance(self._parent._ai_client_type)
+        threads_config : ConversationThreadConfig = self._conversation_thread_client.get_config()
         self._thread_name = threads_config.get_thread_name_by_id(thread_id)
         self._thread_id = thread_id
         self._timeout = timeout
@@ -75,7 +76,8 @@ class StreamEventHandler(AssistantEventHandler):
     def on_text_created(self, text) -> None:
         logger.info(f"on_text_created called, text: {text}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            user_request = self._conversation_thread_client.retrieve_conversation(self._thread_name).get_last_text_message("user").content
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
 
     @override
@@ -92,7 +94,8 @@ class StreamEventHandler(AssistantEventHandler):
     def on_tool_call_created(self, tool_call):
         logger.info(f"on_tool_call_created called, tool_call: {tool_call}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), "Processing user input")
+            user_request = self._conversation_thread_client.retrieve_conversation(self._thread_name).get_last_text_message("user").content
+            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
         if self.current_run.required_action:
             logger.info(f"create, run.required_action.type: {self.current_run.required_action.type}")

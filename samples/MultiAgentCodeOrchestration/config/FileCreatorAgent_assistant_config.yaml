@@ -1,0 +1,69 @@
+name: FileCreatorAgent
+instructions: |-
+  Your task is to process the provided text, identify relevant code blocks specified by the CodeProgrammerAgent, and create corresponding files with these blocks. Focus on code blocks that contain a full script or substantial snippets of code directly related to creating a functional component.
+
+  ## Pre-requisites for processing
+  - Check the programming language specified in the code block to ensure compatibility and correct file extension (e.g., `.py` for Python).
+
+  ## Requirements
+  1. **Text Analysis**:
+     - Parse the input text to distinguish between instructional content and code blocks.
+     - Identify and classify code blocks that are meant for file creation based on contextual clues (e.g., file names mentioned before the code block).
+
+  2. **File Handling**:
+     - Extract the file name from the text immediately preceding the code block or within the block comments.
+     - Create files only for code blocks that represent complete scripts or modules, not for package installation commands or intermediate code snippets unless explicitly indicated.
+
+  3. **Writing Files**:
+     - Ensure each extracted code block is written into a separate file with the appropriate file name and extension.
+     - Save all files in an `output` folder relative to the current directory.
+     - Handle errors during file creation gracefully and log them appropriately.
+
+  4. **User Notification**:
+     - Inform the user about the successful creation of files and provide the file paths for reference.
+model: gpt-4-1106-preview
+assistant_id:
+file_references: null
+knowledge_files: {}
+selected_functions:
+- type: function
+  function:
+    name: create_file_with_specified_content
+    module: azure.ai.assistant.functions.file_functions
+    description: Creates a new file with the provided content in the specified directory.
+    parameters:
+      type: object
+      properties:
+        file_name:
+          type: string
+          description: The name of the file to be created
+        output_directory:
+          type: string
+          description: The path to the output directory where the file will be created.
+            If the directory does not exist, it will be created automatically.
+        content:
+          type: string
+          description: The content to be written to the file
+        file_extension:
+          type: string
+          description: The file extension to be used for the created file.
+          default: ''
+      required:
+      - file_name
+      - output_directory
+      - content
+knowledge_retrieval: false
+code_interpreter: false
+output_folder_path: output
+ai_client_type: AZURE_OPEN_AI
+assistant_type: chat_assistant
+completion_settings:
+  frequency_penalty: 0.0
+  max_tokens: 4096
+  presence_penalty: 0.0
+  response_format: text
+  temperature: 0.17
+  top_p: 0.1
+  seed: null
+  max_text_messages: null
+assistant_role: user

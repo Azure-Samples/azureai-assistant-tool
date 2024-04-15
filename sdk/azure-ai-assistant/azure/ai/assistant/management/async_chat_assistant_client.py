@@ -2,9 +2,8 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.base_chat_assistant_client import BaseChatAssistantClient
-from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 
@@ -30,7 +29,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None
+            callbacks: Optional[AsyncAssistantClientCallbacks] = None
     ) -> None:
         super().__init__(config_json, callbacks, async_mode=True)
         self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
@@ -55,7 +54,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     async def from_json(
         cls,
         config_json: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncChatAssistantClient":
         """
@@ -64,7 +63,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :param config_json: JSON string containing the configuration for the chat assistant.
         :type config_json: str
         :param callbacks: Optional callbacks for the chat assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncChatAssistantClient.
@@ -84,7 +83,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     async def from_yaml(
         cls,
         config_yaml: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncChatAssistantClient":
         """
@@ -93,7 +92,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :param config_yaml: YAML string containing the configuration for the chat assistant.
         :type config_yaml: str
         :param callbacks: Optional callbacks for the chat assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncChatAssistantClient.
@@ -111,7 +110,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     async def from_config(
         cls,
         config: AssistantConfig,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AsyncAssistantClientCallbacks] = None,
         timeout: Optional[float] = None
     ) -> "AsyncChatAssistantClient":
         """
@@ -120,7 +119,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :param config: AssistantConfig object containing the configuration for the chat assistant.
         :type config: AssistantConfig
         :param callbacks: Optional callbacks for the chat assistant client.
-        :type callbacks: Optional[AssistantClientCallbacks]
+        :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
         :return: An instance of AsyncChatAssistantClient.
@@ -183,15 +182,9 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             if additional_instructions:
                 self._messages.append({"role": "system", "content": additional_instructions})
 
-            # call the start_run callback
-            run_start_time = str(datetime.now())
-            run_id = str(uuid.uuid4())
-            self._callbacks.on_run_start(self._name, run_id, run_start_time, "Processing user input")
-
             if thread_name:
-                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
-                conversation = await conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
+                conversation = await self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
                 for message in reversed(conversation.text_messages):
                     if message.role == "user":
                         self._messages.append({"role": "user", "content": message.content})
@@ -199,6 +192,14 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                         self._messages.append({"role": "assistant", "content": message.content})
             elif user_request:
                 self._messages.append({"role": "user", "content": user_request})
+
+            # call the start_run callback
+            run_start_time = str(datetime.now())
+            run_id = str(uuid.uuid4())
+            if thread_name:
+                conversation = await self._conversation_thread_client.retrieve_conversation(thread_name)
+                user_request = conversation.get_last_text_message("user").content
+            await self._callbacks.on_run_start(self._name, run_id, run_start_time, user_request)
 
             continue_processing = True
             self._user_input_processing_cancel_requested = False
@@ -245,16 +246,19 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                     # If there's no response, stop the loop
                     continue_processing = False
 
-            self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
-
-            run_end_time = str(datetime.now())
-            self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
-
             # Reset the system messages
             self._reset_system_messages(self._assistant_config)
 
-            if not stream:
-                return response.choices[0].message.content
+            await self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
+
+            run_end_time = str(datetime.now())
+            if not thread_name and not stream:
+                # If there's no thread name, call the end_run callback and return the response
+                response_message = response.choices[0].message.content
+                await self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name, response_message)
+                return response_message
+
+            await self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name)
 
         except Exception as e:
             logger.error(f"Error occurred during processing run: {e}")
@@ -267,8 +271,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         if response_message.content:
             # extend conversation with assistant's reply
             if thread_name:
-                conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
-                await conversation_thread_client.create_conversation_thread_message(
+                await self._conversation_thread_client.create_conversation_thread_message(
                     response_message.content,
                     thread_name,
                     metadata={"chat_assistant": self._name}
@@ -283,7 +286,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                     tool_call.function.name, 
                     tool_call.function.arguments
                 )
-                self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
+                await self._callbacks.on_function_call_processed(self._name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
                 self._messages.append(
                     {
                         "tool_call_id": tool_call.id,
@@ -308,7 +311,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         async for chunk in response:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
-                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, delta.content)
+                await self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, delta.content)
                 collected_messages.append(delta.content)
                 is_first_message = False
             if delta and delta.tool_calls:
@@ -330,7 +333,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                 tool_call['function']['name'], 
                 tool_call['function']['arguments']
             )
-            self._callbacks.on_function_call_processed(
+            await self._callbacks.on_function_call_processed(
                 self._name, run_id, 
                 tool_call['function']['name'], 
                 tool_call['function']['arguments'], 
@@ -348,8 +351,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     async def _update_conversation_with_messages(self, collected_messages, thread_name):
         full_response = ''.join(filter(None, collected_messages))
         if full_response and thread_name:
-            conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type)
-            await conversation_thread_client.create_conversation_thread_message(
+            await self._conversation_thread_client.create_conversation_thread_message(
                 message=full_response, 
                 thread_name=thread_name, 
                 metadata={"chat_assistant": self._name}

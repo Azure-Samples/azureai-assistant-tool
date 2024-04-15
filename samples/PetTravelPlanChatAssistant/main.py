@@ -4,24 +4,25 @@
 import asyncio
 from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
-from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 
 
 # Define a custom callback class that inherits from AssistantClientCallbacks
-class MyAssistantClientCallbacks(AssistantClientCallbacks):
+class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     def __init__(self, message_queue):
         self.message_queue = message_queue
 
     async def handle_message(self, action, message=""):
         await self.message_queue.put((action, message))
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "streaming":
-            asyncio.create_task(self.handle_message("start" if is_first_message else "message", message))
+            await self.handle_message("start" if is_first_message else "message", message)
 
-    def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
-        asyncio.create_task(self.handle_message("function", function_name))
+    async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
+        await self.handle_message("function", function_name)
+
 
 # Define a function to display streamed messages
 async def display_streamed_messages(message_queue, assistant_name):
