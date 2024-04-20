@@ -46,10 +46,11 @@ class AssistantConfigDialog(QDialog):
         self.init_ui()
 
     def init_variables(self):
-        self.knowledge_files_dict = {}  # Dictionary to store knowledge file paths and IDs
+        self.code_interpreter_files = {}
+        self.file_search_files = {}
         self.selected_functions = []  # Store the selected functions
         self.code_interpreter = False  # Store the code interpreter setting
-        self.knowledge_retrieval = False  # Store the knowledge retrieval setting
+        self.file_search = False  # Store the knowledge retrieval setting
         self.checkBoxes = {}  # To keep track of all function checkboxes
         self.assistant_id = ''
         self.default_output_folder_path = os.path.join(os.getcwd(), 'output')
@@ -249,68 +250,84 @@ class AssistantConfigDialog(QDialog):
         return configTab
 
     def create_tools_tab(self):
-        toolsTab = QWidget()
-        toolsLayout = QVBoxLayout(toolsTab)
+        toolsLayout = QVBoxLayout(self)
 
         # Scroll Area for functions
-        self.scrollArea = QScrollArea(self)
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollWidget = QWidget()
-        self.scrollLayout = QVBoxLayout(self.scrollWidget)
+        scrollArea = QScrollArea(self)
+        scrollArea.setWidgetResizable(True)
+        scrollWidget = QWidget()
+        scrollLayout = QVBoxLayout(scrollWidget)
 
         # Function sections
         if self.function_config_manager:
-            function_configs =  self.function_config_manager.get_function_configs()
+            function_configs = self.function_config_manager.get_function_configs()
             for function_type, funcs in function_configs.items():
-                self.create_function_section(self.scrollLayout, function_type, funcs)
+                self.create_function_section(scrollLayout, function_type, funcs)
 
-        self.scrollArea.setWidget(self.scrollWidget)
-        self.scrollArea.setStyleSheet(
-            "QScrollArea {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
-            "}"
-        )
-        toolsLayout.addWidget(self.scrollArea)
+        scrollArea.setWidget(scrollWidget)
+        toolsLayout.addWidget(scrollArea)
 
-        # Knowledge Files, Add File, and Remove File buttons
-        self.knowledgeFileLabel = QLabel('Knowledge Files:')
-        self.knowledgeFileList = QListWidget()
-        self.knowledgeFileList.setStyleSheet(
+        # Section for managing code interpreter files
+        self.setup_code_interpreter_files(toolsLayout)
+
+        # Checkbox to enable code interpreter tool
+        self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
+        self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
+        toolsLayout.addWidget(self.codeInterpreterCheckBox)
+
+        # Section for managing files for file search vector stores
+        self.setup_file_search_vector_stores(toolsLayout)
+
+        # Checkbox to enable file search tool
+        self.fileSearchCheckBox = QCheckBox("Enable File Search")
+        self.fileSearchCheckBox.stateChanged.connect(lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value))
+        toolsLayout.addWidget(self.fileSearchCheckBox)
+
+    def setup_code_interpreter_files(self, layout):
+        codeFilesLabel = QLabel('Files for Code Interpreter:')
+        self.codeFileList = QListWidget()
+        self.codeFileList.setStyleSheet(
             "QListWidget {"
             "  border-style: solid;"
             "  border-width: 1px;"
             "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
             "}"
         )
-        self.knowledgeFileButton = QPushButton('Add File...')
-        self.knowledgeFileButton.clicked.connect(self.add_knowledge_file)
-        self.knowledgeFileRemoveButton = QPushButton('Remove File')
-        self.knowledgeFileRemoveButton.clicked.connect(self.remove_knowledge_file)
+        addCodeFileButton = QPushButton('Add File...')
+        addCodeFileButton.clicked.connect(lambda: self.add_file(self.code_interpreter_files, self.codeFileList))
+        removeCodeFileButton = QPushButton('Remove File')
+        removeCodeFileButton.clicked.connect(lambda: self.remove_file(self.code_interpreter_files, self.codeFileList))
 
-        fileButtonLayout = QHBoxLayout()
-        fileButtonLayout.addWidget(self.knowledgeFileButton)
-        fileButtonLayout.addWidget(self.knowledgeFileRemoveButton)
+        codeFileButtonLayout = QHBoxLayout()
+        codeFileButtonLayout.addWidget(addCodeFileButton)
+        codeFileButtonLayout.addWidget(removeCodeFileButton)
 
-        toolsLayout.addWidget(self.knowledgeFileLabel)
-        toolsLayout.addWidget(self.knowledgeFileList)
-        toolsLayout.addLayout(fileButtonLayout)
+        layout.addWidget(codeFilesLabel)
+        layout.addWidget(self.codeFileList)
+        layout.addLayout(codeFileButtonLayout)
 
-        # Enable Knowledge Retrieval checkbox
-        self.knowledgeRetrievalCheckBox = QCheckBox("Enable Knowledge Retrieval")
-        self.knowledgeRetrievalCheckBox.stateChanged.connect(lambda state: setattr(self, 'knowledge_retrieval', state == Qt.CheckState.Checked.value))
-        toolsLayout.addWidget(self.knowledgeRetrievalCheckBox)
+    def setup_file_search_vector_stores(self, layout):
+        fileSearchLabel = QLabel('Files for File Search Vector Store:')
+        self.fileSearchList = QListWidget()
+        self.fileSearchList.setStyleSheet(
+            "QListWidget {"
+            "  border-style: solid;"
+            "  border-width: 1px;"
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
+            "}"
+        )
+        addFileSearchFileButton = QPushButton('Add File...')
+        addFileSearchFileButton.clicked.connect(lambda: self.add_file(self.file_search_files, self.fileSearchList))
+        removeFileSearchFileButton = QPushButton('Remove File')
+        removeFileSearchFileButton.clicked.connect(lambda: self.remove_file(self.file_search_files, self.fileSearchList))
 
-        if self.assistant_type == "assistant":
-            self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
-            self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
-            toolsLayout.addWidget(self.codeInterpreterCheckBox)
-        elif self.assistant_type == "chat_assistant":
-            self.knowledgeFileButton.setEnabled(False)
-            self.knowledgeFileRemoveButton.setEnabled(False)
-            self.knowledgeRetrievalCheckBox.setEnabled(False)
-        return toolsTab
+        fileSearchFileButtonLayout = QHBoxLayout()
+        fileSearchFileButtonLayout.addWidget(addFileSearchFileButton)
+        fileSearchFileButtonLayout.addWidget(removeFileSearchFileButton)
+
+        layout.addWidget(fileSearchLabel)
+        layout.addWidget(self.fileSearchList)
+        layout.addLayout(fileSearchFileButtonLayout)
 
     def create_completion_tab(self):
         completionTab = QWidget()
@@ -338,8 +355,8 @@ class AssistantConfigDialog(QDialog):
         self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
         self.temperatureSlider.setMinimum(0)
         self.temperatureSlider.setMaximum(200)
-        self.temperatureSlider.setValue(70)  # Default value as 0.7 for illustration
-        self.temperatureValueLabel = QLabel('0.7')
+        self.temperatureSlider.setValue(100)  # Default value as 1.0 for illustration
+        self.temperatureValueLabel = QLabel('1.0')
         self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
         completionLayout.addWidget(self.temperatureLabel)
         completionLayout.addWidget(self.temperatureSlider)
@@ -493,13 +510,14 @@ class AssistantConfigDialog(QDialog):
         self.nameEdit.clear()
         self.instructionsEdit.clear()
         self.modelComboBox.setCurrentIndex(0)
-        self.knowledge_files_dict = {}
+        self.file_search_files = {}
+        self.code_interpreter_files = {}
         # Reset all checkboxes in the function sections
         for function_type, checkBoxes in self.checkBoxes.items():
             for checkBox in checkBoxes:
                 checkBox.setChecked(False)
         self.selected_functions = []
-        self.knowledge_retrieval = False
+        self.file_search = False
         self.code_interpreter = False
         self.knowledgeFileList.clear()
         self.knowledgeRetrievalCheckBox.setChecked(False)
@@ -631,19 +649,25 @@ class AssistantConfigDialog(QDialog):
             # Pre-select functions
             self.pre_select_functions()
             # Pre-select knowledge retrieval
-            self.knowledge_retrieval = self.assistant_config.knowledge_retrieval
+            self.file_search = self.assistant_config.file_search
             # Pre-select code interpreter
             self.code_interpreter = self.assistant_config.code_interpreter
             # Pre-fill reference files
             for file_path in self.assistant_config.file_references:
                 self.fileReferenceList.addItem(file_path)
             if self.assistant_type == "assistant":
-                # Pre-fill knowledge files
-                for file_path, file_id in self.assistant_config.knowledge_files.items():
-                    self.knowledge_files_dict[file_path] = file_id
-                    self.knowledgeFileList.addItem(file_path)
+                # Pre-fill file_search files
+                for file_path, file_id in self.assistant_config.file_search_files.items():
+                    self.file_search_files[file_path] = file_id
+                    self.fileSearchList.addItem(file_path)
                 # enable knowledge retrieval checkbox
-                self.knowledgeRetrievalCheckBox.setChecked(self.knowledge_retrieval)
+                self.fileSearchCheckBox.setChecked(self.file_search)
+
+                # Pre-fill code interpreter files
+                for file_path, file_id in self.assistant_config.code_interpreter_files.items():
+                    self.code_interpreter_files[file_path] = file_id
+                    self.codeFileList.addItem(file_path)
+
                 # enable code interpreter checkbox
                 self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
                 # Load only the temperature setting for assistant type
@@ -651,9 +675,9 @@ class AssistantConfigDialog(QDialog):
                 if text_completion_config:
                     self.useDefaultSettingsCheckBox.setChecked(False)
                     completion_settings = text_completion_config.to_dict()
-                    temperature = completion_settings.get('temperature', 0.7) * 100
+                    temperature = completion_settings.get('temperature', 1.0) * 100
                 else:
-                    temperature = 70
+                    temperature = 100
                 self.temperatureSlider.setValue(temperature)
             elif self.assistant_type == "chat_assistant":
                 # pre-fill completion settings
@@ -668,8 +692,8 @@ class AssistantConfigDialog(QDialog):
                     presence_penalty = completion_settings.get('presence_penalty', 0) * 100
                     response_format = completion_settings.get('response_format', 'text')
                     seed = str(completion_settings.get('seed', ''))  # Assuming '' represents no seed, as 'None' as a string might be misleading
-                    temperature = completion_settings.get('temperature', 0.7) * 100
-                    top_p = completion_settings.get('top_p', 0.1) * 100
+                    temperature = completion_settings.get('temperature', 1.0) * 100
+                    top_p = completion_settings.get('top_p', 1.0) * 100
                     max_text_messages = completion_settings.get('max_text_messages', '') # Assuming '' represents no limit
                 else:
                     # Default values if text_completion_config is None
@@ -678,8 +702,8 @@ class AssistantConfigDialog(QDialog):
                     presence_penalty = 0
                     response_format = "text"
                     seed = ""
-                    temperature = 70
-                    top_p = 10
+                    temperature = 100
+                    top_p = 100
                     max_text_messages = ""
 
                 # Apply the values to UI elements
@@ -738,12 +762,6 @@ class AssistantConfigDialog(QDialog):
         for item in selected_items:
             self.fileReferenceList.takeItem(self.fileReferenceList.row(item))
 
-    def add_knowledge_file(self):
-        self.add_file(self.knowledge_files_dict, self.knowledgeFileList)
-
-    def remove_knowledge_file(self):
-        self.remove_file(self.knowledge_files_dict, self.knowledgeFileList)
-
     def add_file(self, file_dict, list_widget):
         options = QFileDialog.Options()
         filePath, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
@@ -794,9 +812,10 @@ class AssistantConfigDialog(QDialog):
             # if is_create is True, then the assistant_id is empty
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
-            'knowledge_files': self.knowledge_files_dict,
+            'file_search_files': self.file_search_files,
+            'code_interpreter_files': self.code_interpreter_files,
             'selected_functions': self.selected_functions,
-            'knowledge_retrieval': self.knowledge_retrieval,
+            'file_search': self.file_search,
             'code_interpreter': self.code_interpreter,
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),

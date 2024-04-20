@@ -129,61 +129,50 @@ class AssistantConfig:
         self._name = name
         self._config_data = config_data
         self._instructions = self.remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
-        if 'assistant_id' not in config_data:
-            logger.info("assistant_id not found in config. Setting assistant_id to None.")
-            self._assistant_id = None
-        else:
-            self._assistant_id = config_data['assistant_id'] if config_data['assistant_id'] != "" else None
-        self._ai_client_type = config_data['ai_client_type'] if 'ai_client_type' in config_data else "OPEN_AI"
+        
+        # Initialize assistant_id appropriately based on presence and content in config_data
+        self._assistant_id = config_data.get('assistant_id', None) if config_data.get('assistant_id', '') != '' else None
+        self._ai_client_type = config_data.get('ai_client_type', 'OPEN_AI')
         self._model = config_data['model']
         self._file_references = config_data.get('file_references', [])
-        # Process the knowledge_files to replace empty strings with None
-        raw_knowledge_files = config_data.get('knowledge_files', {})
-        self._knowledge_files = {k: (v if v != '' else None) for k, v in raw_knowledge_files.items()}
+        
+        # Handling file search and code interpreter files
+        self._file_search_files = config_data.get('file_search_files', {})
+        self._code_interpreter_files = config_data.get('code_interpreter_files', {})
+
         self._selected_functions = config_data.get('selected_functions', [])
         self._function_configs = self._get_function_configs()
-        # enable knowledge retrieval when set to True in config
-        self._knowledge_retrieval = config_data.get('knowledge_retrieval', False)
-        # enable code_interpreter when set to True in config
+        
+        # Manage tool activation based on config_data
+        self._file_search = config_data.get('file_search', False)
         self._code_interpreter = config_data.get('code_interpreter', False)
-        # set default output folder as absolute path to 'output' folder in current directory
+
+        # Set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
-        self._text_completion_config: Union[TextCompletionConfig, AssistantTextCompletionConfig, None] = None
 
-        if config_data.get('completion_settings', None) is not None:
-            if self._assistant_type == 'chat_assistant':
-                completion_data = config_data.get('completion_settings', {
-                    'frequency_penalty': 0.0,
-                    'max_tokens': 100,
-                    'presence_penalty': 0.0,
-                    'response_format': 'text',
-                    'temperature': 0.7,
-                    'top_p': 0.1,
-                    'seed': None,
-                    'max_text_messages': None,
-                })
-                # Constructing TextCompletionConfig from the dictionary
-                self._text_completion_config = TextCompletionConfig(
-                    frequency_penalty=completion_data['frequency_penalty'],
-                    max_tokens=completion_data['max_tokens'],
-                    presence_penalty=completion_data['presence_penalty'],
-                    response_format=completion_data['response_format'],
-                    temperature=completion_data['temperature'],
-                    top_p=completion_data['top_p'],
-                    seed=completion_data['seed'],
-                    max_text_messages=completion_data['max_text_messages']
-                )
-            elif self._assistant_type == 'assistant':
-                completion_data = config_data.get('completion_settings', {
-                    'temperature': 0.7
-                })
-                # Constructing AssistantTextCompletionConfig from the dictionary
-                self._text_completion_config = AssistantTextCompletionConfig(
-                    temperature=completion_data['temperature']
-                )
+        # Completion settings based on assistant type
+        self._text_completion_config = self._setup_completion_settings(config_data)
+
+    def _setup_completion_settings(self, config_data):
+        completion_data = config_data.get('completion_settings', {})
+        if self._assistant_type == 'chat_assistant':
+            return TextCompletionConfig(
+                frequency_penalty=completion_data.get('frequency_penalty', 0.0),
+                max_tokens=completion_data.get('max_tokens', 100),
+                presence_penalty=completion_data.get('presence_penalty', 0.0),
+                response_format=completion_data.get('response_format', 'text'),
+                temperature=completion_data.get('temperature', 1.0),
+                top_p=completion_data.get('top_p', 1.0),
+                seed=completion_data.get('seed', None),
+                max_text_messages=completion_data.get('max_text_messages', None)
+            )
+        elif self._assistant_type == 'assistant':
+            return AssistantTextCompletionConfig(
+                temperature=completion_data.get('temperature', 1.0)
+            )
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
