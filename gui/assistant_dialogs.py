@@ -49,9 +49,9 @@ class AssistantConfigDialog(QDialog):
     def init_variables(self):
         self.code_interpreter_files = {}
         self.file_search_files = {}
-        self.functions = []  # Store the selected functions
+        self.functions = []  # Store the functions
         self.code_interpreter = False  # Store the code interpreter setting
-        self.file_search = False  # Store the knowledge retrieval setting
+        self.file_search = False  # Store the file search setting
         self.checkBoxes = {}  # To keep track of all function checkboxes
         self.assistant_id = ''
         self.default_output_folder_path = os.path.join(os.getcwd(), 'output')
@@ -190,7 +190,7 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.instructionsLabel)
         configLayout.addWidget(self.instructionsEdit)
 
-        # Knowledge Files, Add File, and Remove File buttons
+        # File references, Add File, and Remove File buttons
         self.fileReferenceLabel = QLabel('File References:')
         self.fileReferenceList = QListWidget()
         self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:0}, where 0 is the index of the file in the list")
@@ -520,8 +520,7 @@ class AssistantConfigDialog(QDialog):
         self.functions = []
         self.file_search = False
         self.code_interpreter = False
-        self.knowledgeFileList.clear()
-        self.knowledgeRetrievalCheckBox.setChecked(False)
+        self.fileSearchCheckBox.setChecked(False)
         if self.assistant_type == "assistant":
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()

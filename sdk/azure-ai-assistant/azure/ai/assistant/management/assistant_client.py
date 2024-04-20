@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.assistant_config import ToolResources
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
@@ -147,12 +148,17 @@ class AssistantClient(BaseAssistantClient):
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
             assistant_config.model = assistant.model
-            assistant_config.knowledge_files = {file_path: file_id for file_path, file_id in zip(assistant_config.knowledge_files.keys(), assistant.file_ids)}
-            assistant_config.selected_functions = [
+            new_code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
+            new_file_search_files = dict(zip(assistant_config.tool_resources.file_search_files.keys(), assistant.tool_resources.file_search.vector_store_ids))
+            assistant_config.tool_resources = ToolResources(
+                code_interpreter_files=new_code_interpreter_files,
+                file_search_files=new_file_search_files
+            )
+            assistant_config.functions = [
                 tool.function.model_dump() for tool in assistant.tools if tool.type == "function"
             ]
             assistant_config.code_interpreter = any(tool.type == "code_interpreter" for tool in assistant.tools)
-            assistant_config.knowledge_retrieval = any(tool.type == "retrieval" for tool in assistant.tools)
+            assistant_config.file_search = any(tool.type == "file_search" for tool in assistant.tools)
             assistant_config.assistant_id = assistant.id
             config_manager.update_config(self.name, assistant_config.to_json())
             return self

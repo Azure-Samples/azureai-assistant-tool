@@ -176,12 +176,15 @@ class AssistantConfig:
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
-        self._tool_resources = ToolResources(
-            code_interpreter_files=config_data.get('tool_resources', {}).get('code_interpreter', {}).get('files', {}),
-            file_search_files=config_data.get('tool_resources', {}).get('file_search', {}).get('files', {})
-        )
+        if 'tool_resources' in config_data:
+            self._tool_resources = ToolResources(
+                code_interpreter_files=config_data.get('tool_resources', {}).get('code_interpreter', {}).get('files', {}),
+                file_search_files=config_data.get('tool_resources', {}).get('file_search', {}).get('files', {})
+            )
+        else:
+            self._tool_resources = None
 
-        self._selected_functions = config_data.get('selected_functions', [])
+        self._functions = config_data.get('functions', [])
         self._function_configs = self._get_function_configs()
         
         # Manage tool activation based on config_data
