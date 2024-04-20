@@ -113,6 +113,45 @@ class AssistantTextCompletionConfig:
         self._temperature = value
 
 
+class ToolResources:
+    def __init__(self, code_interpreter_files=None, file_search_files=None):
+        self.code_interpreter_files = code_interpreter_files or {}
+        self.file_search_files = file_search_files or {}
+
+    def __eq__(self, other):
+        if not isinstance(other, ToolResources):
+            return NotImplemented
+
+        return (self.code_interpreter_files == other.code_interpreter_files and
+                self.file_search_files == other.file_search_files)
+
+    def to_dict(self):
+        return {
+            'code_interpreter': {
+                'files': self.code_interpreter_files
+            },
+            'file_search': {
+                'files': self.file_search_files
+            }
+        }
+    
+    @property
+    def code_interpreter_files(self):
+        return self._code_interpreter_files
+    
+    @code_interpreter_files.setter
+    def code_interpreter_files(self, value):
+        self._code_interpreter_files = value
+
+    @property
+    def file_search_files(self):
+        return self._file_search_files
+    
+    @file_search_files.setter
+    def file_search_files(self, value):
+        self._file_search_files = value
+
+
 class AssistantConfig:
     """
     A class representing the configuration for an assistant.
@@ -136,17 +175,19 @@ class AssistantConfig:
         self._model = config_data['model']
         self._file_references = config_data.get('file_references', [])
         
-        # Handling file search and code interpreter files
-        self._file_search_files = config_data.get('file_search_files', {})
-        self._code_interpreter_files = config_data.get('code_interpreter_files', {})
+        # Extracting tool resources configuration
+        self._tool_resources = ToolResources(
+            code_interpreter_files=config_data.get('tool_resources', {}).get('code_interpreter', {}).get('files', {}),
+            file_search_files=config_data.get('tool_resources', {}).get('file_search', {}).get('files', {})
+        )
 
         self._selected_functions = config_data.get('selected_functions', [])
         self._function_configs = self._get_function_configs()
         
         # Manage tool activation based on config_data
-        self._file_search = config_data.get('file_search', False)
-        self._code_interpreter = config_data.get('code_interpreter', False)
-
+        self._file_search_enabled = config_data.get('file_search_enabled', False)
+        self._code_interpreter_enabled = config_data.get('code_interpreter_enabled', False)
+        
         # Set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
@@ -157,22 +198,37 @@ class AssistantConfig:
         self._text_completion_config = self._setup_completion_settings(config_data)
 
     def _setup_completion_settings(self, config_data):
-        completion_data = config_data.get('completion_settings', {})
-        if self._assistant_type == 'chat_assistant':
-            return TextCompletionConfig(
-                frequency_penalty=completion_data.get('frequency_penalty', 0.0),
-                max_tokens=completion_data.get('max_tokens', 100),
-                presence_penalty=completion_data.get('presence_penalty', 0.0),
-                response_format=completion_data.get('response_format', 'text'),
-                temperature=completion_data.get('temperature', 1.0),
-                top_p=completion_data.get('top_p', 1.0),
-                seed=completion_data.get('seed', None),
-                max_text_messages=completion_data.get('max_text_messages', None)
-            )
-        elif self._assistant_type == 'assistant':
-            return AssistantTextCompletionConfig(
-                temperature=completion_data.get('temperature', 1.0)
-            )
+        if config_data.get('completion_settings', None) is not None:
+            if self._assistant_type == 'chat_assistant':
+                completion_data = config_data.get('completion_settings', {
+                    'frequency_penalty': 0.0,
+                    'max_tokens': 100,
+                    'presence_penalty': 0.0,
+                    'response_format': 'text',
+                    'temperature': 1.0,
+                    'top_p': 1.0,
+                    'seed': None,
+                    'max_text_messages': None,
+                })
+                # Constructing TextCompletionConfig from the dictionary
+                self._text_completion_config = TextCompletionConfig(
+                    frequency_penalty=completion_data['frequency_penalty'],
+                    max_tokens=completion_data['max_tokens'],
+                    presence_penalty=completion_data['presence_penalty'],
+                    response_format=completion_data['response_format'],
+                    temperature=completion_data['temperature'],
+                    top_p=completion_data['top_p'],
+                    seed=completion_data['seed'],
+                    max_text_messages=completion_data['max_text_messages']
+                )
+            elif self._assistant_type == 'assistant':
+                completion_data = config_data.get('completion_settings', {
+                    'temperature': 1.0
+                })
+                # Constructing AssistantTextCompletionConfig from the dictionary
+                self._text_completion_config = AssistantTextCompletionConfig(
+                    temperature=completion_data['temperature']
+                )
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -184,9 +240,9 @@ class AssistantConfig:
                 self._ai_client_type == other._ai_client_type and
                 self._model == other._model and
                 self._file_references == other._file_references and
-                self._knowledge_files == other._knowledge_files and
-                self._selected_functions == other._selected_functions and
-                self._knowledge_retrieval == other._knowledge_retrieval and
+                self._tool_resources == other._tool_resources and
+                self._functions == other._functions and
+                self._file_search == other._file_search and
                 self._code_interpreter == other._code_interpreter)
 
     @classmethod
@@ -220,10 +276,13 @@ class AssistantConfig:
         self._config_data['ai_client_type'] = self._ai_client_type
         self._config_data['model'] = self._model
         self._config_data['file_references'] = self._file_references
-        self._config_data['knowledge_files'] = self._knowledge_files
-        self._config_data['knowledge_retrieval'] = self._knowledge_retrieval
+        self._config_data['tool_resources'] = {
+            'file_search': {'files': self._file_search_files},
+            'code_interpreter': {'files': self._code_interpreter_files}
+        }
+        self._config_data['file_search'] = self._file_search
         self._config_data['code_interpreter'] = self._code_interpreter
-        self._config_data['selected_functions'] = self._selected_functions
+        self._config_data['functions'] = self._functions
         self._config_data['output_folder_path'] = self._output_folder_path
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
@@ -232,7 +291,7 @@ class AssistantConfig:
 
     def _get_function_configs(self):
         function_configs = []
-        for function_spec in self._selected_functions:
+        for function_spec in self._functions:
             function_configs.append(FunctionConfig(function_spec))
         return function_configs
     
@@ -322,42 +381,42 @@ class AssistantConfig:
         self._file_references = value
 
     @property
-    def knowledge_files(self) -> dict:
-        """Get the knowledge files.
+    def tool_resources(self) -> ToolResources:
+        """Get the tool resources.
         
-        :return: The knowledge files.
-        :rtype: dict
+        :return: The tool resources.
+        :rtype: ToolResources
         """
-        return self._knowledge_files
-    
-    @knowledge_files.setter
-    def knowledge_files(self, value) -> None:
+        return self._tool_resources
+
+    @tool_resources.setter
+    def tool_resources(self, value) -> None:
         """
-        Set the knowledge files.
+        Set the tool resources.
         
-        :param value: The knowledge files.
-        :type value: dict
+        :param value: The tool resources.
+        :type value: ToolResources
         """
-        self._knowledge_files = value
+        self._tool_resources = value
 
     @property
-    def knowledge_retrieval(self) -> bool:
-        """Get the knowledge retrieval.
+    def file_search(self) -> bool:
+        """Get the file search.
         
-        :return: The knowledge retrieval.
+        :return: The file search.
         :rtype: bool
         """
-        return self._knowledge_retrieval
+        return self._file_search
 
-    @knowledge_retrieval.setter
-    def knowledge_retrieval(self, value) -> None:
+    @file_search.setter
+    def file_search(self, value) -> None:
         """
-        Set the knowledge retrieval.
+        Set the file search.
         
-        :param value: The knowledge retrieval.
+        :param value: The file search.
         :type value: bool
         """
-        self._knowledge_retrieval = value
+        self._file_search = value
 
     @property
     def code_interpreter(self) -> bool:
@@ -379,23 +438,23 @@ class AssistantConfig:
         self._code_interpreter = value
 
     @property
-    def selected_functions(self) -> list:
-        """Get the selected functions.
+    def functions(self) -> list:
+        """Get the functions.
         
-        :return: The selected functions.
+        :return: The functions.
         :rtype: list
         """
-        return self._selected_functions
+        return self._functions
     
-    @selected_functions.setter
-    def selected_functions(self, value) -> None:
+    @functions.setter
+    def functions(self, value) -> None:
         """
-        Set the selected functions.
+        Set the functions.
         
-        :param value: The selected functions.
+        :param value: The functions.
         :type value: list
         """
-        self._selected_functions = value
+        self._functions = value
 
     @property
     def instructions(self) -> str:

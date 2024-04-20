@@ -12,6 +12,7 @@ from PySide6.QtGui import QIcon, QTextOption
 import json, os, shutil, threading
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.assistant_config import ToolResources
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 from azure.ai.assistant.management.logger_module import logger
@@ -48,7 +49,7 @@ class AssistantConfigDialog(QDialog):
     def init_variables(self):
         self.code_interpreter_files = {}
         self.file_search_files = {}
-        self.selected_functions = []  # Store the selected functions
+        self.functions = []  # Store the selected functions
         self.code_interpreter = False  # Store the code interpreter setting
         self.file_search = False  # Store the knowledge retrieval setting
         self.checkBoxes = {}  # To keep track of all function checkboxes
@@ -516,7 +517,7 @@ class AssistantConfigDialog(QDialog):
         for function_type, checkBoxes in self.checkBoxes.items():
             for checkBox in checkBoxes:
                 checkBox.setChecked(False)
-        self.selected_functions = []
+        self.functions = []
         self.file_search = False
         self.code_interpreter = False
         self.knowledgeFileList.clear()
@@ -631,7 +632,6 @@ class AssistantConfigDialog(QDialog):
             logger.error(f"Error displaying reviewed instructions: {e}")
 
     def pre_load_assistant_config(self, name):
-        # If an assistant_config is provided, pre-fill the fields
         self.assistant_config = AssistantConfigManager.get_instance().get_config(name)
         if self.assistant_config:
             self.nameEdit.setText(self.assistant_config.name)
@@ -639,91 +639,76 @@ class AssistantConfigDialog(QDialog):
             self.instructionsEdit.setText(self.assistant_config.instructions)
             index = self.modelComboBox.findText(self.assistant_config.model)
             if index >= 0:
-                # Set the current index of the combo box to the found index
                 self.modelComboBox.setCurrentIndex(index)
             else:
-                # add the model to the combo box
                 self.modelComboBox.addItem(self.assistant_config.model)
-                # Set the current index of the combo box to the last index
                 self.modelComboBox.setCurrentIndex(self.modelComboBox.count() - 1)
+
             # Pre-select functions
             self.pre_select_functions()
-            # Pre-select knowledge retrieval
-            self.file_search = self.assistant_config.file_search
-            # Pre-select code interpreter
-            self.code_interpreter = self.assistant_config.code_interpreter
+
             # Pre-fill reference files
             for file_path in self.assistant_config.file_references:
                 self.fileReferenceList.addItem(file_path)
-            if self.assistant_type == "assistant":
-                # Pre-fill file_search files
-                for file_path, file_id in self.assistant_config.file_search_files.items():
-                    self.file_search_files[file_path] = file_id
-                    self.fileSearchList.addItem(file_path)
-                # enable knowledge retrieval checkbox
-                self.fileSearchCheckBox.setChecked(self.file_search)
 
-                # Pre-fill code interpreter files
-                for file_path, file_id in self.assistant_config.code_interpreter_files.items():
-                    self.code_interpreter_files[file_path] = file_id
-                    self.codeFileList.addItem(file_path)
+            # Accessing code interpreter files from the tool resources
+            code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
+            for file_path, file_id in code_interpreter_files.items():
+                self.code_interpreter_files[file_path] = file_id
+                self.codeFileList.addItem(f"{file_path} ({file_id})")
+            self.codeInterpreterCheckBox.setChecked(self.assistant_config.tool_resources.code_interpreter_enabled)
 
-                # enable code interpreter checkbox
-                self.codeInterpreterCheckBox.setChecked(self.code_interpreter)
-                # Load only the temperature setting for assistant type
-                text_completion_config = self.assistant_config.text_completion_config
-                if text_completion_config:
-                    self.useDefaultSettingsCheckBox.setChecked(False)
-                    completion_settings = text_completion_config.to_dict()
-                    temperature = completion_settings.get('temperature', 1.0) * 100
-                else:
-                    temperature = 100
-                self.temperatureSlider.setValue(temperature)
-            elif self.assistant_type == "chat_assistant":
-                # pre-fill completion settings
-                text_completion_config = self.assistant_config.text_completion_config
+            # Accessing file search files from the tool resources
+            file_search_files = self.assistant_config.tool_resources.file_search_files
+            for file_path, file_id in file_search_files.items():
+                self.file_search_files[file_path] = file_id
+                self.fileSearchList.addItem(f"{file_path} ({file_id})")
+            self.fileSearchCheckBox.setChecked(self.assistant_config.tool_resources.file_search_enabled)
 
-                # Check if text_completion_config exists, otherwise use default values directly
-                if text_completion_config is not None:
-                    self.useDefaultSettingsCheckBox.setChecked(False)
-                    completion_settings = text_completion_config.to_dict()
-                    frequency_penalty = completion_settings.get('frequency_penalty', 0) * 100
-                    max_tokens = str(completion_settings.get('max_tokens', 100))
-                    presence_penalty = completion_settings.get('presence_penalty', 0) * 100
-                    response_format = completion_settings.get('response_format', 'text')
-                    seed = str(completion_settings.get('seed', ''))  # Assuming '' represents no seed, as 'None' as a string might be misleading
-                    temperature = completion_settings.get('temperature', 1.0) * 100
-                    top_p = completion_settings.get('top_p', 1.0) * 100
-                    max_text_messages = completion_settings.get('max_text_messages', '') # Assuming '' represents no limit
-                else:
-                    # Default values if text_completion_config is None
-                    frequency_penalty = 0
-                    max_tokens = "100"
-                    presence_penalty = 0
-                    response_format = "text"
-                    seed = ""
-                    temperature = 100
-                    top_p = 100
-                    max_text_messages = ""
-
-                # Apply the values to UI elements
-                self.frequencyPenaltySlider.setValue(frequency_penalty)
-                self.maxTokensEdit.setText(max_tokens)
-                self.presencePenaltySlider.setValue(presence_penalty)
-                self.responseFormatComboBox.setCurrentText(response_format)
-                self.seedEdit.setText(seed)
-                self.temperatureSlider.setValue(temperature)
-                self.topPSlider.setValue(top_p)
-                self.maxMessagesEdit.setText(str(max_text_messages))
+            # Load completion settings
+            self.load_completion_settings(self.assistant_config.text_completion_config)
 
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
                 self.outputFolderPathEdit.setText(output_folder_path)
 
+    def load_completion_settings(self, text_completion_config):
+        # Reset or use default settings if None
+        default_temp = 100
+        if text_completion_config:
+            self.useDefaultSettingsCheckBox.setChecked(False)
+            completion_settings = text_completion_config.to_dict()
+            # Load settings into UI elements based on assistant type
+            if self.assistant_type == "assistant":
+                self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
+            elif self.assistant_type == "chat_assistant":
+                self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
+                self.maxTokensEdit.setText(str(completion_settings.get('max_tokens', 100)))
+                self.presencePenaltySlider.setValue(completion_settings.get('presence_penalty', 0) * 100)
+                self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
+                self.seedEdit.setText(str(completion_settings.get('seed', '')))  # Convert None to empty string
+                self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
+                self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
+                self.maxMessagesEdit.setText(str(completion_settings.get('max_text_messages', '')))
+        else:
+            # Apply default settings if no config is found
+            self.useDefaultSettingsCheckBox.setChecked(True)
+            if self.assistant_type == "assistant":
+                self.temperatureSlider.setValue(default_temp)
+            elif self.assistant_type == "chat_assistant":
+                self.frequencyPenaltySlider.setValue(0)
+                self.maxTokensEdit.setText("100")
+                self.presencePenaltySlider.setValue(0)
+                self.responseFormatComboBox.setCurrentText("text")
+                self.seedEdit.setText("")
+                self.temperatureSlider.setValue(default_temp)
+                self.topPSlider.setValue(100)
+                self.maxMessagesEdit.setText("")
+
     def pre_select_functions(self):
         # Iterate over all selected functions
-        for func in self.assistant_config.selected_functions:
+        for func in self.assistant_config.functions:
             func_name = func['function']['name']
 
             # Find the category of each function
@@ -749,10 +734,10 @@ class AssistantConfigDialog(QDialog):
 
     def handle_function_selection(self, state, functionConfig):
         if state == Qt.CheckState.Checked.value:
-            if functionConfig not in self.selected_functions:
-                self.selected_functions.append(functionConfig.get_full_spec())
+            if functionConfig not in self.functions:
+                self.functions.append(functionConfig.get_full_spec())
         elif state == Qt.CheckState.Unchecked.value:
-            self.selected_functions = [f for f in self.selected_functions if f['function']['name'] != functionConfig.name]
+            self.functions = [f for f in self.functions if f['function']['name'] != functionConfig.name]
 
     def add_reference_file(self):
         self.fileReferenceList.addItem(QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)")[0])
@@ -805,27 +790,36 @@ class AssistantConfigDialog(QDialog):
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
                 }
+        
+        code_interpreter_files = {path: self.code_interpreter_files[path] for path in self.codeFileList}
+        file_search_files = {path: self.file_search_files[path] for path in self.fileSearchList}
+
+        tool_resources = ToolResources(
+            code_interpreter_files=code_interpreter_files,
+            file_search_files=file_search_files
+        )
+
         config = {
             'name': self.nameEdit.text(),
             'instructions': self.instructionsEdit.toPlainText(),
             'model': self.modelComboBox.currentText(),
-            # if is_create is True, then the assistant_id is empty
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
-            'file_search_files': self.file_search_files,
-            'code_interpreter_files': self.code_interpreter_files,
-            'selected_functions': self.selected_functions,
-            'file_search': self.file_search,
-            'code_interpreter': self.code_interpreter,
+            'tool_resources': tool_resources.to_dict(),
+            'functions': self.functions,
+            'file_search': self.fileSearchCheckBox.isChecked(),
+            'code_interpreter': self.codeInterpreterCheckBox.isChecked(),
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
             'completion_settings': completion_settings
         }
-        # if name, instructions, and model are empty, show an error message
+
+        # Validation and emission of the configuration
         if not config['name'] or not config['instructions'] or not config['model']:
             QMessageBox.information(self, "Missing Fields", "Name, Instructions, and Model are required fields.")
             return
+
         assistant_config_json = json.dumps(config, indent=4)
         self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText(), self.assistant_type)
 
