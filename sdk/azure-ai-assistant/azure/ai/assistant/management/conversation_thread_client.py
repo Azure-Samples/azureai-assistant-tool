@@ -224,6 +224,7 @@ class ConversationThreadClient:
             self, 
             message : str,
             thread_name : str,
+            role : Optional[str] = "user",
             file_paths : Optional[list] = None,
             additional_instructions : Optional[str] = None,
             timeout : Optional[float] = None,
@@ -236,6 +237,8 @@ class ConversationThreadClient:
         :type message: str
         :param thread_name: The unique name of the thread to create the message in.
         :type thread_name: str
+        :param role: The role of the message sender. Default is "user".
+        :type role: str, optional
         :param file_paths: The file paths to add to the message.
         :type file_paths: list, optional
         :param additional_instructions: The additional instructions to add to the message.
@@ -257,7 +260,7 @@ class ConversationThreadClient:
             # Create the message with file IDs
             self._ai_client.beta.threads.messages.create(
                 thread_id,
-                role="user",
+                role=role,
                 metadata=metadata,
                 content=message,
                 file_ids=file_ids,

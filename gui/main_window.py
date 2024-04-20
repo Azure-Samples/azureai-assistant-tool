@@ -383,7 +383,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
 
             # Create message to thread
-            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths, additional_instructions, timeout=self.connection_timeout)
+            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths=file_paths, additional_instructions=additional_instructions, timeout=self.connection_timeout)
 
             for assistant_name in assistants:
                 # Signal the start of processing
