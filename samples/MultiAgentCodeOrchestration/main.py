@@ -57,10 +57,10 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
         self.task_started = False
 
     async def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
-        if assistant_name == "CodeProgrammerAgent" or assistant_name == "CodeInspectionAgent":
+        if self._assistants[assistant_name].assistant_config.assistant_role == "engineer":
             print(f"\n{assistant_name}: starting the task with input: {user_input}")
-        elif assistant_name == "FileCreatorAgent":
-            print(f"\n{assistant_name}: analyzing the CodeProgrammerAgent output for file creation")
+        elif self._assistants[assistant_name].assistant_config.assistant_role != "user_interaction":
+            print(f"\n{assistant_name}: starting the task")
 
     async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "in_progress" and is_first_message:

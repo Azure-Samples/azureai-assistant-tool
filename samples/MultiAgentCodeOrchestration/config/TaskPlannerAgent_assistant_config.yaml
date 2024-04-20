@@ -99,4 +99,4 @@ completion_settings:
   top_p: 0.1
   seed: null
   max_text_messages: null
-assistant_role: user
+assistant_role: user_interaction
