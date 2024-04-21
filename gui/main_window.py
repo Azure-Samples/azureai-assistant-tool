@@ -340,14 +340,14 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 thread_name = updated_thread_name
 
             # get files from conversation thread list
-            file_paths = self.conversation_sidebar.threadList.get_attached_files_for_selected_item()
+            attachments = [] #self.conversation_sidebar.threadList.get_attached_files_for_selected_item()
             # get additional instructions
             additional_instructions = self.conversation_sidebar.threadList.get_instructions_for_selected_item()
             # if additional instructions are empty string, set to None
             if additional_instructions == "":
                 additional_instructions = None
 
-            self.executor.submit(self.process_input, user_input, assistants, thread_name, False, file_paths, additional_instructions)
+            self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments, additional_instructions)
             on_user_input_complete_end = time.time()  # End timing after thread starts
             logger.debug(f"Time taken for entering user input: {on_user_input_complete_end - on_user_input_complete_start} seconds")
             self.conversation_view.inputField.clear()
@@ -378,12 +378,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             else:
                 return self.conversation_sidebar.threadList.get_current_text()
 
-    def process_input(self, user_input, assistants, thread_name, is_scheduled_task, file_paths=None, additional_instructions=None):
+    def process_input(self, user_input, assistants, thread_name, is_scheduled_task, attachments=None, additional_instructions=None):
         try:
             logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
 
             # Create message to thread
-            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, file_paths=file_paths, additional_instructions=additional_instructions, timeout=self.connection_timeout)
+            self.conversation_thread_clients[self.active_ai_client_type].create_conversation_thread_message(user_input, thread_name, attachments=attachments, additional_instructions=additional_instructions, timeout=self.connection_timeout)
 
             for assistant_name in assistants:
                 # Signal the start of processing

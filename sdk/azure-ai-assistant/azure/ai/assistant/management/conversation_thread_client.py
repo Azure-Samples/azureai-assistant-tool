@@ -225,7 +225,7 @@ class ConversationThreadClient:
             message : str,
             thread_name : str,
             role : Optional[str] = "user",
-            file_paths : Optional[list] = None,
+            attachments : Optional[list] = None,
             additional_instructions : Optional[str] = None,
             timeout : Optional[float] = None,
             metadata : Optional[dict] = None
@@ -250,12 +250,29 @@ class ConversationThreadClient:
 
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            file_ids = self._update_message_files(thread_id, file_paths) if file_paths is not None else []
+            #file_ids = self._update_message_files(thread_id, file_paths) if file_paths is not None else []
 
             # Update AssistantConfig with the changed additional instructions
             current_additional_instructions = self._thread_config.get_additional_instructions_of_thread(thread_id)
             if additional_instructions != current_additional_instructions:
                 self._thread_config.set_additional_instructions_to_thread(thread_id, additional_instructions)
+
+            """
+            attachments = [
+                {
+                    "file_id": file_id,
+                    "tools": [
+                        {"type": "code_interpreter"}
+                    ]
+                },
+                {
+                    "file_id": file_id,
+                    "tools": [
+                        {"type": "file_search"}
+                    ]
+                }
+            ]
+            """
 
             # Create the message with file IDs
             self._ai_client.beta.threads.messages.create(
@@ -263,14 +280,13 @@ class ConversationThreadClient:
                 role=role,
                 metadata=metadata,
                 content=message,
-                file_ids=file_ids,
                 timeout=timeout
             )
 
-            logger.info(f"Created message: {message} in thread: {thread_id}, files: {file_ids}")
+            logger.info(f"Created message: {message} in thread: {thread_id}, attachments: {attachments}")
         except Exception as e:
-            logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {file_ids}: {e}")
-            raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {file_ids}: {e}")
+            logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
+            raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
 
     def _update_message_files(
             self, 
