@@ -350,8 +350,7 @@ class AssistantClient(BaseAssistantClient):
         """
         try:
             text_completion_config = self._assistant_config.text_completion_config
-            temperature = None if text_completion_config is None else text_completion_config.temperature
-        
+
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
             # Azure OpenAI does not support additional instructions or temperature currently
             if self.assistant_config.ai_client_type == AIClientType.AZURE_OPEN_AI.name:
@@ -365,7 +364,12 @@ class AssistantClient(BaseAssistantClient):
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
-                    temperature=temperature,
+                    temperature=None if text_completion_config is None else text_completion_config.temperature,
+                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                    top_p=None if text_completion_config is None else text_completion_config.top_p,
+                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
                     timeout=timeout
                 )
 
@@ -445,14 +449,18 @@ class AssistantClient(BaseAssistantClient):
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
             text_completion_config = self._assistant_config.text_completion_config
-            temperature = None if text_completion_config is None else text_completion_config.temperature
 
             with self._ai_client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
                 additional_instructions=additional_instructions,
-                temperature=temperature,
+                temperature=None if text_completion_config is None else text_completion_config.temperature,
+                max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                top_p=None if text_completion_config is None else text_completion_config.top_p,
+                response_format=None if text_completion_config is None else text_completion_config.response_format,
+                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
                 event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
@@ -570,16 +578,18 @@ class AssistantClient(BaseAssistantClient):
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = {
-                "code_interpreter":  file_ids,
+                "code_interpreter": {
+                    "file_ids": file_ids
+                }
             }
             # TODO update the assistant with the new configuration only if there are changes
             self._ai_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=instructions,
+                tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids,
                 timeout=timeout
             )
         except Exception as e:
