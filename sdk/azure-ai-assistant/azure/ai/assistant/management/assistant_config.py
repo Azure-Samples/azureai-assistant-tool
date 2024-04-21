@@ -19,14 +19,14 @@ class TextCompletionConfig:
                  seed: Optional[int] = None,
                  max_text_messages: Optional[int] = None
         ) -> None:
-        self.frequency_penalty = frequency_penalty
-        self.max_tokens = max_tokens
-        self.presence_penalty = presence_penalty
-        self.response_format = response_format
-        self.temperature = temperature
-        self.top_p = top_p
-        self.seed = seed
-        self.max_text_messages = max_text_messages
+        self._frequency_penalty = frequency_penalty
+        self._max_tokens = max_tokens
+        self._presence_penalty = presence_penalty
+        self._response_format = response_format
+        self._temperature = temperature
+        self._top_p = top_p
+        self._seed = seed
+        self._max_text_messages = max_text_messages
 
     def to_dict(self):
         return {
@@ -96,13 +96,39 @@ class TextCompletionConfig:
     def seed(self, value) -> None:
         self._seed = value
 
+    @property
+    def max_text_messages(self) -> Optional[int]:
+        return self._max_text_messages
+    
+    @max_text_messages.setter
+    def max_text_messages(self, value) -> None:
+        self._max_text_messages = value
+
 
 class AssistantTextCompletionConfig:
-    def __init__(self, temperature: float) -> None:
-        self.temperature = temperature
+    def __init__(self, 
+                 temperature: float, 
+                 max_completion_tokens: int,
+                 max_prompt_tokens: int,
+                 top_p: float, 
+                 response_format: str,
+                 truncation_strategy : dict
+    ) -> None:
+        self._temperature = temperature
+        self._max_completion_tokens = max_completion_tokens
+        self._max_prompt_tokens = max_prompt_tokens
+        self._top_p = top_p
+        self._response_format = response_format
+        self._truncation_strategy = truncation_strategy
 
     def to_dict(self):
-        return {'temperature': self.temperature}
+        return {'temperature': self.temperature,
+                'max_completion_tokens': self.max_completion_tokens,
+                'max_prompt_tokens': self.max_prompt_tokens,
+                'top_p': self.top_p,
+                'response_format': self.response_format,
+                'truncation_strategy': self.truncation_strategy
+                }
 
     @property
     def temperature(self) -> float:
@@ -111,6 +137,46 @@ class AssistantTextCompletionConfig:
     @temperature.setter
     def temperature(self, value) -> None:
         self._temperature = value
+
+    @property
+    def max_completion_tokens(self) -> int:
+        return self._max_completion_tokens
+    
+    @max_completion_tokens.setter
+    def max_completion_tokens(self, value) -> None:
+        self._max_completion_tokens = value
+
+    @property
+    def max_prompt_tokens(self) -> int:
+        return self._max_prompt_tokens
+    
+    @max_prompt_tokens.setter
+    def max_prompt_tokens(self, value) -> None:
+        self._max_prompt_tokens = value
+
+    @property
+    def top_p(self) -> float:
+        return self._top_p
+    
+    @top_p.setter
+    def top_p(self, value) -> None:
+        self._top_p = value
+
+    @property
+    def response_format(self) -> str:
+        return self._response_format
+    
+    @response_format.setter
+    def response_format(self, value) -> None:
+        self._response_format = value
+
+    @property
+    def truncation_strategy(self) -> dict:
+        return self._truncation_strategy
+    
+    @truncation_strategy.setter
+    def truncation_strategy(self, value) -> None:
+        self._truncation_strategy = value
 
 
 class ToolResources:
