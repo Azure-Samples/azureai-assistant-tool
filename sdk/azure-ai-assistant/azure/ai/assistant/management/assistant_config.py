@@ -295,11 +295,24 @@ class AssistantConfig:
                 )
             elif self._assistant_type == 'assistant':
                 completion_data = config_data.get('completion_settings', {
-                    'temperature': 1.0
+                    'temperature': 1.0,
+                    'max_completion_tokens': 100,
+                    'max_prompt_tokens': 100,
+                    'top_p': 1.0,
+                    'response_format': 'text',
+                    'truncation_strategy': {
+                        'type': 'auto',
+                        'last_messages': None
+                    }
                 })
                 # Constructing AssistantTextCompletionConfig from the dictionary
                 self._text_completion_config = AssistantTextCompletionConfig(
-                    temperature=completion_data['temperature']
+                    temperature=completion_data['temperature'],
+                    max_completion_tokens=completion_data['max_completion_tokens'],
+                    max_prompt_tokens=completion_data['max_prompt_tokens'],
+                    top_p=completion_data['top_p'],
+                    response_format=completion_data['response_format'],
+                    truncation_strategy=completion_data['truncation_strategy']
                 )
 
     def __eq__(self, other):

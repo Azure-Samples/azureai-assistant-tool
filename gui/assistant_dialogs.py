@@ -5,7 +5,7 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6 import QtGui
-from PySide6.QtWidgets import QDialog, QComboBox, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtWidgets import QDialog, QComboBox, QSpinBox, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QIcon, QTextOption
 
@@ -345,31 +345,57 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
         if self.assistant_type == "assistant":
-            self.init_temperature_settings(completionLayout)
+            self.init_assistant_completion_settings(completionLayout)
         elif self.assistant_type == "chat_assistant":
-            self.init_full_completion_settings(completionLayout)
+            self.init_chat_assistant_completion_settings(completionLayout)
 
         self.toggleCompletionSettings()
 
         return completionTab
 
-    def init_temperature_settings(self, completionLayout):
-        # Temperature
-        self.temperatureLabel = QLabel('Temperature:')
-        self.temperatureSlider = QSlider(Qt.Horizontal)
-        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
-        self.temperatureSlider.setMinimum(0)
-        self.temperatureSlider.setMaximum(200)
-        self.temperatureSlider.setValue(100)  # Default value as 1.0 for illustration
-        self.temperatureValueLabel = QLabel('1.0')
-        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
-        completionLayout.addWidget(self.temperatureLabel)
-        completionLayout.addWidget(self.temperatureSlider)
-        completionLayout.addWidget(self.temperatureValueLabel)
+    def init_assistant_completion_settings(self, completionLayout):
+        self.init_common_completion_settings(completionLayout)
 
-    def init_full_completion_settings(self, completionLayout):
+        self.maxCompletionTokensLabel = QLabel('Max Completion Tokens:')
+        self.maxCompletionTokensEdit = QLineEdit()
+        self.maxCompletionTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
 
-        # Frequency Penalty
+        self.maxPromptTokensLabel = QLabel('Max Prompt Tokens:')
+        self.maxPromptTokensEdit = QLineEdit()
+        self.maxPromptTokensEdit.setToolTip("The maximum number of tokens to include in the prompt. The model will use the prompt to generate the completion.")
+
+        truncation_strategy_layout = QVBoxLayout()
+        self.truncationStrategyLabel = QLabel('Truncation Strategy:')
+        truncation_strategy_layout.addWidget(self.truncationStrategyLabel)
+
+        self.truncationTypeComboBox = QComboBox()
+        self.truncationTypeComboBox.setToolTip("Select the truncation strategy to use for the thread. The default is `auto`. If set to `last_messages`, the thread will be truncated to the n most recent messages in the thread.")
+        self.truncationTypeComboBox.addItems(['auto', 'last_messages'])
+        truncation_strategy_layout.addWidget(self.truncationTypeComboBox)
+
+        self.lastMessagesSpinBox = QSpinBox()
+        self.lastMessagesSpinBox.setRange(1, 100)  # Adjust range as needed
+        self.lastMessagesSpinBox.setDisabled(True)  # Disabled by default
+        truncation_strategy_layout.addWidget(self.lastMessagesSpinBox)
+
+        self.truncationTypeComboBox.currentTextChanged.connect(self.on_truncation_type_changed)
+
+        completionLayout.addWidget(self.maxCompletionTokensLabel)
+        completionLayout.addWidget(self.maxCompletionTokensEdit)
+        completionLayout.addWidget(self.maxPromptTokensLabel)
+        completionLayout.addWidget(self.maxPromptTokensEdit)
+        completionLayout.addLayout(truncation_strategy_layout)
+
+    def on_truncation_type_changed(self, text):
+        # Enable SpinBox when 'last_messages' is selected
+        if text == 'last_messages':
+            self.lastMessagesSpinBox.setEnabled(True)
+        else:
+            self.lastMessagesSpinBox.setDisabled(True)
+
+    def init_chat_assistant_completion_settings(self, completionLayout):
+        self.init_common_completion_settings(completionLayout)
+
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
         self.frequencyPenaltySlider.setToolTip("Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.")
@@ -382,14 +408,12 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.frequencyPenaltySlider)
         completionLayout.addWidget(self.frequencyPenaltyValueLabel)
         
-        # Max Tokens
         self.maxTokensLabel = QLabel('Max Tokens:')
         self.maxTokensEdit = QLineEdit()
         self.maxTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
         completionLayout.addWidget(self.maxTokensLabel)
         completionLayout.addWidget(self.maxTokensEdit)
         
-        # Presence Penalty
         self.presencePenaltyLabel = QLabel('Presence Penalty:')
         self.presencePenaltySlider = QSlider(Qt.Horizontal)
         self.presencePenaltySlider.setToolTip("Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.")
@@ -401,31 +425,7 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.presencePenaltyLabel)
         completionLayout.addWidget(self.presencePenaltySlider)
         completionLayout.addWidget(self.presencePenaltyValueLabel)
-        
-        # Response Format
-        self.responseFormatLabel = QLabel('Response Format:')
-        self.responseFormatComboBox = QComboBox()
-        self.responseFormatComboBox.setToolTip("Select the format of the response from the AI model")
-        self.responseFormatComboBox.addItems(["text", "json_object"])
-        completionLayout.addWidget(self.responseFormatLabel)
-        completionLayout.addWidget(self.responseFormatComboBox)
-        
-        self.init_temperature_settings(completionLayout)
 
-        # Top P
-        self.topPLabel = QLabel('Top P:')
-        self.topPSlider = QSlider(Qt.Horizontal)
-        self.topPSlider.setToolTip("Controls the diversity of the generated text. Lower values make the text more deterministic, while higher values make it more diverse.")
-        self.topPSlider.setMinimum(0)
-        self.topPSlider.setMaximum(100)
-        self.topPSlider.setValue(10)  # Default value as 0.1 for illustration
-        self.topPValueLabel = QLabel('0.1')
-        self.topPSlider.valueChanged.connect(lambda: self.topPValueLabel.setText(f"{self.topPSlider.value() / 100:.1f}"))
-        completionLayout.addWidget(self.topPLabel)
-        completionLayout.addWidget(self.topPSlider)
-        completionLayout.addWidget(self.topPValueLabel)
-
-        # Seed
         self.seedLabel = QLabel('Seed:')
         self.seedEdit = QLineEdit()
         self.seedEdit.setToolTip("If specified, system will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result. Determinism is not guaranteed, and you should refer to the system_fingerprint response parameter to monitor changes in the backend.")
@@ -441,12 +441,49 @@ class AssistantConfigDialog(QDialog):
 
         completionLayout.addLayout(self.maxMessagesLayout)
 
+    def init_common_completion_settings(self, completionLayout):
+        self.temperatureLabel = QLabel('Temperature:')
+        self.temperatureSlider = QSlider(Qt.Horizontal)
+        self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
+        self.temperatureSlider.setMinimum(0)
+        self.temperatureSlider.setMaximum(200)
+        self.temperatureSlider.setValue(100)
+        self.temperatureValueLabel = QLabel('1.0')
+        self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.temperatureLabel)
+        completionLayout.addWidget(self.temperatureSlider)
+        completionLayout.addWidget(self.temperatureValueLabel)
+
+        self.topPLabel = QLabel('Top P:')
+        self.topPSlider = QSlider(Qt.Horizontal)
+        self.topPSlider.setToolTip("Controls the diversity of the generated text. Lower values make the text more deterministic, while higher values make it more diverse.")
+        self.topPSlider.setMinimum(0)
+        self.topPSlider.setMaximum(100)
+        self.topPSlider.setValue(100)
+        self.topPValueLabel = QLabel('1.0')
+        self.topPSlider.valueChanged.connect(lambda: self.topPValueLabel.setText(f"{self.topPSlider.value() / 100:.1f}"))
+        completionLayout.addWidget(self.topPLabel)
+        completionLayout.addWidget(self.topPSlider)
+        completionLayout.addWidget(self.topPValueLabel)
+
+        self.responseFormatLabel = QLabel('Response Format:')
+        self.responseFormatComboBox = QComboBox()
+        self.responseFormatComboBox.setToolTip("Select the format of the response from the AI model")
+        self.responseFormatComboBox.addItems(["text", "json_object"])
+        completionLayout.addWidget(self.responseFormatLabel)
+        completionLayout.addWidget(self.responseFormatComboBox)
+
     def toggleCompletionSettings(self):
         # Determine if controls should be enabled based on the checkbox and assistant type
         isEnabled = not self.useDefaultSettingsCheckBox.isChecked()
         
         if self.assistant_type == "assistant":
             self.temperatureSlider.setEnabled(isEnabled)
+            self.topPSlider.setEnabled(isEnabled)
+            self.responseFormatComboBox.setEnabled(isEnabled)
+            self.maxCompletionTokensEdit.setEnabled(isEnabled)
+            self.maxPromptTokensEdit.setEnabled(isEnabled)
+            self.truncationTypeComboBox.setEnabled(isEnabled)
         elif self.assistant_type == "chat_assistant":
             self.frequencyPenaltySlider.setEnabled(isEnabled)
             self.maxTokensEdit.setEnabled(isEnabled)
@@ -774,7 +811,6 @@ class AssistantConfigDialog(QDialog):
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
         # Conditional setup for completion settings based on assistant_type
-        max_text_messages = None
         completion_settings = None
         if self.assistant_type == "chat_assistant":
             if not self.useDefaultSettingsCheckBox.isChecked():
@@ -790,9 +826,17 @@ class AssistantConfigDialog(QDialog):
                 }
         elif self.assistant_type == "assistant":
             if not self.useDefaultSettingsCheckBox.isChecked():
-                # For assistant type, save only the temperature setting
+                truncation_strategy = {
+                    'type': self.truncationTypeComboBox.currentText(),
+                    'last_messages': self.lastMessagesSpinBox.value() if self.truncationTypeComboBox.currentText() == 'last_messages' else None
+                }
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
+                    'max_completion_tokens': int(self.maxCompletionTokensEdit.text()) if self.maxCompletionTokensEdit.text().isdigit() else None,
+                    'max_prompt_tokens': int(self.maxPromptTokensEdit.text()) if self.maxPromptTokensEdit.text().isdigit() else None,
+                    'top_p': self.topPSlider.value() / 100,
+                    'response_format': self.responseFormatComboBox.currentText(),
+                    'truncation_strategy': truncation_strategy
                 }
         
         code_interpreter_files = {path: self.code_interpreter_files[path] for path in self.codeFileList}
