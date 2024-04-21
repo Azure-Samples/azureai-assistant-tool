@@ -23,6 +23,17 @@ from gui.status_bar import ActivityStatus, StatusBar
 from gui.utils import resource_path
 
 
+class CustomSpinBox(QSpinBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def textFromValue(self, value):
+        # Return an empty string when the spin box is disabled
+        if not self.isEnabled():
+            return ""
+        return str(value)
+
+
 class AssistantConfigDialog(QDialog):
     assistantConfigSubmitted = Signal(str, str, str)
 
@@ -373,9 +384,9 @@ class AssistantConfigDialog(QDialog):
         self.truncationTypeComboBox.addItems(['auto', 'last_messages'])
         truncation_strategy_layout.addWidget(self.truncationTypeComboBox)
 
-        self.lastMessagesSpinBox = QSpinBox()
-        self.lastMessagesSpinBox.setRange(1, 100)  # Adjust range as needed
-        self.lastMessagesSpinBox.setDisabled(True)  # Disabled by default
+        self.lastMessagesSpinBox = CustomSpinBox()
+        self.lastMessagesSpinBox.setRange(1, 100)
+        self.lastMessagesSpinBox.setDisabled(True)
         truncation_strategy_layout.addWidget(self.lastMessagesSpinBox)
 
         self.truncationTypeComboBox.currentTextChanged.connect(self.on_truncation_type_changed)
@@ -387,11 +398,12 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addLayout(truncation_strategy_layout)
 
     def on_truncation_type_changed(self, text):
-        # Enable SpinBox when 'last_messages' is selected
+        # Enable or disable SpinBox based on selection
         if text == 'last_messages':
             self.lastMessagesSpinBox.setEnabled(True)
         else:
             self.lastMessagesSpinBox.setDisabled(True)
+            self.lastMessagesSpinBox.clear()
 
     def init_chat_assistant_completion_settings(self, completionLayout):
         self.init_common_completion_settings(completionLayout)
