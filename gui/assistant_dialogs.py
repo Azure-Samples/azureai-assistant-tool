@@ -851,13 +851,24 @@ class AssistantConfigDialog(QDialog):
                     'truncation_strategy': truncation_strategy
                 }
         
-        code_interpreter_files = {path: self.code_interpreter_files[path] for path in self.codeFileList}
-        file_search_files = {path: self.file_search_files[path] for path in self.fileSearchList}
+            code_interpreter_files = {}
+            for i in range(self.codeFileList.count()):
+                item = self.codeFileList.item(i)  # Get the QListWidgetItem at index i
+                file_path = item.text()  # Assuming the file path is the item text
+                file_id = self.code_interpreter_files.get(file_path)
+                code_interpreter_files[file_path] = file_id
 
-        tool_resources = ToolResources(
-            code_interpreter_files=code_interpreter_files,
-            file_search_files=file_search_files
-        )
+            file_search_files = {}
+            for i in range(self.fileSearchList.count()):
+                item = self.fileSearchList.item(i)  # Get the QListWidgetItem at index i
+                file_path = item.text()  # Assuming the file path is the item text
+                file_id = self.file_search_files.get(file_path)
+                file_search_files[file_path] = file_id
+
+            tool_resources = ToolResources(
+                code_interpreter_files=code_interpreter_files,
+                file_search_files=file_search_files
+            )
 
         config = {
             'name': self.nameEdit.text(),
@@ -865,7 +876,7 @@ class AssistantConfigDialog(QDialog):
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
-            'tool_resources': tool_resources.to_dict(),
+            'tool_resources': tool_resources.to_dict() if self.assistant_type == "assistant" else None,
             'functions': self.functions,
             'file_search': self.fileSearchCheckBox.isChecked() if self.assistant_type == "assistant" else False,
             'code_interpreter': self.codeInterpreterCheckBox.isChecked() if self.assistant_type == "assistant" else False,

@@ -221,7 +221,7 @@ class AssistantClient(BaseAssistantClient):
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = {
-                "code_interpreter": assistant_config.tool_resources.code_interpreter_files.values(),
+                "code_interpreter": file_ids,
             }
             assistant = self._ai_client.beta.assistants.create(
                 name=assistant_config.name,
@@ -554,7 +554,7 @@ class AssistantClient(BaseAssistantClient):
                     purpose='assistants',
                     timeout=timeout
                 )
-                assistant_config.knowledge_files[file_path] = file.id
+                assistant_config.tool_resources.code_interpreter_files[file_path] = file.id
 
     def _update_assistant(
             self, 
@@ -564,10 +564,12 @@ class AssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
             self._update_files(assistant_config)
-            file_ids = list(assistant_config.knowledge_files.values())
+            file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-
+            tools_resources = {
+                "code_interpreter":  file_ids,
+            }
             # TODO update the assistant with the new configuration only if there are changes
             self._ai_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
