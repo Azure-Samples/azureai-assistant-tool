@@ -269,21 +269,23 @@ class AssistantConfigDialog(QDialog):
         self.scrollArea.setWidget(self.scrollWidget)
         toolsLayout.addWidget(self.scrollArea)
 
-        # Section for managing code interpreter files
-        self.setup_code_interpreter_files(toolsLayout)
+        if self.assistant_type == "assistant":
+            # Section for managing code interpreter files
+            self.setup_code_interpreter_files(toolsLayout)
 
-        # Checkbox to enable code interpreter tool
-        self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
-        self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
-        toolsLayout.addWidget(self.codeInterpreterCheckBox)
+            # Checkbox to enable code interpreter tool
+            self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
+            self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
+            toolsLayout.addWidget(self.codeInterpreterCheckBox)
 
-        # Section for managing files for file search vector stores
-        self.setup_file_search_vector_stores(toolsLayout)
+            # Section for managing files for file search vector stores
+            self.setup_file_search_vector_stores(toolsLayout)
 
-        # Checkbox to enable file search tool
-        self.fileSearchCheckBox = QCheckBox("Enable File Search")
-        self.fileSearchCheckBox.stateChanged.connect(lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value))
-        toolsLayout.addWidget(self.fileSearchCheckBox)
+            # Checkbox to enable file search tool
+            self.fileSearchCheckBox = QCheckBox("Enable File Search")
+            self.fileSearchCheckBox.stateChanged.connect(lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value))
+            toolsLayout.addWidget(self.fileSearchCheckBox)
+
         return toolsTab
 
     def setup_code_interpreter_files(self, layout):
@@ -522,8 +524,8 @@ class AssistantConfigDialog(QDialog):
         self.functions = []
         self.file_search = False
         self.code_interpreter = False
-        self.fileSearchCheckBox.setChecked(False)
         if self.assistant_type == "assistant":
+            self.fileSearchCheckBox.setChecked(False)
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
         self.assistant_config = None
@@ -809,8 +811,8 @@ class AssistantConfigDialog(QDialog):
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
             'tool_resources': tool_resources.to_dict(),
             'functions': self.functions,
-            'file_search': self.fileSearchCheckBox.isChecked(),
-            'code_interpreter': self.codeInterpreterCheckBox.isChecked(),
+            'file_search': self.fileSearchCheckBox.isChecked() if self.assistant_type == "assistant" else False,
+            'code_interpreter': self.codeInterpreterCheckBox.isChecked() if self.assistant_type == "assistant" else False,
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
