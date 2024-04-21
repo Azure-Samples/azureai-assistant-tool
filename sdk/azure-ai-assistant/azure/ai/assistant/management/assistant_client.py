@@ -459,7 +459,7 @@ class AssistantClient(BaseAssistantClient):
                 max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
                 max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
                 top_p=None if text_completion_config is None else text_completion_config.top_p,
-                response_format=None if text_completion_config is None else text_completion_config.response_format,
+                response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
                 truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
                 event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
