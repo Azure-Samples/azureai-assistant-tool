@@ -283,7 +283,7 @@ class AssistantConfig:
                     'max_text_messages': None,
                 })
                 # Constructing TextCompletionConfig from the dictionary
-                self._text_completion_config = TextCompletionConfig(
+                return TextCompletionConfig(
                     frequency_penalty=completion_data['frequency_penalty'],
                     max_tokens=completion_data['max_tokens'],
                     presence_penalty=completion_data['presence_penalty'],
@@ -306,7 +306,7 @@ class AssistantConfig:
                     }
                 })
                 # Constructing AssistantTextCompletionConfig from the dictionary
-                self._text_completion_config = AssistantTextCompletionConfig(
+                return AssistantTextCompletionConfig(
                     temperature=completion_data['temperature'],
                     max_completion_tokens=completion_data['max_completion_tokens'],
                     max_prompt_tokens=completion_data['max_prompt_tokens'],
@@ -361,10 +361,7 @@ class AssistantConfig:
         self._config_data['ai_client_type'] = self._ai_client_type
         self._config_data['model'] = self._model
         self._config_data['file_references'] = self._file_references
-        self._config_data['tool_resources'] = {
-            'file_search': {'files': self._file_search_files},
-            'code_interpreter': {'files': self._code_interpreter_files}
-        } if self._tool_resources is not None else None
+        self._config_data['tool_resources'] = self._tool_resources.to_dict() if self._tool_resources is not None else None
         self._config_data['file_search'] = self._file_search if self._file_search else False
         self._config_data['code_interpreter'] = self._code_interpreter
         self._config_data['functions'] = self._functions

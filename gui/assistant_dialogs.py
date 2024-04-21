@@ -709,14 +709,14 @@ class AssistantConfigDialog(QDialog):
                 for file_path, file_id in code_interpreter_files.items():
                     self.code_interpreter_files[file_path] = file_id
                     self.codeFileList.addItem(f"{file_path}")
-                self.codeInterpreterCheckBox.setChecked(self.assistant_config.tool_resources.code_interpreter_enabled)
+                self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
                 # Accessing file search files from the tool resources
                 file_search_files = self.assistant_config.tool_resources.file_search_files
                 for file_path, file_id in file_search_files.items():
                     self.file_search_files[file_path] = file_id
                     self.fileSearchList.addItem(f"{file_path}")
-                self.fileSearchCheckBox.setChecked(self.assistant_config.tool_resources.file_search_enabled)
+                self.fileSearchCheckBox.setChecked(self.assistant_config.file_search)
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)

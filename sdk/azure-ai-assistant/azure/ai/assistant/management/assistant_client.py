@@ -221,7 +221,9 @@ class AssistantClient(BaseAssistantClient):
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = {
-                "code_interpreter": file_ids,
+                "code_interpreter": {
+                    "file_ids": file_ids
+                }
             }
             assistant = self._ai_client.beta.assistants.create(
                 name=assistant_config.name,
