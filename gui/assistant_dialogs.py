@@ -191,7 +191,7 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.instructionsEdit)
 
         # File references, Add File, and Remove File buttons
-        self.fileReferenceLabel = QLabel('File References:')
+        self.fileReferenceLabel = QLabel('File References for Instructions:')
         self.fileReferenceList = QListWidget()
         self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:0}, where 0 is the index of the file in the list")
         self.fileReferenceList.setStyleSheet(
@@ -251,22 +251,23 @@ class AssistantConfigDialog(QDialog):
         return configTab
 
     def create_tools_tab(self):
-        toolsLayout = QVBoxLayout(self)
+        toolsTab = QWidget()
+        toolsLayout = QVBoxLayout(toolsTab)
 
         # Scroll Area for functions
-        scrollArea = QScrollArea(self)
-        scrollArea.setWidgetResizable(True)
-        scrollWidget = QWidget()
-        scrollLayout = QVBoxLayout(scrollWidget)
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollWidget = QWidget()
+        self.scrollLayout = QVBoxLayout(self.scrollWidget)
 
         # Function sections
         if self.function_config_manager:
-            function_configs = self.function_config_manager.get_function_configs()
+            function_configs =  self.function_config_manager.get_function_configs()
             for function_type, funcs in function_configs.items():
-                self.create_function_section(scrollLayout, function_type, funcs)
+                self.create_function_section(self.scrollLayout, function_type, funcs)
 
-        scrollArea.setWidget(scrollWidget)
-        toolsLayout.addWidget(scrollArea)
+        self.scrollArea.setWidget(self.scrollWidget)
+        toolsLayout.addWidget(self.scrollArea)
 
         # Section for managing code interpreter files
         self.setup_code_interpreter_files(toolsLayout)
@@ -283,6 +284,7 @@ class AssistantConfigDialog(QDialog):
         self.fileSearchCheckBox = QCheckBox("Enable File Search")
         self.fileSearchCheckBox.stateChanged.connect(lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value))
         toolsLayout.addWidget(self.fileSearchCheckBox)
+        return toolsTab
 
     def setup_code_interpreter_files(self, layout):
         codeFilesLabel = QLabel('Files for Code Interpreter:')
@@ -651,18 +653,19 @@ class AssistantConfigDialog(QDialog):
                 self.fileReferenceList.addItem(file_path)
 
             # Accessing code interpreter files from the tool resources
-            code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
-            for file_path, file_id in code_interpreter_files.items():
-                self.code_interpreter_files[file_path] = file_id
-                self.codeFileList.addItem(f"{file_path} ({file_id})")
-            self.codeInterpreterCheckBox.setChecked(self.assistant_config.tool_resources.code_interpreter_enabled)
+            if self.assistant_config.tool_resources:
+                code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
+                for file_path, file_id in code_interpreter_files.items():
+                    self.code_interpreter_files[file_path] = file_id
+                    self.codeFileList.addItem(f"{file_path} ({file_id})")
+                self.codeInterpreterCheckBox.setChecked(self.assistant_config.tool_resources.code_interpreter_enabled)
 
-            # Accessing file search files from the tool resources
-            file_search_files = self.assistant_config.tool_resources.file_search_files
-            for file_path, file_id in file_search_files.items():
-                self.file_search_files[file_path] = file_id
-                self.fileSearchList.addItem(f"{file_path} ({file_id})")
-            self.fileSearchCheckBox.setChecked(self.assistant_config.tool_resources.file_search_enabled)
+                # Accessing file search files from the tool resources
+                file_search_files = self.assistant_config.tool_resources.file_search_files
+                for file_path, file_id in file_search_files.items():
+                    self.file_search_files[file_path] = file_id
+                    self.fileSearchList.addItem(f"{file_path} ({file_id})")
+                self.fileSearchCheckBox.setChecked(self.assistant_config.tool_resources.file_search_enabled)
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)

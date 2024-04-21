@@ -176,20 +176,23 @@ class AssistantConfig:
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
-        if 'tool_resources' in config_data:
+        tool_resources_data = config_data.get('tool_resources')
+        if tool_resources_data is not None:
+            # Only initialize ToolResources if tool_resources_data is not None
             self._tool_resources = ToolResources(
                 code_interpreter_files=config_data.get('tool_resources', {}).get('code_interpreter', {}).get('files', {}),
                 file_search_files=config_data.get('tool_resources', {}).get('file_search', {}).get('files', {})
             )
         else:
+            # Initialize _tool_resources to None if tool_resources is missing or None
             self._tool_resources = None
 
         self._functions = config_data.get('functions', [])
         self._function_configs = self._get_function_configs()
         
         # Manage tool activation based on config_data
-        self._file_search_enabled = config_data.get('file_search_enabled', False)
-        self._code_interpreter_enabled = config_data.get('code_interpreter_enabled', False)
+        self._file_search = config_data.get('file_search', False)
+        self._code_interpreter = config_data.get('code_interpreter', False)
         
         # Set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
@@ -282,8 +285,8 @@ class AssistantConfig:
         self._config_data['tool_resources'] = {
             'file_search': {'files': self._file_search_files},
             'code_interpreter': {'files': self._code_interpreter_files}
-        }
-        self._config_data['file_search'] = self._file_search
+        } if self._tool_resources is not None else None
+        self._config_data['file_search'] = self._file_search if self._file_search else False
         self._config_data['code_interpreter'] = self._code_interpreter
         self._config_data['functions'] = self._functions
         self._config_data['output_folder_path'] = self._output_folder_path

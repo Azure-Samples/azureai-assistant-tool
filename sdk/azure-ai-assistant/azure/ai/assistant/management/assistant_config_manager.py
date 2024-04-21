@@ -291,7 +291,7 @@ class AssistantConfigManager:
         if 'functions' in config_data and not isinstance(config_data['functions'], list):
             raise ConfigError("Assistant 'functions' must be a list in the configuration")
         # Check if tool resources is in config_data, it is valid dictionary in dictionary
-        if 'tool_resources' in config_data and not isinstance(config_data['tool_resources'], dict):
+        if 'tool_resources' in config_data and config_data.get('tool_resources') is not None and not isinstance(config_data['tool_resources'], dict):
             raise ConfigError("Assistant 'tool_resources' must be a dictionary in the configuration")
 
     def _save_config(self, assistant_name, config_data):
