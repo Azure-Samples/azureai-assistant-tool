@@ -149,10 +149,9 @@ class AssistantClient(BaseAssistantClient):
             assistant_config.instructions = assistant.instructions
             assistant_config.model = assistant.model
             new_code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
-            new_file_search_files = dict(zip(assistant_config.tool_resources.file_search_files.keys(), assistant.tool_resources.file_search.vector_store_ids))
             assistant_config.tool_resources = ToolResources(
                 code_interpreter_files=new_code_interpreter_files,
-                file_search_files=new_file_search_files
+                file_search_files={}
             )
             assistant_config.functions = [
                 tool.function.model_dump() for tool in assistant.tools if tool.type == "function"
@@ -217,16 +216,19 @@ class AssistantClient(BaseAssistantClient):
             logger.info(f"Creating new assistant with name: {assistant_config.name}")
             # Upload the files for new assistant
             self._upload_new_files(assistant_config, timeout=timeout)
-            file_ids = list(assistant_config.knowledge_files.values())
+            # code interpreter files
+            file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-
+            tools_resources = {
+                "code_interpreter": assistant_config.tool_resources.code_interpreter_files.values(),
+            }
             assistant = self._ai_client.beta.assistants.create(
                 name=assistant_config.name,
                 instructions=instructions,
+                tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids,
                 timeout=timeout
             )
             # Update the assistant_id in the assistant_config
@@ -293,7 +295,8 @@ class AssistantClient(BaseAssistantClient):
         try:
             logger.info(f"Updating files for assistant: {assistant_config.name}")
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
-            existing_file_ids = set(assistant.file_ids)
+            # code interpreter files
+            existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
             self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
             self._upload_new_files(assistant_config, timeout=timeout)
 
@@ -528,12 +531,11 @@ class AssistantClient(BaseAssistantClient):
             existing_file_ids,
             timeout : Optional[float] = None
     ):
-        updated_file_ids = set(assistant_config.knowledge_files.values())
+        updated_file_ids = set(assistant_config.tool_resources.code_interpreter_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.beta.assistants.files.delete(
-                assistant_id=assistant_config.assistant_id,
+            file_deletion_status = self._ai_client.files.delete(
                 file_id=file_id,
                 timeout=timeout
             )
@@ -544,7 +546,7 @@ class AssistantClient(BaseAssistantClient):
             timeout : Optional[float] = None
     ):
         logger.info(f"Uploading new files for assistant: {assistant_config.name}")
-        for file_path, file_id in assistant_config.knowledge_files.items():
+        for file_path, file_id in assistant_config.tool_resources.code_interpreter_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = self._ai_client.files.create(
