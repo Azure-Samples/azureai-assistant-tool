@@ -5,7 +5,7 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6 import QtGui
-from PySide6.QtWidgets import QDialog, QComboBox, QSpinBox, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtWidgets import QDialog, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QIcon, QTextOption
 
@@ -711,12 +711,16 @@ class AssistantConfigDialog(QDialog):
                     self.codeFileList.addItem(f"{file_path}")
                 self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
-                # Accessing file search files from the tool resources
-                file_search_files = self.assistant_config.tool_resources.file_search_files
-                for file_path, file_id in file_search_files.items():
-                    self.file_search_files[file_path] = file_id
-                    self.fileSearchList.addItem(f"{file_path}")
-                self.fileSearchCheckBox.setChecked(self.assistant_config.file_search)
+                # Accessing vector stores from the tool resources
+                if self.assistant_config.tool_resources.file_search_vector_stores:
+                    for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
+                        for file_id in vector_store.file_ids:
+                            item = QListWidgetItem(f"{file_id}")
+                            item.setData(Qt.UserRole, vector_store.id)  # Store vector store ID as UserRole data for potential reference
+                            self.fileSearchList.addItem(item)
+                    self.fileSearchCheckBox.setChecked(True)
+                else:
+                    self.fileSearchCheckBox.setChecked(False)
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
