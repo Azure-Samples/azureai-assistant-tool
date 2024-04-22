@@ -711,16 +711,12 @@ class AssistantConfigDialog(QDialog):
                     self.codeFileList.addItem(f"{file_path}")
                 self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
-                # Accessing vector stores from the tool resources
-                if self.assistant_config.tool_resources.file_search_vector_stores:
-                    for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
-                        for file_id in vector_store.file_ids:
-                            item = QListWidgetItem(f"{file_id}")
-                            item.setData(Qt.UserRole, vector_store.id)  # Store vector store ID as UserRole data for potential reference
-                            self.fileSearchList.addItem(item)
-                    self.fileSearchCheckBox.setChecked(True)
-                else:
-                    self.fileSearchCheckBox.setChecked(False)
+                for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
+                    for file_path, file_id in vector_store.files.items():
+                        item = QListWidgetItem(file_path)
+                        item.setData(Qt.UserRole, file_id)
+                        self.fileSearchList.addItem(item)
+                    self.fileSearchCheckBox.setChecked(bool(self.assistant_config.tool_resources.file_search_vector_stores))
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
@@ -862,23 +858,21 @@ class AssistantConfigDialog(QDialog):
                 file_id = self.code_interpreter_files.get(file_path)
                 code_interpreter_files[file_path] = file_id
 
-            # Prepare vector store with files from fileSearchList
-            file_search_vector_stores = []
-            vector_store_files = []
+            vector_stores = []
+            vector_store_files = {}
             for i in range(self.fileSearchList.count()):
                 item = self.fileSearchList.item(i)
-                file_path = item.text()  # Assuming the file path is the item text
-                vector_store_files.append(file_path)
+                file_path = item.text()
+                file_id = item.data(Qt.UserRole)  # Assuming file ID is stored as UserRole data
+                vector_store_files[file_path] = file_id
 
-            # Create a single VectorStore object with collected files if any are present
             if vector_store_files:
-                vector_store = VectorStore(id=None, file_ids=vector_store_files, metadata={})
-                file_search_vector_stores.append(vector_store)
+                vector_store = VectorStore(id=None, files=vector_store_files, metadata={})
+                vector_stores.append(vector_store)
 
-            # Initialize ToolResources with the collected data
             tool_resources = ToolResources(
                 code_interpreter_files=code_interpreter_files,
-                file_search_vector_stores=file_search_vector_stores
+                file_search_vector_stores=vector_stores
             )
 
         config = {

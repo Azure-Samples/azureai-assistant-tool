@@ -180,23 +180,23 @@ class AssistantTextCompletionConfig:
 
 
 class VectorStore:
-    def __init__(self, id=None, file_ids=None, metadata=None):
+    def __init__(self, id=None, files=None, metadata=None):
         self.id = id
-        self.file_ids = file_ids or []
+        self.files = files or {}
         self.metadata = metadata or {}
 
     def to_dict(self):
         return {
             'id': self.id,
-            'file_ids': self.file_ids,
+            'files': self.files,
             'metadata': self.metadata
         }
 
 
 class ToolResources:
     def __init__(self, code_interpreter_files=None, file_search_vector_stores=None):
-        self.code_interpreter_files = code_interpreter_files or {}
-        self.file_search_vector_stores = file_search_vector_stores or []
+        self._code_interpreter_files = code_interpreter_files or {}
+        self._file_search_vector_stores = file_search_vector_stores or []
 
     def __eq__(self, other):
         if not isinstance(other, ToolResources):
@@ -224,12 +224,12 @@ class ToolResources:
         self._code_interpreter_files = value
 
     @property
-    def file_search_files(self):
-        return self._file_search_files
+    def file_search_vector_stores(self):
+        return self._file_search_vector_stores
     
-    @file_search_files.setter
+    @file_search_vector_stores.setter
     def file_search_files(self, value):
-        self._file_search_files = value
+        self._file_search_vector_stores = value
 
 
 class AssistantConfig:
@@ -329,7 +329,7 @@ class AssistantConfig:
             file_search_vector_stores = [
                 VectorStore(
                     id=store.get('id'), 
-                    file_ids=store.get('file_ids', []), 
+                    files=store.get('files', []), 
                     metadata=store.get('metadata', {})
                 ) for store in file_search_vector_stores_data
             ]
