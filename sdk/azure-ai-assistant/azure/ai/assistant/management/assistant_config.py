@@ -208,7 +208,7 @@ class ToolResources:
     def to_dict(self):
         return {
             'code_interpreter': {
-                'file_ids': list(self.code_interpreter_files.values())
+                'files': self.code_interpreter_files
             },
             'file_search': {
                 'vector_stores': [vs.to_dict() for vs in self.file_search_vector_stores]
