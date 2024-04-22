@@ -179,25 +179,39 @@ class AssistantTextCompletionConfig:
         self._truncation_strategy = value
 
 
+class VectorStore:
+    def __init__(self, id=None, file_ids=None, metadata=None):
+        self.id = id
+        self.file_ids = file_ids or []
+        self.metadata = metadata or {}
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'file_ids': self.file_ids,
+            'metadata': self.metadata
+        }
+
+
 class ToolResources:
-    def __init__(self, code_interpreter_files=None, file_search_files=None):
+    def __init__(self, code_interpreter_files=None, file_search_vector_stores=None):
         self.code_interpreter_files = code_interpreter_files or {}
-        self.file_search_files = file_search_files or {}
+        self.file_search_vector_stores = file_search_vector_stores or []
 
     def __eq__(self, other):
         if not isinstance(other, ToolResources):
             return NotImplemented
 
         return (self.code_interpreter_files == other.code_interpreter_files and
-                self.file_search_files == other.file_search_files)
+                self.file_search_vector_stores == other.file_search_vector_stores)
 
     def to_dict(self):
         return {
             'code_interpreter': {
-                'files': self.code_interpreter_files
+                'file_ids': list(self.code_interpreter_files.values())
             },
             'file_search': {
-                'files': self.file_search_files
+                'vector_stores': [vs.to_dict() for vs in self.file_search_vector_stores]
             }
         }
     
@@ -242,16 +256,7 @@ class AssistantConfig:
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
-        tool_resources_data = config_data.get('tool_resources')
-        if tool_resources_data is not None:
-            # Only initialize ToolResources if tool_resources_data is not None
-            self._tool_resources = ToolResources(
-                code_interpreter_files=config_data.get('tool_resources', {}).get('code_interpreter', {}).get('files', {}),
-                file_search_files=config_data.get('tool_resources', {}).get('file_search', {}).get('files', {})
-            )
-        else:
-            # Initialize _tool_resources to None if tool_resources is missing or None
-            self._tool_resources = None
+        self._tool_resources = self.initialize_tool_resources(config_data.get('tool_resources'))
 
         self._functions = config_data.get('functions', [])
         self._function_configs = self._get_function_configs()
@@ -314,6 +319,26 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     truncation_strategy=completion_data['truncation_strategy']
                 )
+
+    def initialize_tool_resources(self, tool_resources_data):
+        """Initialize ToolResources based on the provided data."""
+        if tool_resources_data:
+            code_interpreter_files = tool_resources_data.get('code_interpreter', {}).get('files', {})
+            file_search_vector_stores_data = tool_resources_data.get('file_search', {}).get('vector_stores', [])
+            
+            file_search_vector_stores = [
+                VectorStore(
+                    id=store.get('id'), 
+                    file_ids=store.get('file_ids', []), 
+                    metadata=store.get('metadata', {})
+                ) for store in file_search_vector_stores_data
+            ]
+            
+            return ToolResources(
+                code_interpreter_files=code_interpreter_files, 
+                file_search_vector_stores=file_search_vector_stores
+            )
+        return None
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):

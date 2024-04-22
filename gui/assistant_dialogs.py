@@ -12,7 +12,7 @@ from PySide6.QtGui import QIcon, QTextOption
 import json, os, shutil, threading
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.assistant_config import ToolResources
+from azure.ai.assistant.management.assistant_config import ToolResources, VectorStore
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 from azure.ai.assistant.management.logger_module import logger
@@ -858,16 +858,23 @@ class AssistantConfigDialog(QDialog):
                 file_id = self.code_interpreter_files.get(file_path)
                 code_interpreter_files[file_path] = file_id
 
-            file_search_files = {}
+            # Prepare vector store with files from fileSearchList
+            file_search_vector_stores = []
+            vector_store_files = []
             for i in range(self.fileSearchList.count()):
-                item = self.fileSearchList.item(i)  # Get the QListWidgetItem at index i
+                item = self.fileSearchList.item(i)
                 file_path = item.text()  # Assuming the file path is the item text
-                file_id = self.file_search_files.get(file_path)
-                file_search_files[file_path] = file_id
+                vector_store_files.append(file_path)
 
+            # Create a single VectorStore object with collected files if any are present
+            if vector_store_files:
+                vector_store = VectorStore(id=None, file_ids=vector_store_files, metadata={})
+                file_search_vector_stores.append(vector_store)
+
+            # Initialize ToolResources with the collected data
             tool_resources = ToolResources(
                 code_interpreter_files=code_interpreter_files,
-                file_search_files=file_search_files
+                file_search_vector_stores=file_search_vector_stores
             )
 
         config = {
