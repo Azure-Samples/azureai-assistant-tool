@@ -224,7 +224,7 @@ class ToolResources:
         self._code_interpreter_files = value
 
     @property
-    def file_search_vector_stores(self):
+    def file_search_vector_stores(self) -> list[VectorStore]:
         return self._file_search_vector_stores
     
     @file_search_vector_stores.setter

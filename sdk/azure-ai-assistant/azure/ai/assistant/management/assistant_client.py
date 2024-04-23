@@ -14,7 +14,7 @@ from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
 from datetime import datetime
-import json, time, yaml
+import json, time, yaml, contextlib
 
 
 class AssistantClient(BaseAssistantClient):
@@ -234,24 +234,21 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
 
-    def _create_tool_resources(self, assistant_config: AssistantConfig, timeout) -> dict:
+    def _create_tool_resources(
+            self,
+            assistant_config: AssistantConfig,
+            timeout : Optional[float] = None
+    ) -> dict:
+
         # Upload the code interpreter files
-        self._upload_new_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+        self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
         code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
 
-        # Upload the file search files and create the vector store
-        file_search_file_ids = []
-        file_search_vs = None
-
+        # create the vector store for file search
         if assistant_config.tool_resources.file_search_vector_stores:
-            file_search_vs : VectorStore = assistant_config.tool_resources.file_search_vector_stores[0]
-            self._upload_new_files(assistant_config, file_search_vs.files, timeout=timeout)
-            file_search_file_ids = list(file_search_vs.files.values())
-            client_vs = self._ai_client.beta.vector_stores.create(
-                name=f"Assistant {assistant_config.name} vector store",
-                file_ids = file_search_file_ids
-            )
-            file_search_vs.id = client_vs.id
+            assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+            self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
+            assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
 
         # Create the tool resources dictionary
         tool_resources = {
@@ -259,15 +256,68 @@ class AssistantClient(BaseAssistantClient):
                 "file_ids": code_interpreter_file_ids
             },
             "file_search": {
-                "vector_store_ids": [file_search_vs.id] if file_search_vs else [],
-                "vector_stores": {
-                    "file_ids": file_search_file_ids,
-                    "metadata": {}
-                }
+                "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
             }
         }
-
         return tool_resources
+
+    def _create_vector_store_with_files(
+            self,
+            assistant_config: AssistantConfig,
+            vector_store: VectorStore,
+            timeout: Optional[float] = None
+    ) -> str:
+        try:
+            client_vs = self._ai_client.beta.vector_stores.create(
+                name=f"Assistant {assistant_config.name} vector store",
+                file_ids = list(vector_store.files.values())
+            )
+            return client_vs.id
+        except Exception as e:
+            logger.error(f"Failed to create vector store for assistant: {assistant_config.name}: {e}")
+            raise EngineError(f"Failed to create vector store for assistant: {assistant_config.name}: {e}")
+
+    def _update_tool_resources(
+            self,
+            assistant_config: AssistantConfig,
+            timeout: Optional[float] = None
+    ) -> dict:
+
+        try:
+            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
+            # code interpreter files
+            existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
+            self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+            self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+
+            # file search files in cloud
+            existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
+            all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
+            existing_file_ids = set([file.id for file in all_files_in_vs])
+
+            # if there are new files to upload or delete, recreate the vector store
+            assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+            if set(assistant_config_vs.files.values()) != existing_file_ids:
+                # delete the existing vector store
+                self._ai_client.beta.vector_stores.delete(existing_vs_ids[0], timeout=timeout)
+                self._delete_files(assistant_config, existing_file_ids, assistant_config_vs.files, timeout=timeout)
+                self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
+                existing_vs_ids[0] = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+
+            # Create the tool resources dictionary
+            tool_resources = {
+                "code_interpreter": {
+                    "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values())
+                },
+                "file_search": {
+                    "vector_store_ids": existing_vs_ids
+                }
+            }
+            return tool_resources
+
+        except Exception as e:
+            logger.error(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
+            raise EngineError(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
 
     def purge(
             self,
@@ -316,24 +366,6 @@ class AssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to delete assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to delete assistant with ID: {assistant_id}: {e}")
-
-    def _update_files(
-            self,
-            assistant_config: AssistantConfig,
-            timeout: Optional[float] = None
-    ) -> None:
-
-        try:
-            logger.info(f"Updating files for assistant: {assistant_config.name}")
-            assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
-            # code interpreter files
-            existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
-            self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
-            self._upload_new_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
-
-        except Exception as e:
-            logger.error(f"Failed to update files for assistant: {assistant_config.name}: {e}")
-            raise EngineError(f"Failed to update files for assistant: {assistant_config.name}: {e}")
 
     def process_messages(
             self, 
@@ -564,13 +596,14 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
 
-    def _delete_old_files(
+    def _delete_files(
             self,
             assistant_config : AssistantConfig,
             existing_file_ids,
+            files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        updated_file_ids = set(assistant_config.tool_resources.code_interpreter_files.values())
+        updated_file_ids = set(files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
         for file_id in file_ids_to_delete:
@@ -578,14 +611,14 @@ class AssistantClient(BaseAssistantClient):
                 file_id=file_id,
                 timeout=timeout
             )
-
-    def _upload_new_files(
+    
+    def _upload_files(
             self, 
             assistant_config: AssistantConfig,
             files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        logger.info(f"Uploading new files for assistant: {assistant_config.name}")
+        logger.info(f"Uploading files for assistant: {assistant_config.name}")
         for file_path, file_id in files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
@@ -603,15 +636,10 @@ class AssistantClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
-            self._update_files(assistant_config)
-            file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = {
-                "code_interpreter": {
-                    "file_ids": file_ids
-                }
-            }
+            tools_resources = self._update_tool_resources(assistant_config)
+
             # TODO update the assistant with the new configuration only if there are changes
             self._ai_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
