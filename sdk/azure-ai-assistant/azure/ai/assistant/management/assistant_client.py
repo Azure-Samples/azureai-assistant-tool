@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.assistant_config import VectorStore
 from azure.ai.assistant.management.assistant_config import ToolResources
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
@@ -214,17 +215,10 @@ class AssistantClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Creating new assistant with name: {assistant_config.name}")
-            # Upload the files for new assistant
-            self._upload_new_files(assistant_config, timeout=timeout)
-            # code interpreter files
-            file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = {
-                "code_interpreter": {
-                    "file_ids": file_ids
-                }
-            }
+            tools_resources = self._create_tool_resources(assistant_config)
+
             assistant = self._ai_client.beta.assistants.create(
                 name=assistant_config.name,
                 instructions=instructions,
@@ -239,6 +233,41 @@ class AssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
+
+    def _create_tool_resources(self, assistant_config: AssistantConfig, timeout) -> dict:
+        # Upload the code interpreter files
+        self._upload_new_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+        code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
+
+        # Upload the file search files and create the vector store
+        file_search_file_ids = []
+        file_search_vs = None
+
+        if assistant_config.tool_resources.file_search_vector_stores:
+            file_search_vs : VectorStore = assistant_config.tool_resources.file_search_vector_stores[0]
+            self._upload_new_files(assistant_config, file_search_vs.files, timeout=timeout)
+            file_search_file_ids = list(file_search_vs.files.values())
+            client_vs = self._ai_client.beta.vector_stores.create(
+                name=f"Assistant {assistant_config.name} vector store",
+                file_ids = file_search_file_ids
+            )
+            file_search_vs.id = client_vs.id
+
+        # Create the tool resources dictionary
+        tool_resources = {
+            "code_interpreter": {
+                "file_ids": code_interpreter_file_ids
+            },
+            "file_search": {
+                "vector_store_ids": [file_search_vs.id] if file_search_vs else [],
+                "vector_stores": {
+                    "file_ids": file_search_file_ids,
+                    "metadata": {}
+                }
+            }
+        }
+
+        return tool_resources
 
     def purge(
             self,
@@ -300,7 +329,7 @@ class AssistantClient(BaseAssistantClient):
             # code interpreter files
             existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
             self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
-            self._upload_new_files(assistant_config, timeout=timeout)
+            self._upload_new_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
 
         except Exception as e:
             logger.error(f"Failed to update files for assistant: {assistant_config.name}: {e}")
@@ -553,10 +582,11 @@ class AssistantClient(BaseAssistantClient):
     def _upload_new_files(
             self, 
             assistant_config: AssistantConfig,
+            files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
         logger.info(f"Uploading new files for assistant: {assistant_config.name}")
-        for file_path, file_id in assistant_config.tool_resources.code_interpreter_files.items():
+        for file_path, file_id in files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = self._ai_client.files.create(
@@ -564,7 +594,7 @@ class AssistantClient(BaseAssistantClient):
                     purpose='assistants',
                     timeout=timeout
                 )
-                assistant_config.tool_resources.code_interpreter_files[file_path] = file.id
+                files[file_path] = file.id
 
     def _update_assistant(
             self, 

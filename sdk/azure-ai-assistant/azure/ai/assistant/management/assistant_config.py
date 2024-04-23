@@ -228,7 +228,7 @@ class ToolResources:
         return self._file_search_vector_stores
     
     @file_search_vector_stores.setter
-    def file_search_files(self, value):
+    def file_search_vector_stores(self, value):
         self._file_search_vector_stores = value
 
 
