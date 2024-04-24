@@ -244,6 +244,7 @@ class AssistantClient(BaseAssistantClient):
         self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
         code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
 
+        assistant_config_vs = None
         # create the vector store for file search
         if assistant_config.tool_resources.file_search_vector_stores:
             assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
@@ -270,7 +271,8 @@ class AssistantClient(BaseAssistantClient):
         try:
             client_vs = self._ai_client.beta.vector_stores.create(
                 name=f"Assistant {assistant_config.name} vector store",
-                file_ids = list(vector_store.files.values())
+                file_ids = list(vector_store.files.values()),
+                timeout=timeout
             )
             return client_vs.id
         except Exception as e:
@@ -302,7 +304,7 @@ class AssistantClient(BaseAssistantClient):
                 self._ai_client.beta.vector_stores.delete(existing_vs_ids[0], timeout=timeout)
                 self._delete_files(assistant_config, existing_file_ids, assistant_config_vs.files, timeout=timeout)
                 self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
-                existing_vs_ids[0] = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+                assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
 
             # Create the tool resources dictionary
             tool_resources = {
@@ -310,7 +312,7 @@ class AssistantClient(BaseAssistantClient):
                     "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values())
                 },
                 "file_search": {
-                    "vector_store_ids": existing_vs_ids
+                    "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
                 }
             }
             return tool_resources
@@ -600,10 +602,10 @@ class AssistantClient(BaseAssistantClient):
             self,
             assistant_config : AssistantConfig,
             existing_file_ids,
-            files: Optional[dict] = None,
+            updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        updated_file_ids = set(files.values())
+        updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
         for file_id in file_ids_to_delete:
@@ -615,11 +617,11 @@ class AssistantClient(BaseAssistantClient):
     def _upload_files(
             self, 
             assistant_config: AssistantConfig,
-            files: Optional[dict] = None,
+            updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
         logger.info(f"Uploading files for assistant: {assistant_config.name}")
-        for file_path, file_id in files.items():
+        for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = self._ai_client.files.create(
@@ -627,7 +629,7 @@ class AssistantClient(BaseAssistantClient):
                     purpose='assistants',
                     timeout=timeout
                 )
-                files[file_path] = file.id
+                updated_files[file_path] = file.id
 
     def _update_assistant(
             self, 
