@@ -60,6 +60,7 @@ class AssistantConfigDialog(QDialog):
     def init_variables(self):
         self.code_interpreter_files = {}
         self.file_search_files = {}
+        self.vector_store_ids = []
         self.functions = []  # Store the functions
         self.code_interpreter = False  # Store the code interpreter setting
         self.file_search = False  # Store the file search setting
@@ -564,6 +565,7 @@ class AssistantConfigDialog(QDialog):
         self.nameEdit.clear()
         self.instructionsEdit.clear()
         self.modelComboBox.setCurrentIndex(0)
+        self.vector_store_ids = []
         self.file_search_files = {}
         self.code_interpreter_files = {}
         # Reset all checkboxes in the function sections
@@ -712,9 +714,11 @@ class AssistantConfigDialog(QDialog):
                 self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
                 for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
+                    self.vector_store_ids.append(vector_store.id)
                     for file_path, file_id in vector_store.files.items():
                         item = QListWidgetItem(file_path)
                         item.setData(Qt.UserRole, file_id)
+                        self.file_search_files[file_path] = file_id
                         self.fileSearchList.addItem(item)
                     self.fileSearchCheckBox.setChecked(bool(self.assistant_config.tool_resources.file_search_vector_stores))
 
@@ -867,7 +871,8 @@ class AssistantConfigDialog(QDialog):
                 vector_store_files[file_path] = file_id
 
             if vector_store_files:
-                vector_store = VectorStore(id=None, files=vector_store_files, metadata={})
+                id = self.vector_store_ids[0] if self.vector_store_ids else None
+                vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
                 vector_stores.append(vector_store)
 
             tool_resources = ToolResources(

@@ -185,6 +185,14 @@ class VectorStore:
         self.files = files or {}
         self.metadata = metadata or {}
 
+    def __eq__(self, other):
+        if not isinstance(other, VectorStore):
+            return NotImplemented
+
+        return (self.id == other.id and
+                self.files == other.files and
+                self.metadata == other.metadata)
+
     def to_dict(self):
         return {
             'id': self.id,

@@ -303,12 +303,9 @@ class AssistantClient(BaseAssistantClient):
             # if there are new files to upload or delete, recreate the vector store
             assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
             if set(assistant_config_vs.files.values()) != existing_file_ids:
-                # delete the existing vector store if it exists
                 if existing_vs_ids:
-                    self._ai_client.beta.vector_stores.delete(existing_vs_ids[0], timeout=timeout)
-                    self._delete_files(assistant_config, existing_file_ids, assistant_config_vs.files, timeout=timeout)
-                self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
-                assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+                    self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
+                    self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
 
             # Create the tool resources dictionary
             tool_resources = {
@@ -602,10 +599,49 @@ class AssistantClient(BaseAssistantClient):
             logger.error(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
 
+    def _delete_files_from_vector_store(
+            self,
+            assistant_config : AssistantConfig,
+            vector_store_id: str,
+            existing_file_ids: set,
+            updated_files: Optional[dict] = None,
+            timeout : Optional[float] = None
+    ):
+        updated_file_ids = set(updated_files.values())
+        file_ids_to_delete = existing_file_ids - updated_file_ids
+        logger.info(f"Deleting files: {file_ids_to_delete} from assistant: {assistant_config.name} vector store: {vector_store_id}")
+        for file_id in file_ids_to_delete:
+            file_deletion_status = self._ai_client.beta.vector_stores.files.delete(
+                vector_store_id=vector_store_id,
+                file_id=file_id,
+                timeout=timeout
+            )
+
+    def _upload_files_to_vector_store(
+            self,
+            assistant_config: AssistantConfig,
+            vector_store_id: str,
+            updated_files: Optional[dict] = None,
+            timeout : Optional[float] = None
+    ):
+        logger.info(f"Uploading files to assistant {assistant_config.name} vector store: {vector_store_id}")
+        for file_path, file_id in updated_files.items():
+            if file_id is None:
+                logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
+                file = self._ai_client.beta.vector_stores.files.upload_and_poll(
+                    vector_store_id=vector_store_id,
+                    file=open(file_path, "rb"),
+                    timeout=timeout
+                )
+                #all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(vector_store_id, timeout=timeout))
+                #existing_file_ids = set([file.id for file in all_files_in_vs])
+                #new_file_id = existing_file_ids - set(updated_files.values())
+                updated_files[file_path] = file.id
+
     def _delete_files(
             self,
             assistant_config : AssistantConfig,
-            existing_file_ids,
+            existing_file_ids : set,
             updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
