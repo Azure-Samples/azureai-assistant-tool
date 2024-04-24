@@ -630,12 +630,8 @@ class AssistantClient(BaseAssistantClient):
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = self._ai_client.beta.vector_stores.files.upload_and_poll(
                     vector_store_id=vector_store_id,
-                    file=open(file_path, "rb"),
-                    timeout=timeout
+                    file=open(file_path, "rb")
                 )
-                #all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(vector_store_id, timeout=timeout))
-                #existing_file_ids = set([file.id for file in all_files_in_vs])
-                #new_file_id = existing_file_ids - set(updated_files.values())
                 updated_files[file_path] = file.id
 
     def _delete_files(
