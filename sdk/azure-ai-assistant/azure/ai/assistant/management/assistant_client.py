@@ -293,16 +293,20 @@ class AssistantClient(BaseAssistantClient):
             self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
 
             # file search files in cloud
-            existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
-            all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
-            existing_file_ids = set([file.id for file in all_files_in_vs])
+            existing_vs_ids = []
+            existing_file_ids = set()
+            if assistant.tool_resources.file_search:
+                existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
+                all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
+                existing_file_ids = set([file.id for file in all_files_in_vs])
 
             # if there are new files to upload or delete, recreate the vector store
             assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
             if set(assistant_config_vs.files.values()) != existing_file_ids:
-                # delete the existing vector store
-                self._ai_client.beta.vector_stores.delete(existing_vs_ids[0], timeout=timeout)
-                self._delete_files(assistant_config, existing_file_ids, assistant_config_vs.files, timeout=timeout)
+                # delete the existing vector store if it exists
+                if existing_vs_ids:
+                    self._ai_client.beta.vector_stores.delete(existing_vs_ids[0], timeout=timeout)
+                    self._delete_files(assistant_config, existing_file_ids, assistant_config_vs.files, timeout=timeout)
                 self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
                 assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
 
