@@ -605,6 +605,7 @@ class AssistantClient(BaseAssistantClient):
             vector_store_id: str,
             existing_file_ids: set,
             updated_files: Optional[dict] = None,
+            delete_from_service: Optional[bool] = True,
             timeout : Optional[float] = None
     ):
         updated_file_ids = set(updated_files.values())
@@ -616,6 +617,11 @@ class AssistantClient(BaseAssistantClient):
                 file_id=file_id,
                 timeout=timeout
             )
+            if delete_from_service:
+                file_deletion_status = self._ai_client.files.delete(
+                    file_id=file_id,
+                    timeout=timeout
+                )
 
     def _upload_files_to_vector_store(
             self,
