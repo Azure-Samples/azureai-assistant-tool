@@ -240,6 +240,7 @@ class AssistantClient(BaseAssistantClient):
             timeout : Optional[float] = None
     ) -> dict:
 
+        logger.info(f"Creating tool resources for assistant: {assistant_config.name}")
         # Upload the code interpreter files
         self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
         code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
@@ -260,6 +261,7 @@ class AssistantClient(BaseAssistantClient):
                 "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
             }
         }
+        logger.info(f"Created tool resources: {tool_resources}")
         return tool_resources
 
     def _create_vector_store_with_files(
@@ -286,6 +288,7 @@ class AssistantClient(BaseAssistantClient):
     ) -> dict:
 
         try:
+            logger.info(f"Updating tool resources for assistant: {assistant_config.name}")
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
             # code interpreter files
             existing_file_ids = set()
@@ -323,6 +326,7 @@ class AssistantClient(BaseAssistantClient):
                     "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs and assistant_config_vs.id is not None else []
                 }
             }
+            logger.info(f"Updated tool resources: {tool_resources}")
             return tool_resources
 
         except Exception as e:
