@@ -826,6 +826,12 @@ class AssistantConfigDialog(QDialog):
         if self.tabWidget.currentIndex() == 3:
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
+        # Get the assistant config from the form and ensure assistant_id is up to date with the config
+        assistant_config = AssistantConfigManager.get_instance().get_config(self.get_name())
+        if assistant_config is not None:
+            self.assistant_id = assistant_config.assistant_id
+            self.is_create = False
+
         # Conditional setup for completion settings based on assistant_type
         completion_settings = None
         if self.assistant_type == "chat_assistant":
