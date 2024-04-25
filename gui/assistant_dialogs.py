@@ -144,7 +144,7 @@ class AssistantConfigDialog(QDialog):
         self.stop_processing_signal.stop_signal.connect(self.stop_processing)
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
-        self.ai_client_selection_changed()
+        self.update_assistant_combobox()
 
         # Set the initial size of the dialog to make it wider
         self.resize(600, 600)  # Adjusted to a more standard size, you can change it back to 600x900 if needed
@@ -509,6 +509,11 @@ class AssistantConfigDialog(QDialog):
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
+        self.update_assistant_combobox()
+        self.update_model_combobox()
+
+    def update_assistant_combobox(self):
+        self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
         assistant_config_manager = AssistantConfigManager.get_instance()
         assistant_names = assistant_config_manager.get_assistant_names_by_client_type(self.ai_client_type.name)
 
@@ -518,7 +523,16 @@ class AssistantConfigDialog(QDialog):
             assistant_config = assistant_config_manager.get_config(assistant_name)
             if assistant_config.assistant_type == self.assistant_type:
                 self.assistantComboBox.addItem(assistant_name)
+        self.set_initial_assistant_selection()
 
+    def set_initial_assistant_selection(self):
+        index = self.assistantComboBox.findText(self.assistant_name)
+        if index >= 0:
+            self.assistantComboBox.setCurrentIndex(index)
+        else:
+            self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
+
+    def update_model_combobox(self):
         self.modelComboBox.clear()
         try:
             ai_client = AIClientFactory.get_instance().get_client(self.ai_client_type)
@@ -534,13 +548,6 @@ class AssistantConfigDialog(QDialog):
                 self.modelComboBox.setToolTip("Select a model ID supported for assistant from the list")
             elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
                 self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")
-
-        # If assistant_name is provided, set the assistantComboBox to the assistant_name
-        index = self.assistantComboBox.findText(self.assistant_name)
-        if index >= 0:
-            self.assistantComboBox.setCurrentIndex(index)
-        else:
-            self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
     def assistant_selection_changed(self):
         self.reset_fields()
@@ -686,6 +693,7 @@ class AssistantConfigDialog(QDialog):
             logger.error(f"Error displaying reviewed instructions: {e}")
 
     def pre_load_assistant_config(self, name):
+        self.update_model_combobox()
         self.assistant_config = AssistantConfigManager.get_instance().get_config(name)
         if self.assistant_config:
             self.nameEdit.setText(self.assistant_config.name)
@@ -827,7 +835,8 @@ class AssistantConfigDialog(QDialog):
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
         # Get the assistant config from the form and ensure assistant_id is up to date with the config
-        assistant_config = AssistantConfigManager.get_instance().get_config(self.get_name())
+        self.assistant_name = self.get_name()
+        assistant_config = AssistantConfigManager.get_instance().get_config(self.assistant_name)
         if assistant_config is not None:
             self.assistant_id = assistant_config.assistant_id
             self.is_create = False
@@ -887,7 +896,7 @@ class AssistantConfigDialog(QDialog):
             )
 
         config = {
-            'name': self.nameEdit.text(),
+            'name': self.assistant_name,
             'instructions': self.instructionsEdit.toPlainText(),
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
