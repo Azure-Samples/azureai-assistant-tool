@@ -144,6 +144,7 @@ class AssistantConfigDialog(QDialog):
         self.stop_processing_signal.stop_signal.connect(self.stop_processing)
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
+        self.update_model_combobox()
         self.update_assistant_combobox()
 
         # Set the initial size of the dialog to make it wider
@@ -533,6 +534,7 @@ class AssistantConfigDialog(QDialog):
             self.assistantComboBox.setCurrentIndex(0)  # Set default to "New Assistant"
 
     def update_model_combobox(self):
+        self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
         self.modelComboBox.clear()
         try:
             ai_client = AIClientFactory.get_instance().get_client(self.ai_client_type)
@@ -693,7 +695,6 @@ class AssistantConfigDialog(QDialog):
             logger.error(f"Error displaying reviewed instructions: {e}")
 
     def pre_load_assistant_config(self, name):
-        self.update_model_combobox()
         self.assistant_config = AssistantConfigManager.get_instance().get_config(name)
         if self.assistant_config:
             self.nameEdit.setText(self.assistant_config.name)
