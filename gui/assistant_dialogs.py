@@ -871,8 +871,9 @@ class AssistantConfigDialog(QDialog):
                 vector_store_files[file_path] = file_id
 
             id = self.vector_store_ids[0] if self.vector_store_ids else None
-            vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
-            vector_stores.append(vector_store)
+            if id or vector_store_files:
+                vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
+                vector_stores.append(vector_store)
 
             tool_resources = ToolResources(
                 code_interpreter_files=code_interpreter_files,
