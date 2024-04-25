@@ -306,7 +306,10 @@ class AssistantClient(BaseAssistantClient):
             assistant_config_vs = None
             if assistant_config.tool_resources.file_search_vector_stores:
                 assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-                if set(assistant_config_vs.files.values()) != existing_file_ids:
+                if not existing_vs_ids and assistant_config_vs.id is None:
+                    self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
+                    assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+                elif set(assistant_config_vs.files.values()) != existing_file_ids:
                     if existing_vs_ids:
                         self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
                         self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
@@ -317,7 +320,7 @@ class AssistantClient(BaseAssistantClient):
                     "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values())
                 },
                 "file_search": {
-                    "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
+                    "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs and assistant_config_vs.id is not None else []
                 }
             }
             return tool_resources
@@ -573,7 +576,7 @@ class AssistantClient(BaseAssistantClient):
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
-            function_response = self._handle_function_call(tool_call.function.name, tool_call.function.arguments)
+            function_response = str(self._handle_function_call(tool_call.function.name, tool_call.function.arguments))
             end_time = time.time()
             logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")

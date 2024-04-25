@@ -720,7 +720,7 @@ class AssistantConfigDialog(QDialog):
                         item.setData(Qt.UserRole, file_id)
                         self.file_search_files[file_path] = file_id
                         self.fileSearchList.addItem(item)
-                    self.fileSearchCheckBox.setChecked(bool(self.assistant_config.tool_resources.file_search_vector_stores))
+                    self.fileSearchCheckBox.setChecked(bool(self.assistant_config.file_search))
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
@@ -870,10 +870,9 @@ class AssistantConfigDialog(QDialog):
                 file_id = item.data(Qt.UserRole)  # Assuming file ID is stored as UserRole data
                 vector_store_files[file_path] = file_id
 
-            if vector_store_files:
-                id = self.vector_store_ids[0] if self.vector_store_ids else None
-                vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
-                vector_stores.append(vector_store)
+            id = self.vector_store_ids[0] if self.vector_store_ids else None
+            vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
+            vector_stores.append(vector_store)
 
             tool_resources = ToolResources(
                 code_interpreter_files=code_interpreter_files,
