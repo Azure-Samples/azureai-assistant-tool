@@ -288,7 +288,9 @@ class AssistantClient(BaseAssistantClient):
         try:
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
             # code interpreter files
-            existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
+            existing_file_ids = set()
+            if assistant.tool_resources.code_interpreter:
+                existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
             self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
             self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
 
@@ -301,11 +303,13 @@ class AssistantClient(BaseAssistantClient):
                 existing_file_ids = set([file.id for file in all_files_in_vs])
 
             # if there are new files to upload or delete, recreate the vector store
-            assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-            if set(assistant_config_vs.files.values()) != existing_file_ids:
-                if existing_vs_ids:
-                    self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
-                    self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
+            assistant_config_vs = None
+            if assistant_config.tool_resources.file_search_vector_stores:
+                assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+                if set(assistant_config_vs.files.values()) != existing_file_ids:
+                    if existing_vs_ids:
+                        self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
+                        self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
 
             # Create the tool resources dictionary
             tool_resources = {

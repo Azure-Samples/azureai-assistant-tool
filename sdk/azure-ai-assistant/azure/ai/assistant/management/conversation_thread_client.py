@@ -11,7 +11,7 @@ from openai.types.beta.threads import (
     ImageFileContentBlock,
     TextContentBlock
 )
-from openai.types.beta.threads import Message
+from openai.types.beta.threads import Message, FileCitationAnnotation, FilePathAnnotation
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -185,13 +185,14 @@ class ConversationThreadClient:
 
         conversation = Conversation(self._ai_client_type)
         text_messages_count = 0
+
         for message in messages:
             logger.info(f"Processing message: {message}")
             if message.role == "assistant":
                 sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
                 if sender_name is None:
                     sender_name = "assistant"
-            if message.role == "user":
+            elif message.role == "user":
                 if message.metadata:
                     sender_name = message.metadata.get("chat_assistant", "assistant")
                     message.role = "assistant"
@@ -201,23 +202,39 @@ class ConversationThreadClient:
             for content_item in message.content:
                 if isinstance(content_item, TextContentBlock):
                     if max_text_messages is not None and text_messages_count >= max_text_messages:
-                        # If we've reached the max number of text messages, return the conversation early
                         return conversation
-                    # Add message to conversation and increment counter
+
+                    citations = []
+                    if content_item.text.annotations:
+                        for index, annotation in enumerate(content_item.text.annotations):
+                            # Replace the text with a footnote marker
+                            content_item.text.value = content_item.text.value.replace(annotation.text, f' [{index}]')
+                            
+                            # Handle file path annotations
+                            if isinstance(annotation, FilePathAnnotation):
+                                file_id = annotation.file_path.file_id
+                                file_name = annotation.text.split("/")[-1]
+                                conversation.add_file(file_id, file_name, message.role, sender_name)
+                                citations.append(f'[{index}] {file_name}')
+
+                            # Handle file citation annotations
+                            elif isinstance(annotation, FileCitationAnnotation):
+                                file_id = annotation.file_citation.file_id
+                                file_name = self._ai_client.files.retrieve(file_id).filename
+                                citations.append(f'[{index}] {file_name}')
+
+                    # Append citations at the end of the text content
+                    if citations:
+                        content_item.text.value += '\n' + '\n'.join(citations)
+
                     conversation.add_message(content_item.text.value, message.role, sender_name)
                     text_messages_count += 1
 
-                    file_annotations = content_item.text.annotations
-                    if file_annotations:
-                        for annotation in file_annotations:
-                            file_id = annotation.file_path.file_id
-                            sandbox_file_path = annotation.text
-                            file_name = sandbox_file_path.split("/")[-1]
-                            conversation.add_file(file_id, file_name, message.role, sender_name)
                 elif isinstance(content_item, ImageFileContentBlock):
                     file_id = content_item.image_file.file_id
-                    file_name = f"{file_id}.png" # file type is currently always png for images
+                    file_name = f"{file_id}.png"  # Assuming file type is currently always png for images
                     conversation.add_image(file_id, file_name, message.role, sender_name)
+
         return conversation
 
     def create_conversation_thread_message(
