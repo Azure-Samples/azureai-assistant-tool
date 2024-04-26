@@ -8,7 +8,10 @@ import os
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from pathlib import Path
 
+
+RESOURCES_PATH = Path(__file__).parent / 'resources'
 MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4-1106-preview')
 
 def generate_test_config(updates=None):
@@ -27,7 +30,7 @@ def generate_test_config(updates=None):
         "file_search": False,
         "code_interpreter": False,
         "output_folder_path": "output",
-        "ai_client_type": "AZURE_OPEN_AI"
+        "ai_client_type": "OPEN_AI"
     }
 
     if updates:
@@ -49,7 +52,7 @@ def test_assistant_client_init():
 
     client = AssistantClient(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -61,7 +64,7 @@ def test_assistant_client_from_json():
 
     client = AssistantClient.from_json(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -74,7 +77,7 @@ def test_assistant_client_sync_from_cloud():
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -139,6 +142,40 @@ def skip_test_assistant_client_enable_file_search():
     assert client.assistant_config.file_search == True
     client.purge()
 
+def test_assistant_client_tool_resources_file_search_create():
+    tool_resources = {
+        "code_interpreter": {
+            "files": {}
+        },
+        "file_search": {
+            "vector_stores": [
+                {
+                    "name": "test_vector_store",
+                    "id": None,
+                    "files": {
+                        str(RESOURCES_PATH / "product_info_1.md"): None
+                    },
+                    "metadata": {},
+                    "expires_after": None
+                }
+            ]
+        }
+    }
+    updates = {
+        "tool_resources": tool_resources,
+        "file_search": True
+    }
+
+    config = generate_test_config(updates)
+    config_json = json.dumps(config)
+    client = AssistantClient.from_json(config_json)
+    client = client.sync_from_cloud()
+    assert client.assistant_config.file_search == True
+    vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
+    assert vs_id is not None
+    client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.purge()
+
 def test_assistant_client_enable_code_interpreter():
     updates = {
         "code_interpreter": True
@@ -156,7 +193,7 @@ def test_assistant_client_create_thread_and_process_message():
     config_json = json.dumps(config)
 
     client = AssistantClient.from_json(config_json)
-    thread_client = ConversationThreadClient.get_instance(AIClientType.AZURE_OPEN_AI)
+    thread_client = ConversationThreadClient.get_instance(AIClientType.OPEN_AI)
     thread_name = thread_client.create_conversation_thread()
     thread_client.create_conversation_thread_message("Hello!", thread_name)
     client.process_messages(thread_name)

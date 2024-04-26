@@ -254,7 +254,10 @@ class VectorStoreConfig:
 
 
 class ToolResourcesConfig:
-    def __init__(self, code_interpreter_files=None, file_search_vector_stores=None):
+    def __init__(self, 
+                 code_interpreter_files : dict = None,
+                 file_search_vector_stores : list[VectorStoreConfig] = None):
+
         self._code_interpreter_files = code_interpreter_files or {}
         self._file_search_vector_stores = file_search_vector_stores or []
 

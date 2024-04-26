@@ -299,3 +299,13 @@ class BaseAssistantClient:
         :rtype: AssistantConfig
         """
         return self._assistant_config
+    
+    @property
+    def ai_client(self) -> Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]:
+        """
+        The AI client used by the chat assistant.
+
+        :return: The AI client.
+        :rtype: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]
+        """
+        return self._ai_client

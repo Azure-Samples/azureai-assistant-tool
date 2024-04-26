@@ -138,8 +138,6 @@ class AssistantClient(BaseAssistantClient):
         :rtype: AssistantClient
         """
         try:
-            # If not registered, retrieve data from cloud and register it to AssistantConfig using AssistantConfigManager
-            #TODO fill the config data from the cloud service by default
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
             if assistant_config is None:
@@ -153,12 +151,35 @@ class AssistantClient(BaseAssistantClient):
             #assistant_config.text_completion_config.temperature = assistant.temperature
             #assistant_config.text_completion_config.top_p = assistant.top_p
             assistant_config.model = assistant.model
-            code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
-            file_search_vector_stores = dict(zip(assistant_config.tool_resources.file_search_vector_stores.keys(), assistant.tool_resources.file_search.vector_store_ids))
-            assistant_config.tool_resources = ToolResourcesConfig(
-                code_interpreter_files=code_interpreter_files,
-                file_search_vector_stores=file_search_vector_stores
-            )
+
+            # TODO currently files are not synced from cloud to local
+            code_interpreter_file_ids_cloud = []
+            if assistant.tool_resources and assistant.tool_resources.code_interpreter:
+                code_interpreter_file_ids_cloud = assistant.tool_resources.code_interpreter.file_ids
+
+            if assistant_config.tool_resources and assistant_config.tool_resources.code_interpreter_files:
+                logger.info(f"Code interpreter files in local: {assistant_config.tool_resources.code_interpreter_files}")
+                for file_id in code_interpreter_file_ids_cloud:
+                    file_name = self._ai_client.files.retrieve(file_id).filename
+                    logger.info(f"Code interpreter file id: {file_id}, name: {file_name} in cloud")
+
+            file_search_vs_ids_cloud = []
+            if assistant.tool_resources and assistant.tool_resources.file_search:
+                file_search_vs_ids_cloud = assistant.tool_resources.file_search.vector_store_ids
+                files_in_vs_cloud = list(self._ai_client.beta.vector_stores.files.list(file_search_vs_ids_cloud[0], timeout=timeout))
+                file_search_file_ids_cloud = [file.id for file in files_in_vs_cloud]
+
+            if assistant_config.tool_resources and assistant_config.tool_resources.file_search_vector_stores:
+                logger.info(f"File search vector stores in local: {assistant_config.tool_resources.file_search_vector_stores}")
+                for file_id in file_search_file_ids_cloud:
+                    file_name = self._ai_client.files.retrieve(file_id).filename
+                    logger.info(f"File search file id: {file_id}, name: {file_name} in cloud")
+
+            #assistant_config.tool_resources = ToolResourcesConfig(
+            #    code_interpreter_files=code_interpreter_files,
+            #    file_search_vector_stores=file_search_vector_stores
+            #)
+
             assistant_config.functions = [
                 tool.function.model_dump() for tool in assistant.tools if tool.type == "function"
             ]
@@ -246,12 +267,19 @@ class AssistantClient(BaseAssistantClient):
     ) -> dict:
 
         logger.info(f"Creating tool resources for assistant: {assistant_config.name}")
-        # Upload the code interpreter files
-        self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
-        code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
 
-        assistant_config_vs = None
+        if not assistant_config.tool_resources:
+            logger.info("No tool resources provided for assistant.")
+            return None
+
+        # Upload the code interpreter files
+        code_interpreter_file_ids = []
+        if assistant_config.tool_resources.code_interpreter_files:
+            self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+            code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
+
         # create the vector store for file search
+        assistant_config_vs = None
         if assistant_config.tool_resources.file_search_vector_stores:
             assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
             self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
@@ -296,6 +324,11 @@ class AssistantClient(BaseAssistantClient):
 
         try:
             logger.info(f"Updating tool resources for assistant: {assistant_config.name}")
+
+            if not assistant_config.tool_resources:
+                logger.info("No tool resources provided for assistant.")
+                return None
+
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
             # code interpreter files
             existing_file_ids = set()
