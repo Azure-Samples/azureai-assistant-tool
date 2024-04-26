@@ -148,11 +148,16 @@ class AssistantClient(BaseAssistantClient):
             # Retrieve the assistant from the cloud service and update the local configuration
             assistant = self._retrieve_assistant(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
+            # TODO text_completion_config parameters are currently used in runs only, not assistant creation
+            #assistant_config.text_completion_config.response_format  = assistant.response_format.type
+            #assistant_config.text_completion_config.temperature = assistant.temperature
+            #assistant_config.text_completion_config.top_p = assistant.top_p
             assistant_config.model = assistant.model
-            new_code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
+            code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
+            file_search_vector_stores = dict(zip(assistant_config.tool_resources.file_search_vector_stores.keys(), assistant.tool_resources.file_search.vector_store_ids))
             assistant_config.tool_resources = ToolResourcesConfig(
-                code_interpreter_files=new_code_interpreter_files,
-                file_search_files={}
+                code_interpreter_files=code_interpreter_files,
+                file_search_vector_stores=file_search_vector_stores
             )
             assistant_config.functions = [
                 tool.function.model_dump() for tool in assistant.tools if tool.type == "function"

@@ -22,9 +22,9 @@ def generate_test_config(updates=None):
         "name": "assistant_test",
         "instructions": "You are test assistant with awareness of time",
         "model": MODEL_ENV_VAR,  # Use the model from the environment variable
-        "knowledge_files": {},
-        "selected_functions": [],  # Start with an empty list of selected functions
-        "knowledge_retrieval": False,
+        "tool_resources": {},
+        "functions": [],
+        "file_search": False,
         "code_interpreter": False,
         "output_folder_path": "output",
         "ai_client_type": "AZURE_OPEN_AI"
@@ -102,7 +102,7 @@ def test_assistant_client_purge():
 def test_assistant_client_add_fetch_current_datetime_function():
     # Adding the fetch_current_datetime function in the update
     updates = {
-        "selected_functions": [
+        "functions": [
             {
                 "type": "function",
                 "function": {
@@ -123,20 +123,20 @@ def test_assistant_client_add_fetch_current_datetime_function():
     config_json = json.dumps(config)
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
-    assert len(client.assistant_config.selected_functions) == 1
-    assert client.assistant_config.selected_functions[0]['function']['name'] == "fetch_current_datetime"
+    assert len(client.assistant_config.functions) == 1
+    assert client.assistant_config.functions[0]['function']['name'] == "fetch_current_datetime"
     client.purge()
 
-def skip_test_assistant_client_enable_knowledge_retrieval():
+def skip_test_assistant_client_enable_file_search():
     updates = {
-        "knowledge_retrieval": True
+        "file_search": True
     }
 
     config = generate_test_config(updates)
     config_json = json.dumps(config)
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
-    assert client.assistant_config.knowledge_retrieval == True
+    assert client.assistant_config.file_search == True
     client.purge()
 
 def test_assistant_client_enable_code_interpreter():
