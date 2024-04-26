@@ -179,35 +179,87 @@ class AssistantTextCompletionConfig:
         self._truncation_strategy = value
 
 
-class VectorStore:
-    def __init__(self, id=None, files=None, metadata=None):
+class VectorStoreConfig:
+    def __init__(self,
+                 name : str,
+                 id : str = None,
+                 files : dict = None,
+                 metadata : dict = None,
+                 expires_after : dict = None
+    ):
+        self.name = name
         self.id = id
-        self.files = files or {}
-        self.metadata = metadata or {}
+        self.files = files
+        self.metadata = metadata
+        self.expires_after = expires_after
 
     def __eq__(self, other):
-        if not isinstance(other, VectorStore):
+        if not isinstance(other, VectorStoreConfig):
             return NotImplemented
 
-        return (self.id == other.id and
+        return (self.name == other.name and
+                self.id == other.id and
                 self.files == other.files and
-                self.metadata == other.metadata)
+                self.metadata == other.metadata and
+                self.expires_after == other.expires_after)
 
     def to_dict(self):
         return {
+            'name': self.name,
             'id': self.id,
             'files': self.files,
-            'metadata': self.metadata
+            'metadata': self.metadata,
+            'expires_after': self.expires_after
         }
 
+    @property
+    def name(self) -> str:
+        return self._name
+    
+    @name.setter
+    def name(self, value):
+        self._name = value
 
-class ToolResources:
+    @property
+    def id(self) -> str:
+        return self._id
+    
+    @id.setter
+    def id(self, value):
+        self._id = value
+
+    @property
+    def files(self) -> dict:
+        return self._files
+    
+    @files.setter
+    def files(self, value):
+        self._files = value
+
+    @property
+    def metadata(self) -> dict:
+        return self._metadata
+    
+    @metadata.setter
+    def metadata(self, value):
+        self._metadata = value
+
+    @property
+    def expires_after(self) -> dict:
+        return self._expires_after
+    
+    @expires_after.setter
+    def expires_after(self, value):
+        self._expires_after = value
+
+
+class ToolResourcesConfig:
     def __init__(self, code_interpreter_files=None, file_search_vector_stores=None):
         self._code_interpreter_files = code_interpreter_files or {}
         self._file_search_vector_stores = file_search_vector_stores or []
 
     def __eq__(self, other):
-        if not isinstance(other, ToolResources):
+        if not isinstance(other, ToolResourcesConfig):
             return NotImplemented
 
         return (self.code_interpreter_files == other.code_interpreter_files and
@@ -232,7 +284,7 @@ class ToolResources:
         self._code_interpreter_files = value
 
     @property
-    def file_search_vector_stores(self) -> list[VectorStore]:
+    def file_search_vector_stores(self) -> list[VectorStoreConfig]:
         return self._file_search_vector_stores
     
     @file_search_vector_stores.setter
@@ -335,14 +387,16 @@ class AssistantConfig:
             file_search_vector_stores_data = tool_resources_data.get('file_search', {}).get('vector_stores', [])
             
             file_search_vector_stores = [
-                VectorStore(
+                VectorStoreConfig(
+                    name=store.get('name'),
                     id=store.get('id'), 
                     files=store.get('files', []), 
-                    metadata=store.get('metadata', {})
+                    metadata=store.get('metadata', {}),
+                    expires_after=store.get('expires_after', {})
                 ) for store in file_search_vector_stores_data
             ]
             
-            return ToolResources(
+            return ToolResourcesConfig(
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
@@ -496,7 +550,7 @@ class AssistantConfig:
         self._file_references = value
 
     @property
-    def tool_resources(self) -> ToolResources:
+    def tool_resources(self) -> ToolResourcesConfig:
         """Get the tool resources.
         
         :return: The tool resources.

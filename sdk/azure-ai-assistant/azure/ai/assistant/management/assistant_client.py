@@ -4,8 +4,8 @@
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_config import VectorStore
-from azure.ai.assistant.management.assistant_config import ToolResources
+from azure.ai.assistant.management.assistant_config import VectorStoreConfig
+from azure.ai.assistant.management.assistant_config import ToolResourcesConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
@@ -150,7 +150,7 @@ class AssistantClient(BaseAssistantClient):
             assistant_config.instructions = assistant.instructions
             assistant_config.model = assistant.model
             new_code_interpreter_files = dict(zip(assistant_config.tool_resources.code_interpreter_files.keys(), assistant.tool_resources.code_interpreter.file_ids))
-            assistant_config.tool_resources = ToolResources(
+            assistant_config.tool_resources = ToolResourcesConfig(
                 code_interpreter_files=new_code_interpreter_files,
                 file_search_files={}
             )
@@ -267,13 +267,15 @@ class AssistantClient(BaseAssistantClient):
     def _create_vector_store_with_files(
             self,
             assistant_config: AssistantConfig,
-            vector_store: VectorStore,
+            vector_store: VectorStoreConfig,
             timeout: Optional[float] = None
     ) -> str:
         try:
             client_vs = self._ai_client.beta.vector_stores.create(
-                name=f"Assistant {assistant_config.name} vector store",
+                name=vector_store.name,
                 file_ids = list(vector_store.files.values()),
+                metadata=vector_store.metadata,
+                expires_after=vector_store.expires_after,
                 timeout=timeout
             )
             return client_vs.id

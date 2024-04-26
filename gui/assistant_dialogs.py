@@ -12,7 +12,7 @@ from PySide6.QtGui import QIcon, QTextOption
 import json, os, shutil, threading
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.assistant_config import ToolResources, VectorStore
+from azure.ai.assistant.management.assistant_config import ToolResourcesConfig, VectorStoreConfig
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 from azure.ai.assistant.management.logger_module import logger
@@ -589,6 +589,8 @@ class AssistantConfigDialog(QDialog):
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
         self.assistant_config = None
+        self.fileSearchList.clear()
+        self.codeFileList.clear()
 
     def create_instructions_tab(self):
         instructionsEditorTab = QWidget()
@@ -883,10 +885,12 @@ class AssistantConfigDialog(QDialog):
 
             id = self.vector_store_ids[0] if self.vector_store_ids else None
             if id or vector_store_files:
-                vector_store = VectorStore(id=id, files=vector_store_files, metadata={})
+                vector_store = VectorStoreConfig(name=f"Assistant {self.assistant_name} vector store",
+                                                 id=id,
+                                                 files=vector_store_files)
                 vector_stores.append(vector_store)
 
-            tool_resources = ToolResources(
+            tool_resources = ToolResourcesConfig(
                 code_interpreter_files=code_interpreter_files,
                 file_search_vector_stores=vector_stores
             )

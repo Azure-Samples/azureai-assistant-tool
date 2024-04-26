@@ -317,6 +317,7 @@ class ConversationSidebar(QWidget):
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
+            self.dialog.update_assistant_combobox()
         except Exception as e:
             QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
 
