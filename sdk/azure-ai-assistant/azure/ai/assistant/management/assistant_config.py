@@ -9,6 +9,26 @@ from typing import Optional, Union
 
 
 class TextCompletionConfig:
+    """
+    A class representing the configuration for text completion.
+
+    :param frequency_penalty: The frequency penalty.
+    :type frequency_penalty: float
+    :param max_tokens: The maximum number of tokens.
+    :type max_tokens: int
+    :param presence_penalty: The presence penalty.
+    :type presence_penalty: float
+    :param response_format: The response format.
+    :type response_format: str
+    :param temperature: The temperature.
+    :type temperature: float
+    :param top_p: The top p.
+    :type top_p: float
+    :param seed: The seed.
+    :type seed: Optional[int]
+    :param max_text_messages: The maximum number of text messages.
+    :type max_text_messages: Optional[int]
+    """
     def __init__(self, 
                  frequency_penalty: float, 
                  max_tokens: int, 
@@ -106,6 +126,22 @@ class TextCompletionConfig:
 
 
 class AssistantTextCompletionConfig:
+    """
+    A class representing the configuration for assistant text completion.
+
+    :param temperature: The temperature.
+    :type temperature: float
+    :param max_completion_tokens: The maximum number of completion tokens.
+    :type max_completion_tokens: int
+    :param max_prompt_tokens: The maximum number of prompt tokens.
+    :type max_prompt_tokens: int
+    :param top_p: The top p.
+    :type top_p: float
+    :param response_format: The response format.
+    :type response_format: str
+    :param truncation_strategy: The truncation strategy.
+    :type truncation_strategy: dict
+    """
     def __init__(self, 
                  temperature: float, 
                  max_completion_tokens: int,
@@ -180,6 +216,20 @@ class AssistantTextCompletionConfig:
 
 
 class VectorStoreConfig:
+    """
+    A class representing the configuration for a vector store.
+
+    :param name: The name of the vector store.
+    :type name: str
+    :param id: The ID of the vector store.
+    :type id: str
+    :param files: The files.
+    :type files: dict
+    :param metadata: The metadata.
+    :type metadata: dict
+    :param expires_after: The expiration time.
+    :type expires_after: dict
+    """
     def __init__(self,
                  name : str,
                  id : str = None,
@@ -254,12 +304,20 @@ class VectorStoreConfig:
 
 
 class ToolResourcesConfig:
+    """
+    A class representing the configuration for tool resources.
+
+    :param code_interpreter_files: The code interpreter files.
+    :type code_interpreter_files: dict
+    :param file_search_vector_stores: The file search vector stores.
+    :type file_search_vector_stores: list[VectorStoreConfig]
+    """
     def __init__(self, 
                  code_interpreter_files : dict = None,
                  file_search_vector_stores : list[VectorStoreConfig] = None):
 
-        self._code_interpreter_files = code_interpreter_files or {}
-        self._file_search_vector_stores = file_search_vector_stores or []
+        self._code_interpreter_files = code_interpreter_files
+        self._file_search_vector_stores = file_search_vector_stores
 
     def __eq__(self, other):
         if not isinstance(other, ToolResourcesConfig):
@@ -274,7 +332,7 @@ class ToolResourcesConfig:
                 'files': self.code_interpreter_files
             },
             'file_search': {
-                'vector_stores': [vs.to_dict() for vs in self.file_search_vector_stores]
+                'vector_stores': [vs.to_dict() for vs in self.file_search_vector_stores] if self.file_search_vector_stores is not None else None
             }
         }
     
@@ -299,17 +357,14 @@ class AssistantConfig:
     """
     A class representing the configuration for an assistant.
 
-    :param name: The name of the assistant.
-    :type name: str
     :param config_data: The configuration data for the assistant.
     :type config_data: dict
     """
     def __init__(self, 
-                 name : str,
                  config_data : dict
     ) -> None:
-        self._name = name
         self._config_data = config_data
+        self._name = config_data['name']
         self._instructions = self.remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
         
         # Initialize assistant_id appropriately based on presence and content in config_data
@@ -319,7 +374,7 @@ class AssistantConfig:
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
-        self._tool_resources = self.initialize_tool_resources(config_data.get('tool_resources'))
+        self._tool_resources = self._initialize_tool_resources(config_data.get('tool_resources'))
 
         self._functions = config_data.get('functions', [])
         self._function_configs = self._get_function_configs()
@@ -383,27 +438,29 @@ class AssistantConfig:
                     truncation_strategy=completion_data['truncation_strategy']
                 )
 
-    def initialize_tool_resources(self, tool_resources_data):
-        """Initialize ToolResources based on the provided data."""
+    def _initialize_tool_resources(self, tool_resources_data):
         if tool_resources_data:
             code_interpreter_files = tool_resources_data.get('code_interpreter', {}).get('files', {})
             file_search_vector_stores_data = tool_resources_data.get('file_search', {}).get('vector_stores', [])
             
-            file_search_vector_stores = [
-                VectorStoreConfig(
-                    name=store.get('name'),
-                    id=store.get('id'), 
-                    files=store.get('files', []), 
-                    metadata=store.get('metadata', {}),
-                    expires_after=store.get('expires_after', {})
-                ) for store in file_search_vector_stores_data
-            ]
-            
+            if file_search_vector_stores_data is not None:
+                file_search_vector_stores = [
+                    VectorStoreConfig(
+                        name=store.get('name'),
+                        id=store.get('id'), 
+                        files=store.get('files', []), 
+                        metadata=store.get('metadata', {}),
+                        expires_after=store.get('expires_after', {})
+                    ) for store in file_search_vector_stores_data
+                ]
+            else:
+                file_search_vector_stores = None
+
             return ToolResourcesConfig(
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        return None
+        return ToolResourcesConfig()
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -434,7 +491,7 @@ class AssistantConfig:
         :return: The AssistantConfig object.
         :rtype: AssistantConfig
         """
-        return AssistantConfig(config_data['name'], config_data)
+        return AssistantConfig(config_data)
 
     def to_json(self) -> str:
         """Return the configuration data as a JSON string.
@@ -442,7 +499,11 @@ class AssistantConfig:
         :return: The configuration data as a JSON string.
         :rtype: str
         """
-        return json.dumps(self._get_config_data(), indent=4)
+        try:
+            return json.dumps(self._get_config_data(), indent=4)
+        except Exception as e:
+            logger.error(f"Error converting config to JSON: {e}")
+            return None
 
     def _get_config_data(self):
         self._config_data['name'] = self._name

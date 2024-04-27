@@ -334,8 +334,9 @@ class AssistantClient(BaseAssistantClient):
             existing_file_ids = set()
             if assistant.tool_resources.code_interpreter:
                 existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
-            self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
-            self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+            if assistant_config.tool_resources.code_interpreter_files:
+                self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+                self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
 
             # file search files in cloud
             existing_vs_ids = []
@@ -360,7 +361,7 @@ class AssistantClient(BaseAssistantClient):
             # Create the tool resources dictionary
             tool_resources = {
                 "code_interpreter": {
-                    "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values())
+                    "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values()) if assistant_config.tool_resources.code_interpreter_files else []
                 },
                 "file_search": {
                     "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs and assistant_config_vs.id is not None else []

@@ -175,7 +175,7 @@ class AssistantConfigManager:
                     assistant_name = config_data.get('name')
                     if assistant_name:
                         logger.info(f"Loaded assistant configuration for '{assistant_name}'")
-                        assistant_config = AssistantConfig(assistant_name, config_data)
+                        assistant_config = AssistantConfig(config_data)
                         self._configs[assistant_name] = assistant_config
                         loaded_assistants.add(base_name)
 
@@ -330,7 +330,7 @@ class AssistantConfigManager:
         config_path = os.path.join(self._config_folder, config_filename)
 
         # Update in-memory configuration
-        self._configs[assistant_name] = AssistantConfig(assistant_name, config_data)
+        self._configs[assistant_name] = AssistantConfig(config_data)
         
         logger.info(f"Saving updated configuration for '{assistant_name}' in YAML format")
 

@@ -6,8 +6,11 @@ import json
 import os
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantConfig, VectorStoreConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+
+import time
 from pathlib import Path
 
 
@@ -142,7 +145,8 @@ def skip_test_assistant_client_enable_file_search():
     assert client.assistant_config.file_search == True
     client.purge()
 
-def test_assistant_client_tool_resources_file_search_create():
+def test_assistant_client_tool_resources_file_search_create_with_file_json():
+    file1 = str(RESOURCES_PATH / "product_info_1.md")
     tool_resources = {
         "code_interpreter": {
             "files": {}
@@ -153,7 +157,7 @@ def test_assistant_client_tool_resources_file_search_create():
                     "name": "test_vector_store",
                     "id": None,
                     "files": {
-                        str(RESOURCES_PATH / "product_info_1.md"): None
+                        file1: None
                     },
                     "metadata": {},
                     "expires_after": None
@@ -169,11 +173,35 @@ def test_assistant_client_tool_resources_file_search_create():
     config = generate_test_config(updates)
     config_json = json.dumps(config)
     client = AssistantClient.from_json(config_json)
-    client = client.sync_from_cloud()
     assert client.assistant_config.file_search == True
     vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
     assert vs_id is not None
+    file_id = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file1]
+    assert file_id is not None
     client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.ai_client.files.delete(file_id)
+    client.purge()
+
+def test_assistant_client_tool_resources_file_search_create_with_file_config():
+    config_data = generate_test_config()
+    assistant_config = AssistantConfig(config_data)
+    file_1 = str(RESOURCES_PATH / "product_info_1.md")
+    assistant_config.file_search = True
+    assistant_config.tool_resources.code_interpreter_files = {}
+    vs_config = VectorStoreConfig(name="test_vector_store",
+                                  id=None,
+                                  files={file_1: None},
+                                  metadata={},
+                                  expires_after=None)
+    assistant_config.tool_resources.file_search_vector_stores = [vs_config]
+    client = AssistantClient.from_config(assistant_config)
+    assert client.assistant_config.file_search == True
+    vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
+    assert vs_id is not None
+    file_id = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file_1]
+    assert file_id is not None
+    client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.ai_client.files.delete(file_id)
     client.purge()
 
 def test_assistant_client_enable_code_interpreter():
