@@ -250,6 +250,12 @@ class ConversationSidebar(QWidget):
 
         # Create a list widget for displaying the threads
         self.threadList = CustomListWidget(self)
+        self.threadList.setStyleSheet("QListWidget {"
+            "  border-style: solid;"
+            "  border-width: 1px;"
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  padding: 1px;"
+            "}")
         self.threadList.setFont(QFont("Arial", 11))
 
         # Create connections for the thread and button
@@ -263,6 +269,12 @@ class ConversationSidebar(QWidget):
         self.assistantList = QListWidget(self)
         self.assistantList.setFont(QFont("Arial", 11))
         self.assistantList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.assistantList.setStyleSheet("QListWidget {"
+            "  border-style: solid;"
+            "  border-width: 1px;"
+            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
+            "  padding: 1px;"
+            "}")
         self.assistantList.itemDoubleClicked.connect(self.on_assistant_double_clicked)
         self.assistantList.setToolTip("Select assistants to use in the conversation or double-click to edit the selected assistant.")
         self.threadList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)

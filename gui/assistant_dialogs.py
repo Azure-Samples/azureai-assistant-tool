@@ -5,7 +5,7 @@
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
 from PySide6 import QtGui
-from PySide6.QtWidgets import QDialog, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QSizePolicy, QScrollArea, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QIcon, QTextOption
 
@@ -148,7 +148,7 @@ class AssistantConfigDialog(QDialog):
         self.update_assistant_combobox()
 
         # Set the initial size of the dialog to make it wider
-        self.resize(600, 600)  # Adjusted to a more standard size, you can change it back to 600x900 if needed
+        self.resize(600, 600)
 
     def create_config_tab(self):
         configTab = QWidget()  # Configuration tab
@@ -206,6 +206,7 @@ class AssistantConfigDialog(QDialog):
         # File references, Add File, and Remove File buttons
         self.fileReferenceLabel = QLabel('File References for Instructions:')
         self.fileReferenceList = QListWidget()
+        self.fileReferenceList.setMaximumHeight(100)
         self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:0}, where 0 is the index of the file in the list")
         self.fileReferenceList.setStyleSheet(
             "QListWidget {"
@@ -267,20 +268,33 @@ class AssistantConfigDialog(QDialog):
         toolsTab = QWidget()
         toolsLayout = QVBoxLayout(toolsTab)
 
-        # Scroll Area for functions
-        self.scrollArea = QScrollArea(self)
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollWidget = QWidget()
-        self.scrollLayout = QVBoxLayout(self.scrollWidget)
+        # Splitter for system and user functions
+        splitter = QSplitter(Qt.Vertical)  # Use Qt.Horizontal for a horizontal splitter if preferred
+        toolsLayout.addWidget(splitter)
+
+        # Group box for system functions
+        systemFunctionsGroup = QGroupBox("System Functions")
+        systemFunctionsLayout = QVBoxLayout(systemFunctionsGroup)
+        self.systemFunctionsList = QListWidget()
+        systemFunctionsLayout.addWidget(self.systemFunctionsList)
+        splitter.addWidget(systemFunctionsGroup)
+
+        # Group box for user functions
+        userFunctionsGroup = QGroupBox("User Functions")
+        userFunctionsLayout = QVBoxLayout(userFunctionsGroup)
+        self.userFunctionsList = QListWidget()
+        userFunctionsLayout.addWidget(self.userFunctionsList)
+        splitter.addWidget(userFunctionsGroup)
+
+        self.systemFunctionsList.itemChanged.connect(self.handle_function_selection)
+        self.userFunctionsList.itemChanged.connect(self.handle_function_selection)
 
         # Function sections
         if self.function_config_manager:
-            function_configs =  self.function_config_manager.get_function_configs()
+            function_configs = self.function_config_manager.get_function_configs()
             for function_type, funcs in function_configs.items():
-                self.create_function_section(self.scrollLayout, function_type, funcs)
-
-        self.scrollArea.setWidget(self.scrollWidget)
-        toolsLayout.addWidget(self.scrollArea)
+                list_widget = self.systemFunctionsList if function_type == 'system' else self.userFunctionsList
+                self.create_function_section(list_widget, function_type, funcs)
 
         if self.assistant_type == "assistant":
             # Section for managing code interpreter files
@@ -589,8 +603,10 @@ class AssistantConfigDialog(QDialog):
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
         self.assistant_config = None
-        self.fileSearchList.clear()
-        self.codeFileList.clear()
+        if hasattr(self, 'fileSearchList'):            
+            self.fileSearchList.clear()
+        if hasattr(self, 'codeFileList'):
+            self.codeFileList.clear()
 
     def create_instructions_tab(self):
         instructionsEditorTab = QWidget()
@@ -780,32 +796,41 @@ class AssistantConfigDialog(QDialog):
             func_name = func['function']['name']
 
             # Find the category of each function
-            function_configs =  self.function_config_manager.get_function_configs()
+            function_configs = self.function_config_manager.get_function_configs()
             for func_type, funcs in function_configs.items():
-                if any(func_config.name == func_name for func_config in funcs):
-                    # Check the corresponding checkbox
-                    for checkBox in self.checkBoxes.get(func_type, []):
-                        if checkBox.text() == func_name:
-                            checkBox.setChecked(True)
+                # Check if the function is in the current category and set the corresponding item as checked
+                for func_config in funcs:
+                    if func_config.name == func_name:
+                        list_widget = self.systemFunctionsList if func_type == 'system' else self.userFunctionsList
+                        for i in range(list_widget.count()):
+                            listItem = list_widget.item(i)
+                            if listItem.text() == func_name:
+                                listItem.setCheckState(Qt.Checked)
+                                break  # Break since we've found and checked the item
 
-    def create_function_section(self, layout, function_type, funcs):
-        headerLabel = QLabel(f"{function_type.capitalize()} Functions:")
-        layout.addWidget(headerLabel)
-
-        self.checkBoxes[function_type] = []
-
+    def create_function_section(self, list_widget, function_type, funcs):
         for func_config in funcs:
-            checkBox = QCheckBox(func_config.name)
-            checkBox.stateChanged.connect(lambda state, fc=func_config: self.handle_function_selection(state, fc))
-            layout.addWidget(checkBox)
-            self.checkBoxes[function_type].append(checkBox)
+            listItem = QListWidgetItem(func_config.name)
+            listItem.setFlags(listItem.flags() | Qt.ItemIsUserCheckable)  # Allow the item to be checkable
+            listItem.setCheckState(Qt.Unchecked)
+            listItem.setData(Qt.UserRole, func_config)  # Store the function config object for later retrieval
+            list_widget.addItem(listItem)
 
-    def handle_function_selection(self, state, functionConfig):
-        if state == Qt.CheckState.Checked.value:
-            if functionConfig not in self.functions:
-                self.functions.append(functionConfig.get_full_spec())
-        elif state == Qt.CheckState.Unchecked.value:
-            self.functions = [f for f in self.functions if f['function']['name'] != functionConfig.name]
+    def handle_function_selection(self, item):
+        self.functions = []
+        
+        # Since the method now receives an item, we can check directly if this item is checked
+        if item.checkState() == Qt.Checked:
+            functionConfig = item.data(Qt.UserRole)
+            self.functions.append(functionConfig.get_full_spec())
+
+        # However, to maintain a complete list of checked items, we still need to iterate over all items
+        for listWidget in [self.systemFunctionsList, self.userFunctionsList]:
+            for i in range(listWidget.count()):
+                listItem = listWidget.item(i)
+                if listItem.checkState() == Qt.Checked:
+                    functionConfig = listItem.data(Qt.UserRole)
+                    self.functions.append(functionConfig.get_full_spec())
 
     def add_reference_file(self):
         self.fileReferenceList.addItem(QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)")[0])
