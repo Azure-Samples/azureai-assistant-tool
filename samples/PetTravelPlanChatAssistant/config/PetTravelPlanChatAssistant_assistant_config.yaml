@@ -12,9 +12,13 @@ instructions: |-
 model: gpt-4-1106-preview
 assistant_id: 770c45f7-fd9e-4364-a3ab-ef4d5d861b4c
 file_references:
-- C:/Git/forks/azureai-assistant-tool/samples/PetTravelPlanChatAssistant/FormTemplateForPetTransportation.yaml
-knowledge_files: {}
-selected_functions:
+- C:/Git/azureai-assistant-tool/samples/PetTravelPlanChatAssistant/FormTemplateForPetTransportation.yaml
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores: []
+functions:
 - type: function
   function:
     name: validate_booking_reference
@@ -68,10 +72,10 @@ selected_functions:
       required:
       - phone_number
       - message
-knowledge_retrieval: false
+file_search: false
 code_interpreter: false
 output_folder_path: output
-ai_client_type: AZURE_OPEN_AI
+ai_client_type: OPEN_AI
 assistant_type: chat_assistant
 completion_settings: null
 assistant_role: user

@@ -185,13 +185,14 @@ class AsyncConversationThreadClient:
 
         conversation = Conversation(self._ai_client_type)
         text_messages_count = 0
+
         for message in messages:
             logger.info(f"Processing message: {message}")
             if message.role == "assistant":
                 sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
                 if sender_name is None:
                     sender_name = "assistant"
-            if message.role == "user":
+            elif message.role == "user":
                 if message.metadata:
                     sender_name = message.metadata.get("chat_assistant", "assistant")
                     message.role = "assistant"
@@ -201,23 +202,39 @@ class AsyncConversationThreadClient:
             for content_item in message.content:
                 if isinstance(content_item, TextContentBlock):
                     if max_text_messages is not None and text_messages_count >= max_text_messages:
-                        # If we've reached the max number of text messages, return the conversation early
                         return conversation
-                    # Add message to conversation and increment counter
+
+                    citations = []
+                    if content_item.text.annotations:
+                        for index, annotation in enumerate(content_item.text.annotations):
+                            # Replace the text with a footnote marker
+                            content_item.text.value = content_item.text.value.replace(annotation.text, f' [{index}]')
+                            
+                            # Handle file path annotations
+                            if isinstance(annotation, FilePathAnnotation):
+                                file_id = annotation.file_path.file_id
+                                file_name = annotation.text.split("/")[-1]
+                                conversation.add_file(file_id, file_name, message.role, sender_name)
+                                citations.append(f'[{index}] {file_name}')
+
+                            # Handle file citation annotations
+                            elif isinstance(annotation, FileCitationAnnotation):
+                                file_id = annotation.file_citation.file_id
+                                file_name = self._ai_client.files.retrieve(file_id).filename
+                                citations.append(f'[{index}] {file_name}')
+
+                    # Append citations at the end of the text content
+                    if citations:
+                        content_item.text.value += '\n' + '\n'.join(citations)
+
                     conversation.add_message(content_item.text.value, message.role, sender_name)
                     text_messages_count += 1
 
-                    file_annotations = content_item.text.annotations
-                    if file_annotations:
-                        for annotation in file_annotations:
-                            file_id = annotation.file_path.file_id
-                            sandbox_file_path = annotation.text
-                            file_name = sandbox_file_path.split("/")[-1]
-                            conversation.add_file(file_id, file_name, message.role, sender_name)
                 elif isinstance(content_item, ImageFileContentBlock):
                     file_id = content_item.image_file.file_id
-                    file_name = f"{file_id}.png" # file type is currently always png for images
+                    file_name = f"{file_id}.png"  # Assuming file type is currently always png for images
                     conversation.add_image(file_id, file_name, message.role, sender_name)
+
         return conversation
 
     async def create_conversation_thread_message(
@@ -225,7 +242,7 @@ class AsyncConversationThreadClient:
             message : str,
             thread_name : str,
             role : Optional[str] = "user",
-            file_paths : Optional[list] = None,
+            attachments : Optional[list] = None,
             additional_instructions : Optional[str] = None,
             timeout : Optional[float] = None,
             metadata : Optional[dict] = None
@@ -250,12 +267,29 @@ class AsyncConversationThreadClient:
 
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            file_ids = await self._update_message_files(thread_id, file_paths) if file_paths is not None else []
+            #file_ids = self._update_message_files(thread_id, file_paths) if file_paths is not None else []
 
             # Update AssistantConfig with the changed additional instructions
             current_additional_instructions = self._thread_config.get_additional_instructions_of_thread(thread_id)
             if additional_instructions != current_additional_instructions:
                 self._thread_config.set_additional_instructions_to_thread(thread_id, additional_instructions)
+
+            """
+            attachments = [
+                {
+                    "file_id": file_id,
+                    "tools": [
+                        {"type": "code_interpreter"}
+                    ]
+                },
+                {
+                    "file_id": file_id,
+                    "tools": [
+                        {"type": "file_search"}
+                    ]
+                }
+            ]
+            """
 
             # Create the message with file IDs
             await self._ai_client.beta.threads.messages.create(
@@ -263,14 +297,13 @@ class AsyncConversationThreadClient:
                 role=role,
                 metadata=metadata,
                 content=message,
-                file_ids=file_ids,
                 timeout=timeout
             )
 
-            logger.info(f"Created message: {message} in thread: {thread_id}, files: {file_ids}")
+            logger.info(f"Created message: {message} in thread: {thread_id}, attachments: {attachments}")
         except Exception as e:
-            logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {file_ids}: {e}")
-            raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {file_ids}: {e}")
+            logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
+            raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
 
     async def _update_message_files(
             self, 
