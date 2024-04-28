@@ -11,7 +11,7 @@ from openai.types.beta.threads import (
     ImageFileContentBlock,
     TextContentBlock
 )
-from openai.types.beta.threads import Message
+from openai.types.beta.threads import Message, FilePathAnnotation, FileCitationAnnotation
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
