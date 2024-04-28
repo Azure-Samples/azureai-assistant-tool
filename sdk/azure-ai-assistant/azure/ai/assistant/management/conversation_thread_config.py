@@ -1,9 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import json
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.logger_module import logger
+
+import json, os
 
 
 class ConversationThreadConfig:
@@ -293,6 +294,9 @@ class ConversationThreadConfig:
         """
         Save the configuration for the specific ai_client_type to a JSON file.
         """
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(self._config_file), exist_ok=True)
+        
         # Read the existing configuration
         logger.info(f"Saving conversation thread configuration to {self._config_file}")
         try:
