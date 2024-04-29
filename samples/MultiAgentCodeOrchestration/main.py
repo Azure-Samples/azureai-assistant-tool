@@ -21,7 +21,7 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
     def __init__(self):
         self.task_completion_events = {}
         self._assistants: Dict[str, AsyncAssistantClient] = {}
-        self.conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.AZURE_OPEN_AI)
+        self.conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
         self.condition = asyncio.Condition()
         self.task_started = False
         super().__init__()
@@ -158,7 +158,7 @@ async def main():
     assistants = await initialize_assistants(assistant_names, orchestrator)
     task_manager = AsyncTaskManager(orchestrator)
 
-    conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.AZURE_OPEN_AI)
+    conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
     planner_thread = await conversation_thread_client.create_conversation_thread()
 
     while True:

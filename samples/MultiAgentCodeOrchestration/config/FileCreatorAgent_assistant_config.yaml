@@ -21,11 +21,11 @@ instructions: |-
 
   4. **User Notification**:
      - Inform the user about the successful creation of files and provide the file paths for reference.
-model: gpt-4-1106-preview
+model: gpt-3.5-turbo-0125
 assistant_id:
-file_references: null
-knowledge_files: {}
-selected_functions:
+file_references: []
+tool_resources: null
+functions:
 - type: function
   function:
     name: create_file_with_specified_content
@@ -52,7 +52,7 @@ selected_functions:
       - file_name
       - output_directory
       - content
-knowledge_retrieval: false
+file_search: false
 code_interpreter: false
 output_folder_path: output
 ai_client_type: AZURE_OPEN_AI
