@@ -383,13 +383,25 @@ class AssistantConfigDialog(QDialog):
     def init_assistant_completion_settings(self, completionLayout):
         self.init_common_completion_settings(completionLayout)
 
-        self.maxCompletionTokensLabel = QLabel('Max Completion Tokens:')
-        self.maxCompletionTokensEdit = QLineEdit()
+        maxCompletionTokensLayout = QHBoxLayout()
+        self.maxCompletionTokensLabel = QLabel('Max Completion Tokens (1-5000):')
+        self.maxCompletionTokensEdit = QSpinBox()
+        self.maxCompletionTokensEdit.setRange(1, 5000)
+        self.maxCompletionTokensEdit.setValue(1000)
         self.maxCompletionTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
+        maxCompletionTokensLayout.addWidget(self.maxCompletionTokensLabel)
+        maxCompletionTokensLayout.addWidget(self.maxCompletionTokensEdit)
+        completionLayout.addLayout(maxCompletionTokensLayout)
 
-        self.maxPromptTokensLabel = QLabel('Max Prompt Tokens:')
-        self.maxPromptTokensEdit = QLineEdit()
+        maxPromptTokensLayout = QHBoxLayout()
+        self.maxPromptTokensLabel = QLabel('Max Prompt Tokens (1-5000):')
+        self.maxPromptTokensEdit = QSpinBox()
+        self.maxPromptTokensEdit.setRange(1, 5000)
+        self.maxPromptTokensEdit.setValue(1000)
         self.maxPromptTokensEdit.setToolTip("The maximum number of tokens to include in the prompt. The model will use the prompt to generate the completion.")
+        maxPromptTokensLayout.addWidget(self.maxPromptTokensLabel)
+        maxPromptTokensLayout.addWidget(self.maxPromptTokensEdit)
+        completionLayout.addLayout(maxPromptTokensLayout)
 
         truncation_strategy_layout = QVBoxLayout()
         self.truncationStrategyLabel = QLabel('Truncation Strategy:')
@@ -407,16 +419,13 @@ class AssistantConfigDialog(QDialog):
 
         self.truncationTypeComboBox.currentTextChanged.connect(self.on_truncation_type_changed)
 
-        completionLayout.addWidget(self.maxCompletionTokensLabel)
-        completionLayout.addWidget(self.maxCompletionTokensEdit)
-        completionLayout.addWidget(self.maxPromptTokensLabel)
-        completionLayout.addWidget(self.maxPromptTokensEdit)
         completionLayout.addLayout(truncation_strategy_layout)
 
     def on_truncation_type_changed(self, text):
         # Enable or disable SpinBox based on selection
         if text == 'last_messages':
             self.lastMessagesSpinBox.setEnabled(True)
+            self.lastMessagesSpinBox.setValue(10)
         else:
             self.lastMessagesSpinBox.setDisabled(True)
             self.lastMessagesSpinBox.clear()
@@ -436,11 +445,15 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.frequencyPenaltySlider)
         completionLayout.addWidget(self.frequencyPenaltyValueLabel)
         
-        self.maxTokensLabel = QLabel('Max Tokens:')
-        self.maxTokensEdit = QLineEdit()
+        maxTokensLayout = QHBoxLayout()
+        self.maxTokensLabel = QLabel('Max Tokens (1-5000):')
+        self.maxTokensEdit = QSpinBox()
+        self.maxTokensEdit.setRange(1, 5000)
+        self.maxTokensEdit.setValue(1000)
         self.maxTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
-        completionLayout.addWidget(self.maxTokensLabel)
-        completionLayout.addWidget(self.maxTokensEdit)
+        maxTokensLayout.addWidget(self.maxTokensLabel)
+        maxTokensLayout.addWidget(self.maxTokensEdit)
+        completionLayout.addLayout(maxTokensLayout)
         
         self.presencePenaltyLabel = QLabel('Presence Penalty:')
         self.presencePenaltySlider = QSlider(Qt.Horizontal)
@@ -454,15 +467,11 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.presencePenaltySlider)
         completionLayout.addWidget(self.presencePenaltyValueLabel)
 
-        self.seedLabel = QLabel('Seed:')
-        self.seedEdit = QLineEdit()
-        self.seedEdit.setToolTip("If specified, system will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result. Determinism is not guaranteed, and you should refer to the system_fingerprint response parameter to monitor changes in the backend.")
-        completionLayout.addWidget(self.seedLabel)
-        completionLayout.addWidget(self.seedEdit)
-
         self.maxMessagesLayout = QHBoxLayout()
-        self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context:')
-        self.maxMessagesEdit = QLineEdit()
+        self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context (1-100):')
+        self.maxMessagesEdit = QSpinBox()
+        self.maxMessagesEdit.setRange(1, 100)
+        self.maxMessagesEdit.setValue(10)
         self.maxMessagesEdit.setToolTip("The maximum number of messages to include in the conversation thread context. If set to None, no limit will be applied.")
         self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
         self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
@@ -518,7 +527,6 @@ class AssistantConfigDialog(QDialog):
             self.presencePenaltySlider.setEnabled(isEnabled)
             self.responseFormatComboBox.setEnabled(isEnabled)
             self.topPSlider.setEnabled(isEnabled)
-            self.seedEdit.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
             self.temperatureSlider.setEnabled(isEnabled)
 
@@ -758,37 +766,46 @@ class AssistantConfigDialog(QDialog):
                 self.outputFolderPathEdit.setText(output_folder_path)
 
     def load_completion_settings(self, text_completion_config):
-        # Reset or use default settings if None
-        default_temp = 100
         if text_completion_config:
             self.useDefaultSettingsCheckBox.setChecked(False)
             completion_settings = text_completion_config.to_dict()
             # Load settings into UI elements based on assistant type
             if self.assistant_type == "assistant":
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
+                self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
+                self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
+                self.maxCompletionTokensEdit.setValue(completion_settings.get('max_completion_tokens', 1000))
+                self.maxPromptTokensEdit.setValue(completion_settings.get('max_prompt_tokens', 1000))
+                truncation_strategy = completion_settings.get('truncation_strategy', 'auto')
+                self.truncationTypeComboBox.setCurrentText(truncation_strategy)
+                if truncation_strategy == 'last_messages':
+                    self.lastMessagesSpinBox.setValue(completion_settings.get('last_messages', 10))
             elif self.assistant_type == "chat_assistant":
                 self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
-                self.maxTokensEdit.setText(str(completion_settings.get('max_tokens', 100)))
+                self.maxTokensEdit.setValue(completion_settings.get('max_tokens', 1000))
                 self.presencePenaltySlider.setValue(completion_settings.get('presence_penalty', 0) * 100)
                 self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
-                self.seedEdit.setText(str(completion_settings.get('seed', '')))  # Convert None to empty string
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
-                self.maxMessagesEdit.setText(str(completion_settings.get('max_text_messages', '')))
+                self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 10))
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
             if self.assistant_type == "assistant":
-                self.temperatureSlider.setValue(default_temp)
+                self.temperatureSlider.setValue(100)
+                self.topPSlider.setValue(100)
+                self.responseFormatComboBox.setCurrentText("text")
+                self.maxCompletionTokensEdit.setValue(1000)
+                self.maxPromptTokensEdit.setValue(1000)
+                self.truncationTypeComboBox.setCurrentText("auto")
             elif self.assistant_type == "chat_assistant":
                 self.frequencyPenaltySlider.setValue(0)
-                self.maxTokensEdit.setText("100")
+                self.maxTokensEdit.setValue(1000)
                 self.presencePenaltySlider.setValue(0)
                 self.responseFormatComboBox.setCurrentText("text")
-                self.seedEdit.setText("")
-                self.temperatureSlider.setValue(default_temp)
+                self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
-                self.maxMessagesEdit.setText("")
+                self.maxMessagesEdit.setValue(10)
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -870,13 +887,12 @@ class AssistantConfigDialog(QDialog):
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
-                    'max_tokens': int(self.maxTokensEdit.text()) if self.maxTokensEdit.text().isdigit() else 100,  # Ensure it's an integer and provide a default
+                    'max_tokens': self.maxTokensEdit.value(),
                     'presence_penalty': self.presencePenaltySlider.value() / 100,
                     'response_format': self.responseFormatComboBox.currentText(),
-                    'seed': int(self.seedEdit.text()) if self.seedEdit.text().isdigit() else None,  # Ensure it's an integer or None
                     'temperature': self.temperatureSlider.value() / 100,
                     'top_p': self.topPSlider.value() / 100,
-                    'max_text_messages': int(self.maxMessagesEdit.text()) if self.maxMessagesEdit.text().isdigit() else None  # Ensure it's an integer or None
+                    'max_text_messages': self.maxMessagesEdit.value()
                 }
         elif self.assistant_type == "assistant":
             if not self.useDefaultSettingsCheckBox.isChecked():
@@ -886,8 +902,8 @@ class AssistantConfigDialog(QDialog):
                 }
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
-                    'max_completion_tokens': int(self.maxCompletionTokensEdit.text()) if self.maxCompletionTokensEdit.text().isdigit() else None,
-                    'max_prompt_tokens': int(self.maxPromptTokensEdit.text()) if self.maxPromptTokensEdit.text().isdigit() else None,
+                    'max_completion_tokens': self.maxCompletionTokensEdit.value(),
+                    'max_prompt_tokens': self.maxPromptTokensEdit.value(),
                     'top_p': self.topPSlider.value() / 100,
                     'response_format': self.responseFormatComboBox.currentText(),
                     'truncation_strategy': truncation_strategy

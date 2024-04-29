@@ -237,11 +237,11 @@ class VectorStoreConfig:
                  metadata : dict = None,
                  expires_after : dict = None
     ):
-        self.name = name
-        self.id = id
-        self.files = files
-        self.metadata = metadata
-        self.expires_after = expires_after
+        self._name = name
+        self._id = id
+        self._files = files
+        self._metadata = metadata
+        self._expires_after = expires_after
 
     def __eq__(self, other):
         if not isinstance(other, VectorStoreConfig):
@@ -371,6 +371,7 @@ class AssistantConfig:
         self._assistant_id = config_data.get('assistant_id', None) if config_data.get('assistant_id', '') != '' else None
         self._ai_client_type = config_data.get('ai_client_type', 'OPEN_AI')
         self._model = config_data['model']
+        self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
@@ -386,7 +387,6 @@ class AssistantConfig:
         # Set default output folder as absolute path to 'output' folder in current directory
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
-        self._assistant_type = config_data.get('assistant_type', 'assistant')
         self._assistant_role = config_data.get('assistant_role', 'user')
 
         # Completion settings based on assistant type
@@ -397,7 +397,7 @@ class AssistantConfig:
             if self._assistant_type == 'chat_assistant':
                 completion_data = config_data.get('completion_settings', {
                     'frequency_penalty': 0.0,
-                    'max_tokens': 100,
+                    'max_tokens': 1000,
                     'presence_penalty': 0.0,
                     'response_format': 'text',
                     'temperature': 1.0,
@@ -413,14 +413,14 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     temperature=completion_data['temperature'],
                     top_p=completion_data['top_p'],
-                    seed=completion_data['seed'],
+                    seed=None,
                     max_text_messages=completion_data['max_text_messages']
                 )
             elif self._assistant_type == 'assistant':
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
-                    'max_completion_tokens': 100,
-                    'max_prompt_tokens': 100,
+                    'max_completion_tokens': 1000,
+                    'max_prompt_tokens': 1000,
                     'top_p': 1.0,
                     'response_format': 'text',
                     'truncation_strategy': {
@@ -460,7 +460,10 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        return ToolResourcesConfig()
+        if self._assistant_type == "chat_assistant":
+            return None
+        else:
+            return ToolResourcesConfig()
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
