@@ -243,7 +243,6 @@ class AsyncConversationThreadClient:
             thread_name : str,
             role : Optional[str] = "user",
             attachments : Optional[list] = None,
-            additional_instructions : Optional[str] = None,
             timeout : Optional[float] = None,
             metadata : Optional[dict] = None
     ) -> None:
@@ -256,10 +255,8 @@ class AsyncConversationThreadClient:
         :type thread_name: str
         :param role: The role of the message sender. Default is "user".
         :type role: str, optional
-        :param file_paths: The file paths to add to the message.
-        :type file_paths: list, optional
-        :param additional_instructions: The additional instructions to add to the message.
-        :type additional_instructions: str, optional
+        :param attachments: The list of attachments to add to the message.
+        :type attachments: list, optional
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
         """
@@ -267,35 +264,14 @@ class AsyncConversationThreadClient:
 
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            #file_ids = self._update_message_files(thread_id, file_paths) if file_paths is not None else []
+            attachments = await self._update_message_attachments(thread_id, attachments) if attachments is not None else []
 
-            # Update AssistantConfig with the changed additional instructions
-            current_additional_instructions = self._thread_config.get_additional_instructions_of_thread(thread_id)
-            if additional_instructions != current_additional_instructions:
-                self._thread_config.set_additional_instructions_to_thread(thread_id, additional_instructions)
-
-            """
-            attachments = [
-                {
-                    "file_id": file_id,
-                    "tools": [
-                        {"type": "code_interpreter"}
-                    ]
-                },
-                {
-                    "file_id": file_id,
-                    "tools": [
-                        {"type": "file_search"}
-                    ]
-                }
-            ]
-            """
-
-            # Create the message with file IDs
+            # Create the message with the attachments
             await self._ai_client.beta.threads.messages.create(
                 thread_id,
                 role=role,
                 metadata=metadata,
+                attachments=attachments,
                 content=message,
                 timeout=timeout
             )
@@ -305,52 +281,42 @@ class AsyncConversationThreadClient:
             logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
             raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}: {e}")
 
-    async def _update_message_files(
-            self, 
-            thread_id : str,
-            file_paths : list
-    ):
-        # Check if file handling is necessary
-        existing_files = self._thread_config.get_files_of_thread(thread_id)
-        if not file_paths and not existing_files:
-            return []
+    async def _update_message_attachments(self, thread_id: str, new_attachments: list):
+        try:
+            existing_attachments = self._thread_config.get_attachments_of_thread(thread_id)
+            existing_attachments_by_id = {att['file_id']: att for att in existing_attachments if att['file_id']}
+            new_file_ids = {att['file_id'] for att in new_attachments if att['file_id']}
+            attachments_to_remove = [att for att in existing_attachments if att['file_id'] not in new_file_ids]
 
-        # Identify files to delete and new files to add
-        existing_file_paths = [file['file_path'] for file in existing_files]
-        files_to_delete = [file for file in existing_files if file['file_path'] not in file_paths]
-        file_paths_to_add = [path for path in file_paths if path not in existing_file_paths]
+            for attachment in attachments_to_remove:
+                self._thread_config.remove_attachment_from_thread(thread_id, attachment['file_id'])
+                await self._ai_client.files.delete(file_id=attachment['file_id'])
 
-        # Update AssistantConfig with the new set of files
-        if files_to_delete:
-            # Remove files from ThreadConfig
-            file_ids_to_delete = [file['file_id'] for file in files_to_delete]
-            self._thread_config.remove_files_from_thread(thread_id, file_ids_to_delete)
-            # Get the updated list of files for the thread
-            existing_files = self._thread_config.get_files_of_thread(thread_id)
-            # Delete files from client
-            for file in files_to_delete:
-                await self._ai_client.files.delete(file_id=file['file_id'])
+            all_updated_attachments = []
+            for attachment in new_attachments:
+                file_name = attachment['file_name']
+                file_id = attachment.get('file_id')
+                file_path = attachment.get('file_path')
+                tools = attachment.get('tools', [])
 
-        # if no new files to add, return the list of current file IDs for the thread
-        if not file_paths_to_add:
-            return [file['file_id'] for file in existing_files]
+                if file_id is None:
+                    file_object = await self._ai_client.files.create(file=open(file_path, "rb"), purpose='assistants')
+                    new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
+                    self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])
+                    all_updated_attachments.append(new_attachment)
+                else:
+                    current_attachment = existing_attachments_by_id.get(file_id, {})
+                    if not current_attachment or current_attachment['tools'] != tools:
+                        current_attachment['tools'] = tools
+                        self._thread_config.update_attachment_in_thread(thread_id, current_attachment)
+                    all_updated_attachments.append(current_attachment)
 
-        # Create new files and update ThreadConfig
-        new_files = []
-        for file_path in file_paths_to_add:
-            file_object = await self._ai_client.files.create(
-                file=open(file_path, "rb"),
-                purpose='assistants'
-            )
-            file_id = file_object.id  # Extracting file ID from the FileObject
-            new_files.append({'file_id': file_id, 'file_path': file_path})
-
-        # Update ThreadConfig with the new set of files
-        updated_files = [file for file in existing_files if file not in files_to_delete] + new_files
-        self._thread_config.add_files_to_thread(thread_id, updated_files)
-
-        # Return the list of all current file IDs for the thread
-        return [file['file_id'] for file in updated_files]
+            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments)
+            updated_attachments = [{'file_id': att['file_id'], 'tools': att['tools']} for att in all_updated_attachments]
+            return updated_attachments
+        except Exception as e:
+            logger.error(f"Failed to update attachments for thread {thread_id}: {str(e)}")
+            raise
 
     async def delete_conversation_thread(
             self, 
