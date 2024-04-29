@@ -752,7 +752,7 @@ class AsyncAssistantClient(BaseAssistantClient):
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._update_tool_resources(assistant_config)
+            tools_resources = await self._update_tool_resources(assistant_config)
 
             # TODO update the assistant with the new configuration only if there are changes
             await self._async_client.beta.assistants.update(

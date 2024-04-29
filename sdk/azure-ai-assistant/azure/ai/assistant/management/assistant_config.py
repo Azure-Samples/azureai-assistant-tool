@@ -1,10 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import json
 from azure.ai.assistant.management.function_config import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
-import os
+
+import json, os
 from typing import Optional, Union
 
 
@@ -62,66 +62,162 @@ class TextCompletionConfig:
 
     @property
     def frequency_penalty(self) -> float:
+        """
+        Get the frequency penalty.
+
+        :return: The frequency penalty.
+        :rtype: float
+        """
         return self._frequency_penalty
     
     @frequency_penalty.setter
     def frequency_penalty(self, value) -> None:
+        """
+        Set the frequency penalty.
+
+        :param value: The frequency penalty.
+        :type value: float
+        """
         self._frequency_penalty = value
 
     @property
     def max_tokens(self) -> int:
+        """
+        Get the maximum number of tokens.
+
+        :return: The maximum number of tokens.
+        :rtype: int
+        """
         return self._max_tokens
     
     @max_tokens.setter
     def max_tokens(self, value) -> None:
+        """
+        Set the maximum number of tokens.
+
+        :param value: The maximum number of tokens.
+        :type value: int
+        """
         self._max_tokens = value
 
     @property
     def presence_penalty(self) -> float:
+        """
+        Get the presence penalty.
+
+        :return: The presence penalty.
+        :rtype: float
+        """
         return self._presence_penalty
     
     @presence_penalty.setter
     def presence_penalty(self, value) -> None:
+        """
+        Set the presence penalty.
+
+        :param value: The presence penalty.
+        :type value: float
+        """
         self._presence_penalty = value
 
     @property
     def response_format(self) -> str:
+        """
+        Get the response format.
+
+        :return: The response format.
+        :rtype: str
+        """
         return self._response_format
     
     @response_format.setter
     def response_format(self, value) -> None:
+        """
+        Set the response format.
+
+        :param value: The response format.
+        :type value: str
+        """
         self._response_format = value
 
     @property
     def temperature(self) -> float:
+        """
+        Get the temperature.
+
+        :return: The temperature.
+        :rtype: float
+        """
         return self._temperature
     
     @temperature.setter
     def temperature(self, value) -> None:
+        """
+        Set the temperature.
+
+        :param value: The temperature.
+        :type value: float
+        """
         self._temperature = value
 
     @property
     def top_p(self) -> float:
+        """
+        Get the top p.
+
+        :return: The top p.
+        :rtype: float
+        """
         return self._top_p
     
     @top_p.setter
     def top_p(self, value) -> None:
+        """
+        Set the top p.
+
+        :param value: The top p.
+        :type value: float
+        """
         self._top_p = value
 
     @property
     def seed(self) -> Optional[int]:
+        """
+        Get the seed.
+
+        :return: The seed.
+        :rtype: Optional[int]
+        """
         return self._seed
     
     @seed.setter
     def seed(self, value) -> None:
+        """
+        Set the seed.
+
+        :param value: The seed.
+        :type value: Optional[int]
+        """
         self._seed = value
 
     @property
     def max_text_messages(self) -> Optional[int]:
+        """
+        Get the maximum number of text messages.
+
+        :return: The maximum number of text messages.
+        :rtype: Optional[int]
+        """
         return self._max_text_messages
     
     @max_text_messages.setter
     def max_text_messages(self, value) -> None:
+        """
+        Set the maximum number of text messages.
+
+        :param value: The maximum number of text messages.
+        :type value: Optional[int]
+        """
         self._max_text_messages = value
 
 
@@ -168,50 +264,122 @@ class AssistantTextCompletionConfig:
 
     @property
     def temperature(self) -> float:
+        """
+        Get the temperature.
+
+        :return: The temperature.
+        :rtype: float
+        """
         return self._temperature
     
     @temperature.setter
     def temperature(self, value) -> None:
+        """
+        Set the temperature.
+
+        :param value: The temperature.
+        :type value: float
+        """
         self._temperature = value
 
     @property
     def max_completion_tokens(self) -> int:
+        """
+        Get the maximum number of completion tokens.
+
+        :return: The maximum number of completion tokens.
+        :rtype: int
+        """
         return self._max_completion_tokens
     
     @max_completion_tokens.setter
     def max_completion_tokens(self, value) -> None:
+        """
+        Set the maximum number of completion tokens.
+
+        :param value: The maximum number of completion tokens.
+        :type value: int
+        """
         self._max_completion_tokens = value
 
     @property
     def max_prompt_tokens(self) -> int:
+        """
+        Get the maximum number of prompt tokens.
+
+        :return: The maximum number of prompt tokens.
+        :rtype: int
+        """
         return self._max_prompt_tokens
     
     @max_prompt_tokens.setter
     def max_prompt_tokens(self, value) -> None:
+        """
+        Set the maximum number of prompt tokens.
+
+        :param value: The maximum number of prompt tokens.
+        :type value: int
+        """
         self._max_prompt_tokens = value
 
     @property
     def top_p(self) -> float:
+        """
+        Get the top p.
+
+        :return: The top p.
+        :rtype: float
+        """
         return self._top_p
     
     @top_p.setter
     def top_p(self, value) -> None:
+        """
+        Set the top p.
+
+        :param value: The top p.
+        :type value: float
+        """
         self._top_p = value
 
     @property
     def response_format(self) -> str:
+        """
+        Get the response format.
+
+        :return: The response format.
+        :rtype: str
+        """
         return self._response_format
     
     @response_format.setter
     def response_format(self, value) -> None:
+        """
+        Set the response format.
+
+        :param value: The response format.
+        :type value: str
+        """
         self._response_format = value
 
     @property
     def truncation_strategy(self) -> dict:
+        """
+        Get the truncation strategy.
+
+        :return: The truncation strategy.
+        :rtype: dict
+        """
         return self._truncation_strategy
     
     @truncation_strategy.setter
     def truncation_strategy(self, value) -> None:
+        """
+        Set the truncation strategy.
+
+        :param value: The truncation strategy.
+        :type value: dict
+        """
         self._truncation_strategy = value
 
 
@@ -253,7 +421,13 @@ class VectorStoreConfig:
                 self.metadata == other.metadata and
                 self.expires_after == other.expires_after)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
+        """
+        Convert the vector store configuration to a dictionary.
+
+        :return: The vector store configuration as a dictionary.
+        :rtype: dict
+        """
         return {
             'name': self.name,
             'id': self.id,
@@ -264,42 +438,102 @@ class VectorStoreConfig:
 
     @property
     def name(self) -> str:
+        """
+        Get the name.
+
+        :return: The name.
+        :rtype: str
+        """
         return self._name
     
     @name.setter
     def name(self, value):
+        """
+        Set the name.
+
+        :param value: The name.
+        :type value: str
+        """
         self._name = value
 
     @property
     def id(self) -> str:
+        """
+        Get the ID.
+
+        :return: The ID.
+        :rtype: str
+        """
         return self._id
     
     @id.setter
     def id(self, value):
+        """
+        Set the ID.
+
+        :param value: The ID.
+        :type value: str
+        """
         self._id = value
 
     @property
     def files(self) -> dict:
+        """
+        Get the files.
+
+        :return: The files.
+        :rtype: dict
+        """
         return self._files
     
     @files.setter
     def files(self, value):
+        """
+        Set the files.
+
+        :param value: The files.
+        :type value: dict
+        """
         self._files = value
 
     @property
     def metadata(self) -> dict:
+        """
+        Get the metadata.
+
+        :return: The metadata.
+        :rtype: dict
+        """
         return self._metadata
     
     @metadata.setter
     def metadata(self, value):
+        """
+        Set the metadata.
+
+        :param value: The metadata.
+        :type value: dict
+        """
         self._metadata = value
 
     @property
     def expires_after(self) -> dict:
+        """
+        Get the expiration time.
+
+        :return: The expiration time.
+        :rtype: dict
+        """
         return self._expires_after
     
     @expires_after.setter
     def expires_after(self, value):
+        """
+        Set the expiration time.
+
+        :param value: The expiration time.
+        :type value: dict
+        """
         self._expires_after = value
 
 
@@ -326,7 +560,13 @@ class ToolResourcesConfig:
         return (self.code_interpreter_files == other.code_interpreter_files and
                 self.file_search_vector_stores == other.file_search_vector_stores)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
+        """
+        Convert the tool resources configuration to a dictionary.
+
+        :return: The tool resources configuration as a dictionary.
+        :rtype: dict
+        """
         return {
             'code_interpreter': {
                 'files': self.code_interpreter_files
@@ -338,18 +578,42 @@ class ToolResourcesConfig:
     
     @property
     def code_interpreter_files(self):
+        """
+        Get the code interpreter files.
+
+        :return: The code interpreter files.
+        :rtype: dict
+        """
         return self._code_interpreter_files
     
     @code_interpreter_files.setter
     def code_interpreter_files(self, value):
+        """
+        Set the code interpreter files.
+
+        :param value: The code interpreter files.
+        :type value: dict
+        """
         self._code_interpreter_files = value
 
     @property
     def file_search_vector_stores(self) -> list[VectorStoreConfig]:
+        """
+        Get the file search vector stores.
+
+        :return: The file search vector stores.
+        :rtype: list[VectorStoreConfig]
+        """
         return self._file_search_vector_stores
     
     @file_search_vector_stores.setter
     def file_search_vector_stores(self, value):
+        """
+        Set the file search vector stores.
+
+        :param value: The file search vector stores.
+        :type value: list[VectorStoreConfig]
+        """
         self._file_search_vector_stores = value
 
 
@@ -365,7 +629,7 @@ class AssistantConfig:
     ) -> None:
         self._config_data = config_data
         self._name = config_data['name']
-        self._instructions = self.remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
+        self._instructions = self._remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
         
         # Initialize assistant_id appropriately based on presence and content in config_data
         self._assistant_id = config_data.get('assistant_id', None) if config_data.get('assistant_id', '') != '' else None
@@ -762,5 +1026,5 @@ class AssistantConfig:
         """
         return self._text_completion_config
 
-    def remove_trailing_spaces(self, text):
+    def _remove_trailing_spaces(self, text):
         return '\n'.join(line.rstrip() for line in text.splitlines())
