@@ -45,17 +45,15 @@ class CustomListWidget(QListWidget):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.itemToFileMap = {}  # Maps list items to attached file paths
-        self.itemToInstructionsMap = {}  # Maps list items to additional instructions
 
-    def clear_files_and_instructions(self):
+    def clear_files(self):
         self.itemToFileMap.clear()
-        self.itemToInstructionsMap.clear()
 
     def contextMenuEvent(self, event):
         context_menu = QMenu(self)
-        attach_file_action = context_menu.addAction("Attach File")
-        add_instructions_action = context_menu.addAction("Additional Instructions")
-
+        attach_file_search_action = context_menu.addAction("Attach File for File Search")
+        attach_file_code_action = context_menu.addAction("Attach File for Code Interpreter")
+        
         current_item = self.currentItem()
         remove_file_menu = None
         if current_item:
@@ -64,39 +62,24 @@ class CustomListWidget(QListWidget):
                 remove_file_menu = context_menu.addMenu("Remove File")
                 for file_info in self.itemToFileMap[row]:
                     actual_file_path = file_info['file_path']
-                    action = remove_file_menu.addAction(os.path.basename(actual_file_path))
+                    tool_type = file_info['tools'][0]['type']
+
+                    file_label = f"{os.path.basename(actual_file_path)} ({tool_type})"
+                    action = remove_file_menu.addAction(file_label)
                     action.setData(file_info)
 
         selected_action = context_menu.exec_(self.mapToGlobal(event.pos()))
 
-        if selected_action == attach_file_action:
-            self.attach_file_to_selected_item()
-        elif selected_action == add_instructions_action:
-            self.add_edit_instructions()
+        if selected_action == attach_file_search_action:
+            self.attach_file_to_selected_item("file_search")
+        elif selected_action == attach_file_code_action:
+            self.attach_file_to_selected_item("code_interpreter")
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
             self.remove_specific_file_from_selected_item(file_info, row)
 
-    def add_edit_instructions(self):
-        current_item = self.currentItem()
-        if current_item:
-            row = self.row(current_item)
-            current_instructions = self.itemToInstructionsMap.get(row, "")
-            text, ok = QInputDialog.getText(self, "Additional Instructions",
-                                            "Enter instructions:", text=current_instructions)
-            if ok:
-                self.itemToInstructionsMap[row] = text
-                attached_files = self.itemToFileMap.get(row, [])
-                self.update_item_icon(current_item, attached_files, text)
-
-    def get_instructions_for_selected_item(self):
-        current_item = self.currentItem()
-        if current_item:
-            row = self.row(current_item)
-            return self.itemToInstructionsMap.get(row, "")
-        return ""
-
-    def attach_file_to_selected_item(self):
+    def attach_file_to_selected_item(self, mode):
+        """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
         file_path, _ = file_dialog.getOpenFileName(self, "Select File")
         if file_path:
@@ -106,65 +89,90 @@ class CustomListWidget(QListWidget):
                 if row not in self.itemToFileMap:
                     self.itemToFileMap[row] = []
 
-                temp_file_id = "temp_" + os.path.basename(file_path)
-                self.itemToFileMap[row].append({"file_id": temp_file_id, "file_path": file_path})
+                self.itemToFileMap[row].append({
+                    "file_id": None,  # This will be updated later
+                    "file_path": file_path,
+                    "tools": [{"type": mode}]  # Store the tool type for later use
+                })
 
-                current_instructions = self.itemToInstructionsMap.get(row, "")
-                self.update_item_icon(current_item, self.itemToFileMap[row], current_instructions)
+                self.update_item_icon(current_item, self.itemToFileMap[row])
 
     def remove_specific_file_from_selected_item(self, file_info, row):
+        """Removes a specific file from the selected item based on the file info provided."""
         if row in self.itemToFileMap:
             file_path_to_remove = file_info['file_path']
             self.itemToFileMap[row] = [fi for fi in self.itemToFileMap[row] if fi['file_path'] != file_path_to_remove]
-            
+
             current_item = self.item(row)
-            current_instructions = self.itemToInstructionsMap.get(row, "")
-            if not self.itemToFileMap[row] and not current_instructions:
+            if not self.itemToFileMap[row]:
                 current_item.setIcon(QIcon())
             else:
-                self.update_item_icon(current_item, self.itemToFileMap[row], current_instructions)
+                self.update_item_icon(current_item, self.itemToFileMap[row])
 
-    def update_item_icon(self, item, files, instructions):
-        if files or instructions:
+    def update_item_icon(self, item, files):
+        """Updates the list item's icon based on whether there are attached files."""
+        if files:
             item.setIcon(QIcon("gui/images/paperclip_icon.png"))
         else:
             item.setIcon(QIcon())
 
-    def get_attached_files_for_selected_item(self):
-        """Return the file paths of files attached to the currently selected item."""
+    def get_attachments_for_selected_item(self):
+        """Return the details of files attached to the currently selected item including file path and specific tool usage."""
         current_item = self.currentItem()
         if current_item:
             row = self.row(current_item)
             attached_files_info = self.itemToFileMap.get(row, [])
-            # Extract and return only the file paths
-            return [file_info['file_path'] for file_info in attached_files_info]
-        return []
+            attachments = []
+            for file_info in attached_files_info:
+                file_path = file_info['file_path']
+                file_name = os.path.basename(file_path)
+                file_id = file_info.get('file_id', None)
+                tools = file_info.get('tools', [])
 
-    def load_threads_with_files_and_instructions(self, threads):
-        """Load threads into the list widget, adding icons for attached files and instructions."""
+                # Create a structured entry for the attachments list including file_path
+                attachments.append({
+                    "file_name": file_name,
+                    "file_id": file_id,
+                    "file_path": file_path,  # Include the full file path for upload or further processing
+                    "tools": tools
+                })
+            return attachments
+        return []
+    
+    def set_attachments_for_selected_item(self, attachments):
+        """Set the attachments for the currently selected item."""
+        current_item = self.currentItem()
+        if current_item is not None:
+            row = self.row(current_item)
+            self.itemToFileMap[row] = attachments[:]
+            self.update_item_icon(current_item, attachments)
+        else:
+            logger.warning("No item is currently selected.")
+
+    def load_threads_with_attachments(self, threads):
+        """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
         for thread in threads:
             item = QListWidgetItem(thread['thread_name'])
             self.addItem(item)
-            thread_tooltip_text = f"You can add/remove files and instructions by right-clicking this item."
+            thread_tooltip_text = "You can add/remove files by right-clicking this item."
             item.setToolTip(thread_tooltip_text)
 
-            # Get file paths and instructions from the thread data
-            file_paths = thread.get('file_ids', [])
-            additional_instructions = thread.get('additional_instructions', "")
+            # Get attachments from the thread data
+            attachments = thread.get('attachments', [])
 
-            # Update the item with the paperclip icon if there are attached files or instructions
-            self.update_item_with_files_and_instructions(item, file_paths, additional_instructions)
+            # Update the item to reflect any attachments
+            self.update_item_with_attachments(item, attachments)
 
-    def update_item_with_files_and_instructions(self, item, file_paths, additional_instructions=""):
-        """Update the given item with a paperclip icon if there are attached files or instructions."""
+    def update_item_with_attachments(self, item, attachments):
+        """Update the given item with a paperclip icon if there are attachments."""
         row = self.row(item)
-        if file_paths or additional_instructions:
+        if attachments:
             item.setIcon(QIcon("gui/images/paperclip_icon.png"))
         else:
             item.setIcon(QIcon())
 
-        self.itemToFileMap[row] = file_paths
-        self.itemToInstructionsMap[row] = additional_instructions
+        # Store complete attachment information in the mapping
+        self.itemToFileMap[row] = attachments[:]
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
@@ -423,17 +431,20 @@ class ConversationSidebar(QWidget):
 
             # Clear the existing items in the thread list
             self.threadList.clear()
-            self.threadList.clear_files_and_instructions()
+            self.threadList.clear_files()
 
             # Get the threads for the selected AI client type
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            # TODO use ai_client_type to retrieve threads from cloud API
             threads = threads_client.get_conversation_threads()
-            self.threadList.load_threads_with_files_and_instructions(threads)
+            self.threadList.load_threads_with_attachments(threads)
         except Exception as e:
             logger.error(f"Error while changing AI client type: {e}")
         finally:
             self.main_window.set_active_ai_client_type(self._ai_client_type)
+
+    def set_attachments_for_selected_thread(self, attachments):
+        """Set the attachments for the currently selected item."""
+        self.threadList.set_attachments_for_selected_item(attachments)
 
     def on_add_thread_button_clicked(self):
         """Handle clicks on the add thread button."""

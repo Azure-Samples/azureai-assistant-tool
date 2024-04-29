@@ -201,44 +201,44 @@ class ConversationThreadConfig:
 
         return self._threads
 
-    def set_additional_instructions_to_thread(self, thread_id, additional_instructions) -> None:
+    def add_attachments_to_thread(self, thread_id, attachments) -> None:
         """
-        Add additional instructions to a specific thread.
+        Add attachments to a specific thread. Each attachment is a dictionary with 'file_id' and 'tools'.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
-        :param additional_instructions: The additional instructions to add.
-        :type additional_instructions: str
+        :param attachments: A list of attachments to add to the thread.
+        :type attachments: list
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                thread['additional_instructions'] = additional_instructions
+                if 'attachments' not in thread:
+                    thread['attachments'] = []
+
+                # Add new attachments that are not already in the list
+                existing_file_ids = [att['file_id'] for att in thread['attachments']]
+                for new_attachment in attachments:
+                    if new_attachment['file_id'] not in existing_file_ids:
+                        thread['attachments'].append(new_attachment)
                 break
 
-    def add_files_to_thread(self, thread_id, files) -> None:
+    def remove_attachment_from_thread(self, thread_id, file_id_to_remove) -> None:
         """
-        Add files to a specific thread. Each file is a dictionary with 'file_id' and 'file_path'.
+        Remove a specific attachment from a thread by its file_id.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
-        :param files: A list of files to add to the thread.
-        :type files: list
+        :param file_id_to_remove: The file_id of the attachment to remove.
+        :type file_id_to_remove: str
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                if 'file_ids' not in thread:
-                    thread['file_ids'] = []
-
-                # Add new files that are not already in the list
-                existing_file_ids = [f['file_id'] for f in thread['file_ids']]
-                for new_file in files:
-                    if new_file['file_id'] not in existing_file_ids:
-                        thread['file_ids'].append(new_file)
+                thread['attachments'] = [att for att in thread.get('attachments', []) if att['file_id'] != file_id_to_remove]
                 break
 
-    def remove_files_from_thread(self, thread_id, file_ids_to_remove) -> None:
+    def remove_attachments_from_thread(self, thread_id, file_ids_to_remove) -> None:
         """
-        Remove specific files from a thread by their file_id.
+        Remove specific attachments from a thread by their file_id.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
@@ -247,38 +247,54 @@ class ConversationThreadConfig:
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                thread['file_ids'] = [file for file in thread.get('file_ids', []) if file['file_id'] not in file_ids_to_remove]
+                thread['attachments'] = [att for att in thread.get('attachments', []) if att['file_id'] not in file_ids_to_remove]
                 break
 
-    def get_additional_instructions_of_thread(self, thread_id) -> str:
+    def get_attachments_of_thread(self, thread_id) -> list:
         """
-        Get the additional instructions associated with a specific thread.
+        Get the list of attachments associated with a specific thread.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
 
-        :return: The additional instructions.
-        :rtype: str
-        """
-        for thread in self._threads:
-            if thread['thread_id'] == thread_id:
-                return thread.get('additional_instructions', None)
-        return None
-
-    def get_files_of_thread(self, thread_id) -> list:
-        """
-        Get the list of files associated with a specific thread.
-        
-        :param thread_id: The ID of the thread.
-        :type thread_id: str
-
-        :return: A list of file_ids.
+        :return: A list of attachments, each containing a file_id and tools.
         :rtype: list
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                return thread.get('file_ids', [])
+                return thread.get('attachments', [])
         return []
+
+    def set_attachments_of_thread(self, thread_id, attachments) -> None:
+        """
+        Set the attachments for a specific thread.
+        
+        :param thread_id: The ID of the thread.
+        :type thread_id: str
+        :param attachments: A list of attachments to set for the thread.
+        :type attachments: list
+        """
+        for thread in self._threads:
+            if thread['thread_id'] == thread_id:
+                thread['attachments'] = attachments
+                break
+
+    def update_attachment_in_thread(self, thread_id, attachment) -> None:
+        """
+        Update an attachment in a specific thread.
+        
+        :param thread_id: The ID of the thread.
+        :type thread_id: str
+        :param attachment: The attachment to update.
+        :type attachment: dict
+        """
+        for thread in self._threads:
+            if thread['thread_id'] == thread_id:
+                for att in thread.get('attachments', []):
+                    if att['file_id'] == attachment['file_id']:
+                        att.update(attachment)
+                        break
+                break
 
     def _get_config_data(self):
         # Initialize a structure for threads categorized by ai_client_type
