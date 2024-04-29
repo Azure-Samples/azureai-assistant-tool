@@ -265,13 +265,13 @@ class ConversationThreadClient:
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             attachments = self._update_message_attachments(thread_id, attachments) if attachments is not None else []
-            logger.debug(f"attachments to message create: {attachments}")
 
             # Create the message with the attachments
             self._ai_client.beta.threads.messages.create(
                 thread_id,
                 role=role,
                 metadata=metadata,
+                attachments=attachments,
                 content=message,
                 timeout=timeout
             )
