@@ -220,7 +220,11 @@ class AsyncConversationThreadClient:
                             # Handle file citation annotations
                             elif isinstance(annotation, FileCitationAnnotation):
                                 file_id = annotation.file_citation.file_id
-                                file_name = self._ai_client.files.retrieve(file_id).filename
+                                try:
+                                    file_name = self._ai_client.files.retrieve(file_id).filename
+                                except Exception as e:
+                                    logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
+                                    file_name = "Unknown_file_" + str(file_id)
                                 citations.append(f'[{index}] {file_name}')
 
                     # Append citations at the end of the text content
