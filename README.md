@@ -26,7 +26,7 @@
 💬 Inbuilt thread and memory management <br>
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
-📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
+📚 Retrieval Augmented Generation with **File Search** tool (coming soon to Azure OpenAI Assistants)<br>
 🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
 📤 Exporting the assistant configuration into simple CLI application
 
