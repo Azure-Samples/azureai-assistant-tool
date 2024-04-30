@@ -318,23 +318,42 @@ class ConversationView(QWidget):
         return url_regex.sub(replace_with_link, text)
 
     def format_file_links(self, text):
-        markdown_link_pattern = r'\[([^\]]+)\]\(sandbox:/mnt/data/([^)]+)\)'
-        
+        # Pattern to find citations in the form [Download text]( [index])
+        citation_link_pattern = r'\[([^\]]+)\]\(\s*\[(\d+)\]\s*\)'
+        # Dictionary to store file paths indexed by the citation index
+        citation_to_filename = {}
+
+        # First, extract all file citations like "[0] finance_sector_revenue_chart.png"
+        file_citations = re.findall(r'\[(\d+)\]\s*(.+)', text)
+        for index, filename in file_citations:
+            citation_to_filename[index] = filename
+
+        # Function to replace citation links with clickable HTML links
         def replace_with_clickable_text(match):
             link_text = match.group(1)
-            file_name = match.group(2)
-            local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))
+            citation_index = match.group(2)
+            file_name = citation_to_filename.get(citation_index)
 
-            if link_text in self.text_to_url_map:
-                link_text = f"{link_text} {len(self.text_to_url_map) + 1}"
-            # Store the file path
-            self.text_to_url_map[link_text] = {"path": local_file_path}
+            if file_name:
+                local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))
 
-            # Return the HTML link and the local file path in separate inline-block divs
-            return (f'<div style="display: inline-block;"><a href="#" style="color:green; text-decoration: underline;" onclick="return false;">{link_text}</a></div>'
-                    f'<div style="display: inline-block; color:gray;">{local_file_path}</div>')
+                if link_text in self.text_to_url_map:
+                    link_text = f"{link_text} {len(self.text_to_url_map) + 1}"
+                
+                # Store the file path
+                self.text_to_url_map[link_text] = {"path": local_file_path}
 
-        return re.sub(markdown_link_pattern, replace_with_clickable_text, text)
+                # Return the HTML link and the local file path in separate inline-block divs
+                return (f'<div style="display: inline-block;"><a href="{local_file_path}" style="color:green; text-decoration: underline;" download="{file_name}">{link_text}</a></div>'
+                        f'<div style="display: inline-block; color:gray;">{local_file_path}</div>')
+
+        # Replace links in the original text
+        updated_text = re.sub(citation_link_pattern, replace_with_clickable_text, text)
+
+        # Remove the original citation lines
+        updated_text = re.sub(r'\[\d+\]\s*[^ ]+\.png', '', updated_text)
+
+        return updated_text
 
     def parse_message(self, message):
         """Parse the message into a list of (is_code, text) tuples."""

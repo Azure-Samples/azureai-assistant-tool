@@ -18,7 +18,7 @@ async def test_async_assistant_client_from_json():
 
     client = await AsyncAssistantClient.from_json(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AsyncAIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AsyncAIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -32,7 +32,7 @@ async def test_async_assistant_client_sync_from_cloud():
     client = await AsyncAssistantClient.from_json(config_json)
     client = await client.sync_from_cloud()
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AsyncAIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AsyncAIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -62,7 +62,7 @@ async def test_async_assistant_client_purge():
 @pytest.mark.asyncio
 async def test_async_assistant_client_add_fetch_current_datetime_function():
     updates = {
-        "selected_functions": [
+        "functions": [
             {
                 "type": "function",
                 "function": {
@@ -83,8 +83,8 @@ async def test_async_assistant_client_add_fetch_current_datetime_function():
     config_json = json.dumps(config)
     client = await AsyncAssistantClient.from_json(config_json)
     client = await client.sync_from_cloud()
-    assert len(client.assistant_config.selected_functions) == 1
-    assert client.assistant_config.selected_functions[0]['function']['name'] == "fetch_current_datetime"
+    assert len(client.assistant_config.functions) == 1
+    assert client.assistant_config.functions[0]['function']['name'] == "fetch_current_datetime"
     await client.purge()
 
 @pytest.mark.asyncio
@@ -93,12 +93,12 @@ async def test_async_assistant_client_create_thread_and_process_message():
     config_json = json.dumps(config)
 
     client = await AsyncAssistantClient.from_json(config_json)
-    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.AZURE_OPEN_AI)
+    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
     thread_name = await thread_client.create_conversation_thread()
     await thread_client.create_conversation_thread_message("Hello!", thread_name)
     await client.process_messages(thread_name)
     conversation = await thread_client.retrieve_conversation(thread_name)
     last_message = conversation.get_last_text_message(client.assistant_config.name)
     assert last_message is not None
-    await client.purge()  # Assuming purge is also async
+    await client.purge()
     await thread_client.close()

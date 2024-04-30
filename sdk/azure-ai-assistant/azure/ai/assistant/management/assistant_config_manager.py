@@ -175,7 +175,7 @@ class AssistantConfigManager:
                     assistant_name = config_data.get('name')
                     if assistant_name:
                         logger.info(f"Loaded assistant configuration for '{assistant_name}'")
-                        assistant_config = AssistantConfig(assistant_name, config_data)
+                        assistant_config = AssistantConfig(config_data)
                         self._configs[assistant_name] = assistant_config
                         loaded_assistants.add(base_name)
 
@@ -287,12 +287,12 @@ class AssistantConfigManager:
         if 'assistant_id' not in config_data:
             raise ConfigError("Assistant 'assistant_id' is required in the configuration")
 
-        # Check if selected functions is in config_data, it is valid list
-        if 'selected_functions' in config_data and not isinstance(config_data['selected_functions'], list):
-            raise ConfigError("Assistant 'selected_functions' must be a list in the configuration")
-        # Check if knowledge files is in config_data, it is valid dictionary in dictionary
-        if 'knowledge_files' in config_data and not isinstance(config_data['knowledge_files'], dict):
-            raise ConfigError("Assistant 'knowledge_files' must be a dictionary in the configuration")
+        # Check if functions is in config_data, it is valid list
+        if 'functions' in config_data and not isinstance(config_data['functions'], list):
+            raise ConfigError("Assistant 'functions' must be a list in the configuration")
+        # Check if tool resources is in config_data, it is valid dictionary in dictionary
+        if 'tool_resources' in config_data and config_data.get('tool_resources') is not None and not isinstance(config_data['tool_resources'], dict):
+            raise ConfigError("Assistant 'tool_resources' must be a dictionary in the configuration")
 
     def _save_config(self, assistant_name, config_data):
         # Check if the assistant name and configuration data are provided
@@ -330,7 +330,7 @@ class AssistantConfigManager:
         config_path = os.path.join(self._config_folder, config_filename)
 
         # Update in-memory configuration
-        self._configs[assistant_name] = AssistantConfig(assistant_name, config_data)
+        self._configs[assistant_name] = AssistantConfig(config_data)
         
         logger.info(f"Saving updated configuration for '{assistant_name}' in YAML format")
 

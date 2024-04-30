@@ -3,7 +3,8 @@
 
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
-from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.assistant_config import AssistantConfig, VectorStoreConfig
+from azure.ai.assistant.management.assistant_config import ToolResourcesConfig
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
@@ -153,8 +154,6 @@ class AsyncAssistantClient(BaseAssistantClient):
         :rtype: AsyncAssistantClient
         """
         try:
-            # If not registered, retrieve data from cloud and register it to AssistantConfig using AssistantConfigManager
-            #TODO fill the config data from the cloud service by default
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
             if assistant_config is None:
@@ -163,13 +162,45 @@ class AsyncAssistantClient(BaseAssistantClient):
             # Retrieve the assistant from the cloud service and update the local configuration
             assistant = await self._retrieve_assistant(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
+            # TODO text_completion_config parameters are currently used in runs only, not assistant creation
+            #assistant_config.text_completion_config.response_format  = assistant.response_format.type
+            #assistant_config.text_completion_config.temperature = assistant.temperature
+            #assistant_config.text_completion_config.top_p = assistant.top_p
             assistant_config.model = assistant.model
-            assistant_config.knowledge_files = {file_path: file_id for file_path, file_id in zip(assistant_config.knowledge_files.keys(), assistant.file_ids)}
-            assistant_config.selected_functions = [
+
+            # TODO currently files are not synced from cloud to local
+            code_interpreter_file_ids_cloud = []
+            if assistant.tool_resources and assistant.tool_resources.code_interpreter:
+                code_interpreter_file_ids_cloud = assistant.tool_resources.code_interpreter.file_ids
+
+            if assistant_config.tool_resources and assistant_config.tool_resources.code_interpreter_files:
+                logger.info(f"Code interpreter files in local: {assistant_config.tool_resources.code_interpreter_files}")
+                for file_id in code_interpreter_file_ids_cloud:
+                    file_name = await self._async_client.files.retrieve(file_id).filename
+                    logger.info(f"Code interpreter file id: {file_id}, name: {file_name} in cloud")
+
+            file_search_vs_ids_cloud = []
+            if assistant.tool_resources and assistant.tool_resources.file_search:
+                file_search_vs_ids_cloud = assistant.tool_resources.file_search.vector_store_ids
+                files_in_vs_cloud = list(self._async_client.beta.vector_stores.files.list(file_search_vs_ids_cloud[0], timeout=timeout))
+                file_search_file_ids_cloud = [file.id for file in files_in_vs_cloud]
+
+            if assistant_config.tool_resources and assistant_config.tool_resources.file_search_vector_stores:
+                logger.info(f"File search vector stores in local: {assistant_config.tool_resources.file_search_vector_stores}")
+                for file_id in file_search_file_ids_cloud:
+                    file_name = await self._async_client.files.retrieve(file_id).filename
+                    logger.info(f"File search file id: {file_id}, name: {file_name} in cloud")
+
+            #assistant_config.tool_resources = ToolResourcesConfig(
+            #    code_interpreter_files=code_interpreter_files,
+            #    file_search_vector_stores=file_search_vector_stores
+            #)
+
+            assistant_config.functions = [
                 tool.function.model_dump() for tool in assistant.tools if tool.type == "function"
             ]
             assistant_config.code_interpreter = any(tool.type == "code_interpreter" for tool in assistant.tools)
-            assistant_config.knowledge_retrieval = any(tool.type == "retrieval" for tool in assistant.tools)
+            assistant_config.file_search = any(tool.type == "file_search" for tool in assistant.tools)
             assistant_config.assistant_id = assistant.id
             config_manager.update_config(self.name, assistant_config.to_json())
             return self
@@ -226,18 +257,16 @@ class AsyncAssistantClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Creating new assistant with name: {assistant_config.name}")
-            # Upload the files for new assistant
-            await self._upload_new_files(assistant_config, timeout=timeout)
-            file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
+            tools_resources = await self._create_tool_resources(assistant_config)
 
             assistant = await self._async_client.beta.assistants.create(
                 name=assistant_config.name,
                 instructions=instructions,
+                tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids,
                 timeout=timeout
             )
             # Update the assistant_id in the assistant_config
@@ -246,6 +275,120 @@ class AsyncAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new assistant with name: {assistant_config.name}: {e}")
+
+    async def _create_tool_resources(
+            self,
+            assistant_config: AssistantConfig,
+            timeout : Optional[float] = None
+    ) -> dict:
+
+        logger.info(f"Creating tool resources for assistant: {assistant_config.name}")
+
+        if not assistant_config.tool_resources:
+            logger.info("No tool resources provided for assistant.")
+            return None
+
+        # Upload the code interpreter files
+        code_interpreter_file_ids = []
+        if assistant_config.tool_resources.code_interpreter_files:
+            await self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+            code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
+
+        # create the vector store for file search
+        assistant_config_vs = None
+        if assistant_config.tool_resources.file_search_vector_stores:
+            assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+            await self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
+            assistant_config_vs.id = await self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+
+        # Create the tool resources dictionary
+        tool_resources = {
+            "code_interpreter": {
+                "file_ids": code_interpreter_file_ids
+            },
+            "file_search": {
+                "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
+            }
+        }
+        logger.info(f"Created tool resources: {tool_resources}")
+        return tool_resources
+
+    async def _create_vector_store_with_files(
+            self,
+            assistant_config: AssistantConfig,
+            vector_store: VectorStoreConfig,
+            timeout: Optional[float] = None
+    ) -> str:
+        try:
+            client_vs = await self._async_client.beta.vector_stores.create(
+                name=vector_store.name,
+                file_ids = list(vector_store.files.values()),
+                metadata=vector_store.metadata,
+                expires_after=vector_store.expires_after,
+                timeout=timeout
+            )
+            return client_vs.id
+        except Exception as e:
+            logger.error(f"Failed to create vector store for assistant: {assistant_config.name}: {e}")
+            raise EngineError(f"Failed to create vector store for assistant: {assistant_config.name}: {e}")
+
+    async def _update_tool_resources(
+            self,
+            assistant_config: AssistantConfig,
+            timeout: Optional[float] = None
+    ) -> dict:
+
+        try:
+            logger.info(f"Updating tool resources for assistant: {assistant_config.name}")
+
+            if not assistant_config.tool_resources:
+                logger.info("No tool resources provided for assistant.")
+                return None
+
+            assistant = await self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
+            # code interpreter files
+            existing_file_ids = set()
+            if assistant.tool_resources.code_interpreter:
+                existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
+            if assistant_config.tool_resources.code_interpreter_files:
+                await self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+                await self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
+
+            # file search files in cloud
+            existing_vs_ids = []
+            existing_file_ids = set()
+            if assistant.tool_resources.file_search:
+                existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
+                all_files_in_vs = list(self._async_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
+                existing_file_ids = set([file.id for file in all_files_in_vs])
+
+            # if there are new files to upload or delete, recreate the vector store
+            assistant_config_vs = None
+            if assistant_config.tool_resources.file_search_vector_stores:
+                assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+                if not existing_vs_ids and assistant_config_vs.id is None:
+                    await self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
+                    assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+                elif set(assistant_config_vs.files.values()) != existing_file_ids:
+                    if existing_vs_ids:
+                        await self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
+                        await self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
+
+            # Create the tool resources dictionary
+            tool_resources = {
+                "code_interpreter": {
+                    "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values()) if assistant_config.tool_resources.code_interpreter_files else []
+                },
+                "file_search": {
+                    "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs and assistant_config_vs.id is not None else []
+                }
+            }
+            logger.info(f"Updated tool resources: {tool_resources}")
+            return tool_resources
+
+        except Exception as e:
+            logger.error(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
+            raise EngineError(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
 
     async def purge(
             self,
@@ -295,23 +438,6 @@ class AsyncAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to delete assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to delete assistant with ID: {assistant_id}: {e}")
 
-    async def _update_files(
-            self,
-            assistant_config: AssistantConfig,
-            timeout: Optional[float] = None
-    ) -> None:
-
-        try:
-            logger.info(f"Updating files for assistant: {assistant_config.name}")
-            assistant = await self._retrieve_assistant(assistant_config.assistant_id, timeout=timeout)
-            existing_file_ids = set(assistant.file_ids)
-            await self._delete_old_files(assistant_config, existing_file_ids, timeout=timeout)
-            await self._upload_new_files(assistant_config, timeout=timeout)
-
-        except Exception as e:
-            logger.error(f"Failed to update files for assistant: {assistant_config.name}: {e}")
-            raise EngineError(f"Failed to update files for assistant: {assistant_config.name}: {e}")
-
     async def process_messages(
             self, 
             thread_name: str,
@@ -356,8 +482,7 @@ class AsyncAssistantClient(BaseAssistantClient):
         """
         try:
             text_completion_config = self._assistant_config.text_completion_config
-            temperature = None if text_completion_config is None else text_completion_config.temperature
-        
+
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
             # Azure OpenAI does not support additional instructions or temperature currently
             if self.assistant_config.ai_client_type == AsyncAIClientType.AZURE_OPEN_AI.name:
@@ -371,7 +496,12 @@ class AsyncAssistantClient(BaseAssistantClient):
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
                     additional_instructions=additional_instructions,
-                    temperature=temperature,
+                    temperature=None if text_completion_config is None else text_completion_config.temperature,
+                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                    top_p=None if text_completion_config is None else text_completion_config.top_p,
+                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
                     timeout=timeout
                 )
 
@@ -452,13 +582,18 @@ class AsyncAssistantClient(BaseAssistantClient):
             logger.info(f"Creating and streaming a run for assistant: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
             text_completion_config = self._assistant_config.text_completion_config
-            temperature = None if text_completion_config is None else text_completion_config.temperature
+
             async with self._async_client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=self._assistant_config.assistant_id,
                 instructions=self._assistant_config.instructions,
                 additional_instructions=additional_instructions,
-                temperature=temperature,
+                temperature=None if text_completion_config is None else text_completion_config.temperature,
+                max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                top_p=None if text_completion_config is None else text_completion_config.top_p,
+                response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
                 event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
@@ -534,29 +669,71 @@ class AsyncAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
 
-    async def _delete_old_files(
+    async def _delete_files_from_vector_store(
             self,
             assistant_config : AssistantConfig,
-            existing_file_ids,
+            vector_store_id: str,
+            existing_file_ids: set,
+            updated_files: Optional[dict] = None,
+            delete_from_service: Optional[bool] = True,
             timeout : Optional[float] = None
     ):
-        updated_file_ids = set(assistant_config.knowledge_files.values())
+        updated_file_ids = set(updated_files.values())
+        file_ids_to_delete = existing_file_ids - updated_file_ids
+        logger.info(f"Deleting files: {file_ids_to_delete} from assistant: {assistant_config.name} vector store: {vector_store_id}")
+        for file_id in file_ids_to_delete:
+            file_deletion_status = await self._async_client.beta.vector_stores.files.delete(
+                vector_store_id=vector_store_id,
+                file_id=file_id,
+                timeout=timeout
+            )
+            if delete_from_service:
+                file_deletion_status = await self._async_client.files.delete(
+                    file_id=file_id,
+                    timeout=timeout
+                )
+
+    async def _upload_files_to_vector_store(
+            self,
+            assistant_config: AssistantConfig,
+            vector_store_id: str,
+            updated_files: Optional[dict] = None,
+            timeout : Optional[float] = None
+    ):
+        logger.info(f"Uploading files to assistant {assistant_config.name} vector store: {vector_store_id}")
+        for file_path, file_id in updated_files.items():
+            if file_id is None:
+                logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
+                file = await self._async_client.beta.vector_stores.files.upload_and_poll(
+                    vector_store_id=vector_store_id,
+                    file=open(file_path, "rb")
+                )
+                updated_files[file_path] = file.id
+
+    async def _delete_files(
+            self,
+            assistant_config : AssistantConfig,
+            existing_file_ids : set,
+            updated_files: Optional[dict] = None,
+            timeout : Optional[float] = None
+    ):
+        updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = await self._async_client.beta.assistants.files.delete(
-                assistant_id=assistant_config.assistant_id,
+            file_deletion_status = await self._async_client.files.delete(
                 file_id=file_id,
                 timeout=timeout
             )
 
-    async def _upload_new_files(
+    async def _upload_files(
             self, 
             assistant_config: AssistantConfig,
+            updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        logger.info(f"Uploading new files for assistant: {assistant_config.name}")
-        for file_path, file_id in assistant_config.knowledge_files.items():
+        logger.info(f"Uploading files for assistant: {assistant_config.name}")
+        for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
                 file = await self._async_client.files.create(
@@ -564,7 +741,7 @@ class AsyncAssistantClient(BaseAssistantClient):
                     purpose='assistants',
                     timeout=timeout
                 )
-                assistant_config.knowledge_files[file_path] = file.id
+                updated_files[file_path] = file.id
 
     async def _update_assistant(
             self, 
@@ -573,19 +750,18 @@ class AsyncAssistantClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Updating assistant with ID: {assistant_config.assistant_id}")
-            await self._update_files(assistant_config)
-            file_ids = list(assistant_config.knowledge_files.values())
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
+            tools_resources = await self._update_tool_resources(assistant_config)
 
             # TODO update the assistant with the new configuration only if there are changes
             await self._async_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=instructions,
+                tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
-                file_ids=file_ids,
                 timeout=timeout
             )
         except Exception as e:

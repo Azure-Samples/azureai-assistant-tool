@@ -6,9 +6,15 @@ import json
 import os
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantConfig, VectorStoreConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 
+import time
+from pathlib import Path
+
+
+RESOURCES_PATH = Path(__file__).parent / 'resources'
 MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4-1106-preview')
 
 def generate_test_config(updates=None):
@@ -22,12 +28,12 @@ def generate_test_config(updates=None):
         "name": "assistant_test",
         "instructions": "You are test assistant with awareness of time",
         "model": MODEL_ENV_VAR,  # Use the model from the environment variable
-        "knowledge_files": {},
-        "selected_functions": [],  # Start with an empty list of selected functions
-        "knowledge_retrieval": False,
+        "tool_resources": {},
+        "functions": [],
+        "file_search": False,
         "code_interpreter": False,
         "output_folder_path": "output",
-        "ai_client_type": "AZURE_OPEN_AI"
+        "ai_client_type": "OPEN_AI"
     }
 
     if updates:
@@ -49,7 +55,7 @@ def test_assistant_client_init():
 
     client = AssistantClient(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -61,7 +67,7 @@ def test_assistant_client_from_json():
 
     client = AssistantClient.from_json(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -74,7 +80,7 @@ def test_assistant_client_sync_from_cloud():
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.AZURE_OPEN_AI
+    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -102,7 +108,7 @@ def test_assistant_client_purge():
 def test_assistant_client_add_fetch_current_datetime_function():
     # Adding the fetch_current_datetime function in the update
     updates = {
-        "selected_functions": [
+        "functions": [
             {
                 "type": "function",
                 "function": {
@@ -123,20 +129,79 @@ def test_assistant_client_add_fetch_current_datetime_function():
     config_json = json.dumps(config)
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
-    assert len(client.assistant_config.selected_functions) == 1
-    assert client.assistant_config.selected_functions[0]['function']['name'] == "fetch_current_datetime"
+    assert len(client.assistant_config.functions) == 1
+    assert client.assistant_config.functions[0]['function']['name'] == "fetch_current_datetime"
     client.purge()
 
-def skip_test_assistant_client_enable_knowledge_retrieval():
+def skip_test_assistant_client_enable_file_search():
     updates = {
-        "knowledge_retrieval": True
+        "file_search": True
     }
 
     config = generate_test_config(updates)
     config_json = json.dumps(config)
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
-    assert client.assistant_config.knowledge_retrieval == True
+    assert client.assistant_config.file_search == True
+    client.purge()
+
+def test_assistant_client_tool_resources_file_search_create_with_file_json():
+    file1 = str(RESOURCES_PATH / "product_info_1.md")
+    tool_resources = {
+        "code_interpreter": {
+            "files": {}
+        },
+        "file_search": {
+            "vector_stores": [
+                {
+                    "name": "test_vector_store",
+                    "id": None,
+                    "files": {
+                        file1: None
+                    },
+                    "metadata": {},
+                    "expires_after": None
+                }
+            ]
+        }
+    }
+    updates = {
+        "tool_resources": tool_resources,
+        "file_search": True
+    }
+
+    config = generate_test_config(updates)
+    config_json = json.dumps(config)
+    client = AssistantClient.from_json(config_json)
+    assert client.assistant_config.file_search == True
+    vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
+    assert vs_id is not None
+    file_id = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file1]
+    assert file_id is not None
+    client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.ai_client.files.delete(file_id)
+    client.purge()
+
+def test_assistant_client_tool_resources_file_search_create_with_file_config():
+    config_data = generate_test_config()
+    assistant_config = AssistantConfig(config_data)
+    file_1 = str(RESOURCES_PATH / "product_info_1.md")
+    assistant_config.file_search = True
+    assistant_config.tool_resources.code_interpreter_files = {}
+    vs_config = VectorStoreConfig(name="test_vector_store",
+                                  id=None,
+                                  files={file_1: None},
+                                  metadata={},
+                                  expires_after=None)
+    assistant_config.tool_resources.file_search_vector_stores = [vs_config]
+    client = AssistantClient.from_config(assistant_config)
+    assert client.assistant_config.file_search == True
+    vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
+    assert vs_id is not None
+    file_id = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file_1]
+    assert file_id is not None
+    client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.ai_client.files.delete(file_id)
     client.purge()
 
 def test_assistant_client_enable_code_interpreter():
@@ -156,7 +221,7 @@ def test_assistant_client_create_thread_and_process_message():
     config_json = json.dumps(config)
 
     client = AssistantClient.from_json(config_json)
-    thread_client = ConversationThreadClient.get_instance(AIClientType.AZURE_OPEN_AI)
+    thread_client = ConversationThreadClient.get_instance(AIClientType.OPEN_AI)
     thread_name = thread_client.create_conversation_thread()
     thread_client.create_conversation_thread_message("Hello!", thread_name)
     client.process_messages(thread_name)

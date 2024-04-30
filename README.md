@@ -26,7 +26,7 @@
 💬 Inbuilt thread and memory management <br>
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
-📚 Retrieval Augmented Generation with **Retrieval** tool (coming soon to Azure OpenAI Assistants)<br>
+📚 Retrieval Augmented Generation with **File Search** tool (coming soon to Azure OpenAI Assistants)<br>
 🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
 📤 Exporting the assistant configuration into simple CLI application
 
@@ -92,7 +92,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Go to the`sdk/azure-ai-assistant` folder
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.2.12a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.3.0a1-py3-none-any.whl`
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
 ### Step 4: Install Python UI libraries

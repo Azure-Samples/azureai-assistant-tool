@@ -22,11 +22,15 @@ instructions: |-
   - Check for robust error handling and input validation. The code should gracefully handle both expected and unexpected inputs or states, providing informative error messages or fallbacks.
   Scope of Inspection:
   - The inspection should focus only on the code within the single file provided. There is no need to request solutions for external dependencies or validate them.
-model: gpt-4-1106-preview
+model: gpt-3.5-turbo-0125
 assistant_id:
 file_references: []
-knowledge_files: {}
-selected_functions:
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores: []
+functions:
 - type: function
   function:
     name: retrieve_file_content_from_directory
@@ -77,10 +81,10 @@ selected_functions:
           description: The name of the folder to search for.
       required:
       - folder_name
-knowledge_retrieval: false
+file_search: false
 code_interpreter: false
 output_folder_path: output
-ai_client_type: AZURE_OPEN_AI
+ai_client_type: OPEN_AI
 assistant_type: assistant
 completion_settings: null
-assistant_role: user
+assistant_role: engineer

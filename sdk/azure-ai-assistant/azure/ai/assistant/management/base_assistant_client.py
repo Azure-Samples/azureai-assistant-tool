@@ -159,7 +159,7 @@ class BaseAssistantClient:
         functions = {}
 
         try:
-            for func_spec in assistant_config.selected_functions:
+            for func_spec in assistant_config.functions:
                 logger.info(f"Loading selected function: {func_spec['function']['name']}")
                 function_name = func_spec["function"]["name"]
                 module_name = func_spec["function"].get("module", "default.module.path")
@@ -264,13 +264,11 @@ class BaseAssistantClient:
     def _update_tools(self, assistant_config: AssistantConfig):
         tools = []
         logger.info(f"Updating tools for assistant: {assistant_config.name}")
-        # Add the retrieval tool to the tools list if there are knowledge files
-        if assistant_config.knowledge_retrieval:
-            tools.append({"type": "retrieval"})
-        # Process and add the functions to the tools list if there are functions
-        if assistant_config.selected_functions:
+        if assistant_config.file_search:
+            tools.append({"type": "file_search"})
+        if assistant_config.functions:
             modified_functions = []
-            for function in assistant_config.selected_functions:
+            for function in assistant_config.functions:
                 # Create a copy of the function spec to avoid modifying the original
                 modified_function = copy.deepcopy(function)
                 # Remove the module field from the function spec
@@ -278,7 +276,6 @@ class BaseAssistantClient:
                     del modified_function["function"]["module"]
                 modified_functions.append(modified_function)
             tools.extend(modified_functions)
-        # Add the code interpreter to the tools list if there is a code interpreter
         if assistant_config.code_interpreter:
             tools.append({"type": "code_interpreter"})
         return tools
@@ -302,3 +299,13 @@ class BaseAssistantClient:
         :rtype: AssistantConfig
         """
         return self._assistant_config
+    
+    @property
+    def ai_client(self) -> Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]:
+        """
+        The AI client used by the chat assistant.
+
+        :return: The AI client.
+        :rtype: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]
+        """
+        return self._ai_client
