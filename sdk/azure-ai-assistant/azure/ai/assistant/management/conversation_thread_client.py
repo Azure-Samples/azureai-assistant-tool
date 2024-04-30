@@ -224,7 +224,7 @@ class ConversationThreadClient:
                                     file_name = self._ai_client.files.retrieve(file_id).filename
                                 except Exception as e:
                                     logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
-                                    file_name = "Unknown_file_" + str(file_id)
+                                    file_name = "Unknown_" + str(file_id)
                                 citations.append(f'[{index}] {file_name}')
 
                     # Append citations at the end of the text content
