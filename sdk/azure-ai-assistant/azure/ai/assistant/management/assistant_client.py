@@ -343,8 +343,9 @@ class AssistantClient(BaseAssistantClient):
             existing_file_ids = set()
             if assistant.tool_resources.file_search:
                 existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
-                all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
-                existing_file_ids = set([file.id for file in all_files_in_vs])
+                if existing_vs_ids:
+                    all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
+                    existing_file_ids = set([file.id for file in all_files_in_vs])
 
             # if there are new files to upload or delete, recreate the vector store
             assistant_config_vs = None

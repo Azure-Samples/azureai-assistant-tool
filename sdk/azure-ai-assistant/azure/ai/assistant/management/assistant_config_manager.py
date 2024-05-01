@@ -136,57 +136,59 @@ class AssistantConfigManager:
             logger.warning(f"No configuration found for '{name}'")
             return None
 
+        # ensure the configurations are up-to-date
+        self._load_config(name)
+
         # Return the AssistantConfig object for the given name
         return self._configs.get(name, None)
 
     def load_configs(self) -> None:
         """
-        Loads all assistant local configurations from JSON and YAML (both .yaml and .yml) files.
+        Loads all assistant local configurations from JSON and YAML (both .yaml and .yml) files using the load_config method.
         """
-        config_files = []
-        loaded_assistants = set()  # Track loaded assistant names to prevent duplicates
         try:
             config_files = os.listdir(self._config_folder)
         except FileNotFoundError:
             logger.warning("No assistant configurations found in the config folder.")
             return
 
-        # Sort to prefer YAML over JSON if both are present for the same configuration
-        for filename in sorted(config_files, reverse=True):
+        loaded_assistants = set()  # Track loaded assistant names to prevent duplicates
+        # Identify base names to be processed
+        for filename in config_files:
             if filename.endswith(('_assistant_config.json', '_assistant_config.yaml', '_assistant_config.yml')):
                 base_name = filename.split('_assistant_config')[0]
-                if base_name in loaded_assistants:
-                    # Skip if configuration already loaded to avoid duplication
-                    continue
+                if base_name not in loaded_assistants:
+                    self._load_config(base_name)
+                    loaded_assistants.add(base_name)
 
-                file_path = os.path.join(self._config_folder, filename)
+        if not self._configs:
+            logger.warning("No valid assistant configurations found.")
+
+        self._set_last_modified_assistant()
+
+    def _load_config(self, base_name: str) -> None:
+        # Try loading JSON first, then YAML
+        extensions = ['_assistant_config.json', '_assistant_config.yaml', '_assistant_config.yml']
+        for ext in extensions:
+            file_path = os.path.join(self._config_folder, base_name + ext)
+            if os.path.exists(file_path):
                 try:
                     logger.info(f"Loading assistant configuration from '{file_path}'")
-                    if filename.endswith('.json'):
+                    if file_path.endswith('.json'):
                         with open(file_path, 'r') as file:
                             config_data = json.load(file)
-                    elif filename.endswith(('.yaml', '.yml')):
+                    else:  # For .yaml or .yml
                         with open(file_path, 'r') as file:
                             config_data = yaml.safe_load(file)
-                    else:
-                        # Skip if the file is not in an expected format
-                        continue
 
                     assistant_name = config_data.get('name')
                     if assistant_name:
                         logger.info(f"Loaded assistant configuration for '{assistant_name}'")
                         assistant_config = AssistantConfig(config_data)
                         self._configs[assistant_name] = assistant_config
-                        loaded_assistants.add(base_name)
-
+                        return  # Stop after successfully loading one format to avoid duplicates
                 except (json.JSONDecodeError, yaml.YAMLError) as e:
                     logger.warning(f"Invalid format in the assistant configuration file '{file_path}': {e}")
-                    continue  # Skip this file and continue with the next
-
-        if not self._configs:
-            logger.warning("No valid assistant configurations found.")
-
-        self._set_last_modified_assistant()
 
     def _set_last_modified_assistant(self):
         latest_mod_time = None

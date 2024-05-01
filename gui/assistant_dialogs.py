@@ -574,7 +574,6 @@ class AssistantConfigDialog(QDialog):
                 self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")
 
     def assistant_selection_changed(self):
-        self.reset_fields()
         selected_assistant = self.assistantComboBox.currentText()
         if selected_assistant == "New Assistant":
             self.is_create = True
@@ -583,6 +582,7 @@ class AssistantConfigDialog(QDialog):
             self.outputFolderPathEdit.setText(self.default_output_folder_path)
         # if selected_assistant is not empty string, load the assistant config
         elif selected_assistant != "":
+            self.reset_fields()
             self.is_create = False
             self.pre_load_assistant_config(selected_assistant)
             self.createAsNewCheckBox.setEnabled(True)
@@ -755,7 +755,7 @@ class AssistantConfigDialog(QDialog):
                         item.setData(Qt.UserRole, file_id)
                         self.file_search_files[file_path] = file_id
                         self.fileSearchList.addItem(item)
-                    self.fileSearchCheckBox.setChecked(bool(self.assistant_config.file_search))
+                self.fileSearchCheckBox.setChecked(bool(self.assistant_config.file_search))
 
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
@@ -818,6 +818,8 @@ class AssistantConfigDialog(QDialog):
                 # Check if the function is in the current category and set the corresponding item as checked
                 for func_config in funcs:
                     if func_config.name == func_name:
+                        if func_config.get_full_spec() not in self.functions:
+                            self.functions.append(func_config.get_full_spec())
                         list_widget = self.systemFunctionsList if func_type == 'system' else self.userFunctionsList
                         for i in range(list_widget.count()):
                             listItem = list_widget.item(i)
@@ -839,7 +841,9 @@ class AssistantConfigDialog(QDialog):
         # Since the method now receives an item, we can check directly if this item is checked
         if item.checkState() == Qt.Checked:
             functionConfig = item.data(Qt.UserRole)
-            self.functions.append(functionConfig.get_full_spec())
+            # if functionConfig is already in the list, don't add it again
+            if functionConfig.get_full_spec() not in self.functions:
+                self.functions.append(functionConfig.get_full_spec())
 
         # However, to maintain a complete list of checked items, we still need to iterate over all items
         for listWidget in [self.systemFunctionsList, self.userFunctionsList]:
@@ -847,7 +851,8 @@ class AssistantConfigDialog(QDialog):
                 listItem = listWidget.item(i)
                 if listItem.checkState() == Qt.Checked:
                     functionConfig = listItem.data(Qt.UserRole)
-                    self.functions.append(functionConfig.get_full_spec())
+                    if functionConfig.get_full_spec() not in self.functions:
+                        self.functions.append(functionConfig.get_full_spec())
 
     def add_reference_file(self):
         self.fileReferenceList.addItem(QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)")[0])
