@@ -494,7 +494,8 @@ class AssistantClient(BaseAssistantClient):
             run_start_time = str(datetime.now())
             user_request = self._conversation_thread_client.retrieve_conversation(thread_name).get_last_text_message("user").content
             self._callbacks.on_run_start(self._name, run.id, run_start_time, user_request)
-            self._user_input_processing_cancel_requested = False
+            if self._cancel_run_requested.is_set():
+                self._cancel_run_requested.clear()
             is_first_message = True
 
             while True:
@@ -513,9 +514,9 @@ class AssistantClient(BaseAssistantClient):
 
                 logger.info(f"Processing run: {run.id} with status: {run.status}")
 
-                if self._user_input_processing_cancel_requested:
+                if self._cancel_run_requested.is_set():
                     self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
-                    self._user_input_processing_cancel_requested = False
+                    self._cancel_run_requested.clear()
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
 

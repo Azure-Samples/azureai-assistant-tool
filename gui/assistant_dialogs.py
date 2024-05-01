@@ -776,10 +776,13 @@ class AssistantConfigDialog(QDialog):
                 self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
                 self.maxCompletionTokensEdit.setValue(completion_settings.get('max_completion_tokens', 1000))
                 self.maxPromptTokensEdit.setValue(completion_settings.get('max_prompt_tokens', 1000))
-                truncation_strategy = completion_settings.get('truncation_strategy', 'auto')
-                self.truncationTypeComboBox.setCurrentText(truncation_strategy)
-                if truncation_strategy == 'last_messages':
-                    self.lastMessagesSpinBox.setValue(completion_settings.get('last_messages', 10))
+                truncation_strategy = completion_settings.get('truncation_strategy', {'type': 'auto'})
+                truncation_type = truncation_strategy.get('type', 'auto')  # Default to 'auto' if 'type' is missing
+                self.truncationTypeComboBox.setCurrentText(truncation_type)
+                if truncation_type == 'last_messages':
+                    last_messages = truncation_strategy.get('last_messages')
+                    if last_messages is not None:
+                        self.lastMessagesSpinBox.setValue(last_messages)
             elif self.assistant_type == "chat_assistant":
                 self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
                 self.maxTokensEdit.setValue(completion_settings.get('max_tokens', 1000))
