@@ -18,10 +18,7 @@ instructions: |-
   - Provides recommendations on how to revise the instructions to meet the requirements.
   - Suggests examples that could enhance the clarity and completeness of the instructions.
 model: ''
-assistant_id: ''
-knowledge_files: {}
-selected_functions: []
-knowledge_retrieval: false
+assistant_id: null
 code_interpreter: false
 output_folder_path: ''
 ai_client_type: AZURE_OPEN_AI
@@ -29,3 +26,6 @@ assistant_type: chat_assistant
 assistant_role: system
 file_references: []
 completion_settings: null
+tool_resources: null
+file_search: false
+functions: []
