@@ -26,9 +26,8 @@ instructions: |-
       ["Please review the ./folder1/input1.py file and suggest improvements.", "Please review the ./folder2/input2.py file and suggest improvements."]
   4. The end result must be always valid list, e.g. ["formatted user request1", "formatted user request2"], otherwise result is considered as failure.
 model: ''
-assistant_id: ''
-knowledge_files: {}
-selected_functions:
+assistant_id: null
+functions:
 - type: function
   function:
     name: find_files_by_extension_in_directory
@@ -47,7 +46,6 @@ selected_functions:
       required:
       - directory
       - file_extension
-knowledge_retrieval: false
 code_interpreter: false
 output_folder_path: ''
 ai_client_type: AZURE_OPEN_AI
@@ -55,3 +53,5 @@ assistant_type: chat_assistant
 assistant_role: system
 file_references: []
 completion_settings: null
+tool_resources: null
+file_search: false

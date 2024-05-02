@@ -19,6 +19,7 @@ from typing import Union
 import re, yaml, copy
 import json, importlib, sys, os
 from typing import Optional
+import threading
 
 
 class BaseAssistantClient:
@@ -61,8 +62,8 @@ class BaseAssistantClient:
                 self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
                 self._conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type)
             self._functions = {}
-            self._user_input_processing_cancel_requested = False
             self._assistant_config = AssistantConfig.from_dict(self._config_data)
+            self._cancel_run_requested = threading.Event()
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -99,7 +100,8 @@ class BaseAssistantClient:
         self._functions = {}
         self._ai_client = None
         self._callbacks = None
-        self._user_input_processing_cancel_requested = False
+        if self._cancel_run_requested:
+            self._cancel_run_requested.clear()
         self._ai_client_type = None
         self._name = None
 
@@ -111,7 +113,7 @@ class BaseAssistantClient:
         :rtype: None
         """
         logger.info("User processing run cancellation requested.")
-        self._user_input_processing_cancel_requested = True
+        self._cancel_run_requested.set()
 
     def _update_arguments(self, args):
         """

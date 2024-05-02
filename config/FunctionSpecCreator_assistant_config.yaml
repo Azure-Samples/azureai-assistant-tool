@@ -36,10 +36,7 @@ instructions: |-
   7. The module value must not be changed from what is in the template.
   8. The end result must not contain triple backtics, otherwise, it is considered a failure.
 model: ''
-assistant_id: ''
-knowledge_files: {}
-selected_functions: []
-knowledge_retrieval: false
+assistant_id: null
 code_interpreter: false
 output_folder_path: ''
 ai_client_type: AZURE_OPEN_AI
@@ -47,3 +44,6 @@ assistant_type: chat_assistant
 assistant_role: system
 file_references: []
 completion_settings: null
+tool_resources: null
+file_search: false
+functions: []

@@ -184,14 +184,15 @@ class ChatAssistantClient(BaseChatAssistantClient):
             self._callbacks.on_run_start(self._name, run_id, run_start_time, user_request)
 
             continue_processing = True
-            self._user_input_processing_cancel_requested = False
+            if self._cancel_run_requested.is_set():
+                self._cancel_run_requested.clear()
 
             response = None
             while continue_processing:
 
-                if self._user_input_processing_cancel_requested:
+                if self._cancel_run_requested.is_set():
                     logger.info("User input processing cancellation requested.")
-                    self._user_input_processing_cancel_requested = False
+                    self._cancel_run_requested.clear()
                     break
 
                 text_completion_config = self._assistant_config.text_completion_config

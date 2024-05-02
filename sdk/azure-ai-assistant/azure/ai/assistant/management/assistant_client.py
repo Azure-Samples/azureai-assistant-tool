@@ -343,8 +343,9 @@ class AssistantClient(BaseAssistantClient):
             existing_file_ids = set()
             if assistant.tool_resources.file_search:
                 existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
-                all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
-                existing_file_ids = set([file.id for file in all_files_in_vs])
+                if existing_vs_ids:
+                    all_files_in_vs = list(self._ai_client.beta.vector_stores.files.list(existing_vs_ids[0], timeout=timeout))
+                    existing_file_ids = set([file.id for file in all_files_in_vs])
 
             # if there are new files to upload or delete, recreate the vector store
             assistant_config_vs = None
@@ -493,7 +494,8 @@ class AssistantClient(BaseAssistantClient):
             run_start_time = str(datetime.now())
             user_request = self._conversation_thread_client.retrieve_conversation(thread_name).get_last_text_message("user").content
             self._callbacks.on_run_start(self._name, run.id, run_start_time, user_request)
-            self._user_input_processing_cancel_requested = False
+            if self._cancel_run_requested.is_set():
+                self._cancel_run_requested.clear()
             is_first_message = True
 
             while True:
@@ -512,9 +514,9 @@ class AssistantClient(BaseAssistantClient):
 
                 logger.info(f"Processing run: {run.id} with status: {run.status}")
 
-                if self._user_input_processing_cancel_requested:
+                if self._cancel_run_requested.is_set():
                     self._ai_client.beta.threads.runs.cancel(thread_id=thread_id, run_id=run.id, timeout=timeout)
-                    self._user_input_processing_cancel_requested = False
+                    self._cancel_run_requested.clear()
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return None
 

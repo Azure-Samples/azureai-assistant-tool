@@ -221,7 +221,7 @@ class ConversationSidebar(QWidget):
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(250)
         self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.assistant_client_manager = AssistantClientManager.get_instance()
 
