@@ -1,0 +1,8 @@
+# Assistant middleware from GitHub Release
+https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.3.1-alpha/azure_ai_assistant-0.3.1a1-py3-none-any.whl
+
+# GUI Framework
+PySide6
+
+# Azure Cognitive Services Speech SDK
+azure-cognitiveservices-speech

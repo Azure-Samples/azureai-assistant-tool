@@ -66,7 +66,7 @@
 
 ### Step 2: Install Python
 
-Azure AI Assistant tool requires Python >= 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
+The Azure AI Assistant tool requires Python >= 3.8 on your system. You can download Python from [the official website](https://www.python.org/downloads/).
 Latest stable Python version is recommended.
 
 Create a new Python virtual environment. Virtual environment is recommended for safe install the SDK packages:
@@ -81,7 +81,15 @@ Create a new Python virtual environment. Virtual environment is recommended for 
    .venv\scripts\activate
    ```
 
-### Step 3: Build and install azure.ai.assistant Python library
+### Step 3: Install the tool and dependencies
+
+Run the following command in your terminal to install all the necessary dependencies as specified in the requirements.txt file.
+
+```
+pip install -r requirements.txt
+```
+
+### Step 4: Build and install azure.ai.assistant Python library (Optional)
 
 We have included the `azure.ai.assistant` library currently within this repository as part of the alpha status of the project. 
 The plan is to release library on PyPI for more convenience installation in future.
@@ -92,17 +100,9 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Go to the`sdk/azure-ai-assistant` folder
 - Build the wheel using following command: `python setup.py sdist bdist_wheel`
 - Go to generated `dist` folder
-- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.3.1a1-py3-none-any.whl`
+- Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.x.xa1-py3-none-any.whl`
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
-### Step 4: Install Python UI libraries
-
-Install following specific libraries needed for the Azure AI Assistant Tool GUI
-
-```
-pip install PySide6
-pip install azure-cognitiveservices-speech
-```
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
 
