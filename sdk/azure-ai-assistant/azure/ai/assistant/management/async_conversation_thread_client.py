@@ -26,23 +26,28 @@ class AsyncConversationThreadClient:
 
     :param ai_client_type: The type of the AI client to use.
     :type ai_client_type: AIClientType
+    :param client_args: The arguments to pass to the AI client.
+    :type client_args: dict
     """
-    def __init_private(self, ai_client_type):
+    def __init_private(self, ai_client_type, **client_args):
         self._ai_client_type = ai_client_type
-        self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type)
+        self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type, **client_args)
         self._thread_config = ConversationThreadConfig(self._ai_client_type, 'config/threads.json')
         self._assistant_config_manager = AssistantConfigManager.get_instance()
 
     @classmethod
     def get_instance(
         cls, 
-        ai_client_type : AsyncAIClientType
+        ai_client_type : AsyncAIClientType,
+        **client_args
     ) -> 'AsyncConversationThreadClient':
         """
         Get the singleton instance of the AsyncConversationThreadClient.
 
         :param ai_client_type: The type of the AI client to use.
         :type ai_client_type: AsyncAIClientType
+        :param client_args: The arguments to pass to the AI client.
+        :type client_args: dict
 
         :return: The singleton instance of the AsyncConversationThreadClient.
         :rtype: AsyncConversationThreadClient
@@ -51,7 +56,7 @@ class AsyncConversationThreadClient:
             with cls._lock:
                 if ai_client_type not in cls._instances:
                     instance = cls.__new__(cls)
-                    instance.__init_private(ai_client_type)
+                    instance.__init_private(ai_client_type, **client_args)
                     cls._instances[ai_client_type] = instance
         return cls._instances[ai_client_type]
 

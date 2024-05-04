@@ -22,14 +22,17 @@ class BaseChatAssistantClient(BaseAssistantClient):
     :type callbacks: Optional[AssistantClientCallbacks]
     :param async_mode: Whether to run the assistant in async mode.
     :type async_mode: bool
+    :param client_args: Additional keyword arguments for configuring the AI client.
+    :type client_args: Dict
     """
     def __init__(
             self,
             config_json: str,
             callbacks: Optional[AssistantClientCallbacks] = None,
-            async_mode: bool = False
+            async_mode: bool = False,
+            **client_args
     ) -> None:
-        super().__init__(config_json, callbacks, async_mode)
+        super().__init__(config_json, callbacks, async_mode, **client_args)
         self._tools = None
         self._messages = []
 

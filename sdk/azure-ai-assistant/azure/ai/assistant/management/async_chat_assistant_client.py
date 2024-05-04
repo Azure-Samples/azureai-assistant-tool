@@ -25,13 +25,16 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
     :type callbacks: Optional[AssistantClientCallbacks]
+    :param client_args: Additional keyword arguments for configuring the AI client.
+    :type client_args: Dict
     """
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AsyncAssistantClientCallbacks] = None
+            callbacks: Optional[AsyncAssistantClientCallbacks] = None,
+            **client_args
     ) -> None:
-        super().__init__(config_json, callbacks, async_mode=True)
+        super().__init__(config_json, callbacks, async_mode=True, **client_args)
         self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
         # Init with base settings, leaving async init for the factory method
 
@@ -55,7 +58,8 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         cls,
         config_json: str,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncChatAssistantClient":
         """
         Creates a AsyncChatAssistantClient instance from JSON configuration data.
@@ -66,11 +70,14 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncChatAssistantClient.
         :rtype: AsyncChatAssistantClient
         """
         try:
-            instance = cls(config_json, callbacks)  # Instance creation without async init
+            instance = cls(config_json, callbacks, **client_args)
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
             await instance._async_init(is_create, timeout)  # Perform async initialization
@@ -84,7 +91,8 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         cls,
         config_yaml: str,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncChatAssistantClient":
         """
         Creates an AsyncChatAssistantClient instance from YAML configuration data.
@@ -95,13 +103,16 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncChatAssistantClient.
         :rtype: AsyncChatAssistantClient
         """
         try:
             config_data = yaml.safe_load(config_yaml)
             config_json = json.dumps(config_data)
-            return await cls.from_json(config_json, callbacks, timeout)
+            return await cls.from_json(config_json, callbacks, timeout, **client_args)
         except yaml.YAMLError as e:
             logger.error(f"Invalid YAML format: {e}")
             raise EngineError(f"Invalid YAML format: {e}")
@@ -111,7 +122,8 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         cls,
         config: AssistantConfig,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncChatAssistantClient":
         """
         Creates a AsyncChatAssistantClient instance from an AssistantConfig object.
@@ -122,12 +134,15 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncChatAssistantClient.
         :rtype: AsyncChatAssistantClient
         """
         try:
             config_json = config.to_json()
-            return await cls.from_json(config_json, callbacks, timeout)
+            return await cls.from_json(config_json, callbacks, timeout, **client_args)
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")
