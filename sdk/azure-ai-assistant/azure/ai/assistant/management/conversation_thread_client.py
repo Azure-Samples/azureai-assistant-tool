@@ -275,15 +275,25 @@ class ConversationThreadClient:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             attachments = self._update_message_attachments(thread_id, attachments) if attachments is not None else []
 
-            # Create the message with the attachments
-            self._ai_client.beta.threads.messages.create(
-                thread_id,
-                role=role,
-                metadata=metadata,
-                attachments=attachments,
-                content=message,
-                timeout=timeout
-            )
+            if attachments:
+                # Create the message with the attachments
+                self._ai_client.beta.threads.messages.create(
+                    thread_id,
+                    role=role,
+                    metadata=metadata,
+                    attachments=attachments,
+                    content=message,
+                    timeout=timeout
+                )
+            else:
+                # Create the message without attachments
+                self._ai_client.beta.threads.messages.create(
+                    thread_id,
+                    role=role,
+                    metadata=metadata,
+                    content=message,
+                    timeout=timeout
+                )
 
             logger.info(f"Created message: {message} in thread: {thread_id}, attachments: {attachments}")
         except Exception as e:
