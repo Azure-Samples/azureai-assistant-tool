@@ -51,8 +51,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         QTimer.singleShot(100, lambda: self.deferred_init())
 
     def initialize_singletons(self):
-        self.function_config_manager = FunctionConfigManager.get_instance()
-        self.assistant_config_manager = AssistantConfigManager.get_instance()
+        self.function_config_manager = FunctionConfigManager.get_instance('config')
+        self.assistant_config_manager = AssistantConfigManager.get_instance('config')
         self.task_manager = TaskManager.get_instance(self)
         self.assistant_client_manager = AssistantClientManager.get_instance()
 
@@ -228,6 +228,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Save the conversation threads for the current active assistant
         if self.conversation_thread_clients[self.active_ai_client_type] is not None:
             self.conversation_thread_clients[self.active_ai_client_type].save_conversation_threads()
+
+        # Save assistant configurations when switching AI client types 
+        self.assistant_config_manager.save_configs()
 
         self.conversation_view.conversationView.clear()
         self.active_ai_client_type = ai_client_type

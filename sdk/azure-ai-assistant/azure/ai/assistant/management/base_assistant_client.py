@@ -233,6 +233,14 @@ class BaseAssistantClient:
         file_references = assistant_config.file_references
         
         try:
+            # Log the current working directory
+            cwd = os.getcwd()
+            logger.info(f"Current working directory: {cwd}")
+            
+            # Optionally, list files in the current directory
+            files_in_cwd = os.listdir(cwd)
+            logger.debug(f"Files in the current directory: {files_in_cwd}")
+
             # Regular expression to find all placeholders in the format {file_reference:X}
             pattern = re.compile(r'\{file_reference:(\d+)\}')
             

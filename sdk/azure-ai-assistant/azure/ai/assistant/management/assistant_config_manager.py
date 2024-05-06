@@ -24,28 +24,37 @@ class AssistantConfigManager:
     """
     A class to manage the creation, updating, deletion, and loading of assistant configurations from local files.
 
-    :param config_folder: The folder path for storing configuration files. Optional, defaults to 'config'.
+    :param config_folder: The folder path for storing configuration files. Optional, defaults to config folder in the user's home directory.
     :type config_folder: str
     """
     def __init__(
             self, 
-            config_folder : str ='config'
+            config_folder : Optional[str] = None
     ) -> None:
-        self._config_folder = config_folder
+        if config_folder is None:
+            self._config_folder = self._default_config_path()
+        else:
+            self._config_folder = config_folder
         self._last_modified_assistant_name = None
         self._configs: dict[str, AssistantConfig] = {}
         # Load all assistant configurations under the config folder
         self.load_configs()
 
+    @staticmethod
+    def _default_config_path() -> str:
+        home = os.path.expanduser("~")
+        return os.path.join(home, ".config", 'azure-ai-assistant')
+
     @classmethod
     def get_instance(
         cls, 
-        config_folder : str ='config'
+        config_folder : Optional[str] = None
+
     ) -> 'AssistantConfigManager':
         """
         Gets the singleton instance of the AssistantConfigManager object.
         
-        :param config_folder: The folder path for storing configuration files. Optional, defaults to 'config'.
+        :param config_folder: The folder path for storing configuration files. Optional, defaults to config folder in the user's home directory.
         :type config_folder: str
 
         :return: The singleton instance of the AssistantConfigManager object.
@@ -61,8 +70,8 @@ class AssistantConfigManager:
             config_json : str
     ) -> str:
         """
-        Updates an existing assistant local configuration.
-        
+        Updates an existing assistant local configuration in memory.
+
         :param name: The name of the configuration to update.
         :type name: str
         :param config_json: The JSON string containing the updated configuration data.
@@ -75,8 +84,11 @@ class AssistantConfigManager:
             logger.info(f"Updating assistant configuration for '{name}' with data: {config_json}")
             new_config_data = json.loads(config_json)
             self._validate_config(new_config_data)
-            name = self._save_config(name, new_config_data)
+            
+            # Update the configuration in memory without saving to a file
+            self._configs[name] = AssistantConfig(new_config_data)
             self._last_modified_assistant_name = name
+
             return name
         except json.JSONDecodeError as e:
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -135,9 +147,6 @@ class AssistantConfigManager:
         if name not in self._configs:
             logger.warning(f"No configuration found for '{name}'")
             return None
-
-        # ensure the configurations are up-to-date
-        self._load_config(name)
 
         # Return the AssistantConfig object for the given name
         return self._configs.get(name, None)
@@ -209,13 +218,19 @@ class AssistantConfigManager:
 
         self._last_modified_assistant_name = latest_assistant_name
 
-    def save_configs(self) -> None:
+    def save_configs(
+            self, 
+            config_folder: Optional[str] = None
+    ) -> None:
         """
         Saves all assistant local configurations to json files.
+
+        :param config_folder: The folder path where the configuration files should be saved. Optional, defaults to the config folder.
+        :type config_folder: str
         """
         # Save all assistant configurations to files
         for assistant_name, assistant_config in self._configs.items():
-            self._save_config(assistant_name, assistant_config._get_config_data())
+            self.save_config(assistant_name, config_folder or self._config_folder)
 
     def get_last_modified_assistant(self) -> str:
         """
@@ -296,71 +311,39 @@ class AssistantConfigManager:
         if 'tool_resources' in config_data and config_data.get('tool_resources') is not None and not isinstance(config_data['tool_resources'], dict):
             raise ConfigError("Assistant 'tool_resources' must be a dictionary in the configuration")
 
-    def _save_config(self, assistant_name, config_data):
-        # Check if the assistant name and configuration data are provided
-        if not assistant_name:
-            raise ConfigError("Assistant name is required")
+    def save_config(
+            self, 
+            name: str, 
+            folder_path : Optional[str] = None
+    ) -> None:
+        """
+        Saves the specified assistant configuration to a file in the given directory.
 
-        if not config_data:
-            raise ConfigError("Assistant configuration data is required")
+        :param name: The name of the assistant configuration to save.
+        :type name: str
+        :param folder_path: The directory path where the configuration file should be saved. Optional, defaults to the config folder.
+        :type folder_path: str
+        """
+        if name not in self._configs:
+            raise ConfigError(f"No configuration found for '{name}'")
 
-        logger.info(f"Checking for updates in assistant configuration for '{assistant_name}'")
+        config_data = self._configs[name]._get_config_data()  # assuming AssistantConfig has a method to get its data
+        config_filename = f"{name}_assistant_config.yaml"
+        folder_path = folder_path or self._config_folder
+        config_path = os.path.join(folder_path, config_filename)
 
-        # Handle possible change in assistant name within the configuration data
-        if 'name' in config_data and config_data['name'] != assistant_name:
-            logger.info(f"Assistant name changed from '{assistant_name}' to \"{config_data['name']}\"")
-
-            # Construct path for potentially existing old configuration files
-            old_json_config_path = os.path.join(self._config_folder, f"{assistant_name}_assistant_config.json")
-            old_yaml_config_path = os.path.join(self._config_folder, f"{assistant_name}_assistant_config.yaml")
-            old_yml_config_path = os.path.join(self._config_folder, f"{assistant_name}_assistant_config.yml")
-
-            # Attempt to delete old configuration files if they exist
-            for old_path in [old_json_config_path, old_yaml_config_path, old_yml_config_path]:
-                if os.path.exists(old_path):
-                    try:
-                        os.remove(old_path)
-                        logger.info(f"Removed outdated configuration file: {old_path}")
-                    except Exception as e:
-                        logger.error(f"Error deleting outdated file: {e}")
-
-            # Update the assistant name to the new name from the configuration data
-            assistant_name = config_data['name']
-
-        # Define the new YAML file path for saving the configuration
-        config_filename = f"{assistant_name}_assistant_config.yaml"
-        config_path = os.path.join(self._config_folder, config_filename)
-
-        # Update in-memory configuration
-        self._configs[assistant_name] = AssistantConfig(config_data)
-        
-        logger.info(f"Saving updated configuration for '{assistant_name}' in YAML format")
-
-        # Ensure the configuration directory exists
-        if not os.path.exists(self._config_folder):
-            try:
-                os.makedirs(self._config_folder)
-            except Exception as e:
-                logger.error(f"Error creating config directory: {e}")
-                raise ConfigError(f"Error creating config directory: {e}")
+        # Ensure the directory exists
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
 
         # Save the configuration data in YAML format
         try:
             with open(config_path, 'w') as file:
                 yaml.dump(config_data, file, sort_keys=False)
+            logger.info(f"Configuration for '{name}' saved successfully at '{config_path}'")
         except Exception as e:
-            logger.error(f"Error writing to YAML file: {e}")
-            raise ConfigError(f"Error writing to YAML file: {e}")
-
-        # Delete the corresponding JSON file if it exists
-        json_config_path = config_path.replace('.yaml', '.json')
-        if os.path.exists(json_config_path):
-            try:
-                os.remove(json_config_path)
-                logger.info(f"Removed outdated JSON configuration for '{assistant_name}'")
-            except Exception as e:
-                logger.error(f"Error deleting outdated JSON file: {e}")
-        return assistant_name
+            logger.error(f"Error saving configuration file at '{config_path}': {e}")
+            raise ConfigError(f"Error saving configuration file: {e}")
 
     @property
     def configs(self) -> dict:
