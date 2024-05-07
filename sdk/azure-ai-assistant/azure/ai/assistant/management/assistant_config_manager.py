@@ -204,7 +204,7 @@ class AssistantConfigManager:
         latest_assistant_name = None
 
         for assistant_name, assistant_config in self._configs.items():
-            file_path = os.path.join(self._config_folder, f"{assistant_name}_assistant_config.json")
+            file_path = os.path.join(self._config_folder, f"{assistant_name}_assistant_config.yaml")
             try:
                 mod_time = os.path.getmtime(file_path)
 

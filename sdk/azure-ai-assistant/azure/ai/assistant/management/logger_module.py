@@ -36,8 +36,9 @@ def setup_logger() -> logging.Logger:
     # Environment variable check for console logging
     log_to_console = os.getenv('ASSISTANT_LOG_TO_CONSOLE', 'false').lower() in ('true', '1', 't')
 
-    # Default to file logging if ASSISTANT_LOG_TO_CONSOLE is not 'true'
-    if not log_to_console:
+    log_to_file = os.getenv('ASSISTANT_LOG_TO_FILE', 'false').lower() in ('true', '1', 't')
+
+    if log_to_file:
         # Set the file handler with UTF-8 encoding for file output
         file_handler = logging.FileHandler('assistant.log', encoding='utf-8')
         file_handler.setFormatter(formatter)
