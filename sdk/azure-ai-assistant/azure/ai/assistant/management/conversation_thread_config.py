@@ -5,6 +5,7 @@ from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.logger_module import logger
 
 import json, os
+from typing import Optional
 
 
 class ConversationThreadConfig:
@@ -18,11 +19,14 @@ class ConversationThreadConfig:
     """
     def __init__(
             self, 
-            ai_client_type: AIClientType, 
-            config_file
+            ai_client_type: AIClientType,
+            config_folder : Optional[str] = None,
     ) -> None:
         self._ai_client_type = ai_client_type.name
-        self._config_file = config_file
+        if config_folder:
+            self._config_file = os.path.join(config_folder, 'threads.json')
+        else:
+            self._config_file = None
         self._config_data = {}
         self._current_thread_id = None
         self._threads = []
@@ -185,6 +189,9 @@ class ConversationThreadConfig:
         :rtype: list
         """
         # create config file if it doesn't exist
+        if self._config_file is None:
+            return []
+
         try:
             with open(self._config_file, 'r') as f:
                 pass
@@ -310,6 +317,9 @@ class ConversationThreadConfig:
         """
         Save the configuration for the specific ai_client_type to a JSON file.
         """
+        if self._config_file is None:
+            return
+
         # Ensure the directory exists
         os.makedirs(os.path.dirname(self._config_file), exist_ok=True)
         

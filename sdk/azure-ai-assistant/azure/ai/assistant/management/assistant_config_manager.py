@@ -158,7 +158,7 @@ class AssistantConfigManager:
         try:
             config_files = os.listdir(self._config_folder)
         except FileNotFoundError:
-            logger.warning("No assistant configurations found in the config folder.")
+            logger.warning(f"No assistant configurations found in the folder '{self._config_folder}'")
             return
 
         loaded_assistants = set()  # Track loaded assistant names to prevent duplicates
