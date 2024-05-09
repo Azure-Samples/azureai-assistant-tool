@@ -83,7 +83,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.conversation_thread_clients : dict[AIClientType, ConversationThreadClient] = {}
         for ai_client_type in AIClientType:
             try:
-                self.conversation_thread_clients[ai_client_type] = ConversationThreadClient.get_instance(ai_client_type)
+                self.conversation_thread_clients[ai_client_type] = ConversationThreadClient.get_instance(ai_client_type, config_folder='config')
             except Exception as e:
                 self.conversation_thread_clients[ai_client_type] = None
                 logger.error(f"Error initializing conversation thread client for ai_client_type {ai_client_type.name}: {e}")

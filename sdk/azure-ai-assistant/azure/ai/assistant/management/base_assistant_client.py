@@ -59,12 +59,15 @@ class BaseAssistantClient:
             self._name = self._config_data["name"]
             self._ai_client_type = self._get_ai_client_type(self._config_data["ai_client_type"], async_mode)
             self._ai_client : Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI] = self._get_ai_client(self._ai_client_type, **client_args)
+            config_folder = None
+            if "config_folder" in self._config_data:
+                config_folder = self._config_data["config_folder"]
             if async_mode:
                 self._callbacks = callbacks if callbacks is not None else AsyncAssistantClientCallbacks()
-                self._conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type, config_folder=self._config_data["config_folder"])
+                self._conversation_thread_client = AsyncConversationThreadClient.get_instance(self._ai_client_type, config_folder=config_folder)
             else:
                 self._callbacks = callbacks if callbacks is not None else AssistantClientCallbacks()
-                self._conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type, config_folder=self._config_data["config_folder"])
+                self._conversation_thread_client = ConversationThreadClient.get_instance(self._ai_client_type, config_folder=config_folder)
             self._functions = {}
             self._assistant_config = AssistantConfig.from_dict(self._config_data)
             self._cancel_run_requested = threading.Event()
