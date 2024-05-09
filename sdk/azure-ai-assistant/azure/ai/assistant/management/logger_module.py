@@ -30,6 +30,9 @@ def setup_logger() -> logging.Logger:
     logger = logging.getLogger('assistant_logger')
     logger.setLevel(logging.INFO)
     
+    # Disable by default
+    logger.disabled = True
+
     # Including function name in the log message format
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s')
 
@@ -39,12 +42,14 @@ def setup_logger() -> logging.Logger:
     log_to_file = os.getenv('ASSISTANT_LOG_TO_FILE', 'false').lower() in ('true', '1', 't')
 
     if log_to_file:
+        logger.disabled = False
         # Set the file handler with UTF-8 encoding for file output
         file_handler = logging.FileHandler('assistant.log', encoding='utf-8')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
     if log_to_console:
+        logger.disabled = False
         # Set the stream handler for console output
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
@@ -60,6 +65,7 @@ def add_broadcaster_to_logger(broadcaster) -> None:
     """
     global logger
 
+    logger.disabled = False
     # Check if a BroadcasterLoggingHandler is already added and update it
     for handler in logger.handlers:
         if isinstance(handler, BroadcasterLoggingHandler):

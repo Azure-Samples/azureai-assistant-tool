@@ -38,8 +38,9 @@ class ConversationThreadClient:
             **client_args
     ):
         self._ai_client_type = ai_client_type
+        self._config_folder = config_folder
         self._ai_client : Union[OpenAI, AzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type, **client_args)
-        self._thread_config = ConversationThreadConfig(self._ai_client_type, config_folder)
+        self._thread_config = ConversationThreadConfig(self._ai_client_type, self._config_folder)
         self._assistant_config_manager = AssistantConfigManager.get_instance()
 
     @classmethod

@@ -58,19 +58,19 @@ class FunctionConfigManager:
     @classmethod
     def get_instance(
         cls,
-        config_directory : Optional[str] = None
+        config_folder : Optional[str] = None
     ) -> 'FunctionConfigManager':
         """
         Get the singleton instance of FunctionConfigManager.
 
-        :param config_directory: The directory containing the function specifications.
-        :type config_directory: str
+        :param config_folder: The directory containing the function specifications.
+        :type config_folder: str
 
         :return: The singleton instance of FunctionConfigManager.
         :rtype: FunctionConfigManager
         """
         if cls._instance is None:
-            cls._instance = cls(config_directory)
+            cls._instance = cls(config_folder)
         return cls._instance
 
     def load_function_configs(self) -> None:
