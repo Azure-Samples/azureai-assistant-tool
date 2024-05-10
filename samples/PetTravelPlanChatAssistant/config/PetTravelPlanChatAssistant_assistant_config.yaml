@@ -9,7 +9,7 @@ instructions: |-
   2. You only ask same question more than once if you do not get satisfactory answer. The document form you have lists either possible answer options or accepts free form answers.
   3. To know what is the next question to ask from the from, you will always analyze the earlier questions and answers in the conversation
   4. After all questions has been answered and all questions from form have been answered successfully, you will provide a summary to user which contains all questions and answers.
-model: gpt-3.5-turbo-0125
+model: gpt-4-32k
 assistant_id: 770c45f7-fd9e-4364-a3ab-ef4d5d861b4c
 file_references:
 - C:/Git/azureai-assistant-tool/samples/PetTravelPlanChatAssistant/FormTemplateForPetTransportation.yaml
@@ -71,7 +71,7 @@ functions:
 file_search: false
 code_interpreter: false
 output_folder_path: output
-ai_client_type: OPEN_AI
+ai_client_type: AZURE_OPEN_AI
 assistant_type: chat_assistant
 completion_settings: null
 assistant_role: user

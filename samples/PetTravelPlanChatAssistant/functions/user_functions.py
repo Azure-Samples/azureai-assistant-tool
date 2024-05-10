@@ -7,9 +7,6 @@ import os
 import platform
 import random
 import re
-import sounddevice as sd
-import yfinance as yf
-
 
 # This file is auto-generated. Do not edit directly.
 
