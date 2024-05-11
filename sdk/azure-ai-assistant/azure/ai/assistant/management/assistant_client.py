@@ -484,11 +484,12 @@ class AssistantClient(BaseAssistantClient):
             text_completion_config = self._assistant_config.text_completion_config
 
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
-            # Azure OpenAI does not support additional instructions or temperature currently
-            if self.assistant_config.ai_client_type == AIClientType.AZURE_OPEN_AI.name:
+            # Azure OpenAI does not support all completion parameters currently
+            if text_completion_config == None:
                 run = self._ai_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
                     timeout=timeout
                 )
             else:
@@ -583,21 +584,30 @@ class AssistantClient(BaseAssistantClient):
 
             text_completion_config = self._assistant_config.text_completion_config
 
-            with self._ai_client.beta.threads.runs.stream(
-                thread_id=thread_id,
-                assistant_id=self._assistant_config.assistant_id,
-                instructions=self._assistant_config.instructions,
-                additional_instructions=additional_instructions,
-                temperature=None if text_completion_config is None else text_completion_config.temperature,
-                max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
-                max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
-                top_p=None if text_completion_config is None else text_completion_config.top_p,
-                response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
-                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
-                timeout=timeout
-            ) as stream:
-                stream.until_done()
+            if text_completion_config is None:
+                with self._ai_client.beta.threads.runs.stream(
+                    thread_id=thread_id,
+                    assistant_id=self._assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
+                    timeout=timeout,
+                    event_handler=StreamEventHandler(self, thread_id, timeout=timeout)
+                ) as stream:
+                    stream.until_done()
+            else:
+                with self._ai_client.beta.threads.runs.stream(
+                    thread_id=thread_id,
+                    assistant_id=self._assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
+                    temperature=None if text_completion_config is None else text_completion_config.temperature,
+                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                    top_p=None if text_completion_config is None else text_completion_config.top_p,
+                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
+                    event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                    timeout=timeout
+                ) as stream:
+                    stream.until_done()
 
         except Exception as e:
             logger.error(f"Error occurred during streaming processing run: {e}")
