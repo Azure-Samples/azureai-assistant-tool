@@ -57,7 +57,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     async def on_end(self) -> None:
         logger.info(f"on_end called, run_id: {self.current_run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
         if self._is_submit_tool_call is False:
-            self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), self._thread_name)
+            await self._parent._callbacks.on_run_end(self._name, self.current_run.id, str(datetime.now()), self._thread_name)
 
     @override
     async def on_message_created(self, message) -> None:
@@ -69,7 +69,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
 
     @override
     async def on_message_done(self, message) -> None:
-        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
+        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
         logger.info(f"on_message_done called, message: {message}")
 
     @override
@@ -78,13 +78,13 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
         if self._is_started is False and self._is_submit_tool_call is False:
             conversation = await self._conversation_thread_client.retrieve_conversation(self._thread_name)
             user_request = conversation.get_last_text_message("user").content
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
+            await self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
 
     @override
     async def on_text_delta(self, delta, snapshot):
         logger.debug(f"on_text_delta called, delta: {delta}")
-        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
+        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
         self._is_first_message = False
 
     @override
@@ -97,7 +97,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
         if self._is_started is False and self._is_submit_tool_call is False:
             conversation = await self._conversation_thread_client.retrieve_conversation(self._thread_name)
             user_request = conversation.get_last_text_message("user").content
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
+            await self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
         if self.current_run.required_action:
             logger.info(f"create, run.required_action.type: {self.current_run.required_action.type}")

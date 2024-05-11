@@ -24,15 +24,18 @@ class ChatAssistantClient(BaseChatAssistantClient):
     :type is_create: bool
     :param timeout: The HTTP request timeout in seconds.
     :type timeout: Optional[float]
+    :param client_args: Additional keyword arguments for configuring the AI client.
+    :type client_args: Dict
     """
     def __init__(
             self, 
             config_json: str,
             callbacks: Optional[AssistantClientCallbacks] = None,
             is_create: bool = True,
-            timeout: Optional[float] = None
+            timeout: Optional[float] = None,
+            **client_args
     ) -> None:
-        super().__init__(config_json, callbacks)
+        super().__init__(config_json, callbacks, **client_args)
         self._init_chat_assistant_client(self._config_data, is_create, timeout=timeout)
 
     @classmethod
@@ -40,7 +43,8 @@ class ChatAssistantClient(BaseChatAssistantClient):
         cls,
         config_json: str,
         callbacks: Optional[AssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "ChatAssistantClient":
         """
         Creates a ChatAssistantClient instance from JSON configuration data.
@@ -51,13 +55,16 @@ class ChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of ChatAssistantClient.
         :rtype: ChatAssistantClient
         """
         try:
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout)
+            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout, **client_args)
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -67,7 +74,8 @@ class ChatAssistantClient(BaseChatAssistantClient):
         cls,
         config_yaml: str,
         callbacks: Optional[AssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "ChatAssistantClient":
         """
         Creates an ChatAssistantClient instance from YAML configuration data.
@@ -78,13 +86,16 @@ class ChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of ChatAssistantClient.
         :rtype: ChatAssistantClient
         """
         try:
             config_data = yaml.safe_load(config_yaml)
             config_json = json.dumps(config_data)
-            return cls.from_json(config_json, callbacks, timeout)
+            return cls.from_json(config_json, callbacks, timeout, **client_args)
         except yaml.YAMLError as e:
             logger.error(f"Invalid YAML format: {e}")
             raise EngineError(f"Invalid YAML format: {e}")
@@ -94,7 +105,8 @@ class ChatAssistantClient(BaseChatAssistantClient):
         cls,
         config: AssistantConfig,
         callbacks: Optional[AssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "ChatAssistantClient":
         """
         Creates a ChatAssistantClient instance from an AssistantConfig object.
@@ -105,12 +117,15 @@ class ChatAssistantClient(BaseChatAssistantClient):
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of ChatAssistantClient.
         :rtype: ChatAssistantClient
         """
         try:
             config_json = config.to_json()
-            return cls.from_json(config_json, callbacks, timeout)
+            return cls.from_json(config_json, callbacks, timeout, **client_args)
         except Exception as e:
             logger.error(f"Failed to create chat client from config: {e}")
             raise EngineError(f"Failed to create chat client from config: {e}")

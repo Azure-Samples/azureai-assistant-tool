@@ -1,12 +1,14 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import json
-import os, ast, re, sys
-from pathlib import Path
 from azure.ai.assistant.management.function_config import FunctionConfig
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
+
+import json
+import os, ast, re, sys
+from pathlib import Path
+from typing import Optional
 
 # Template for a function spec
 function_spec_template = {
@@ -39,41 +41,49 @@ class FunctionConfigManager:
     """
     def __init__(
             self, 
-            config_directory : str = 'config'
+            config_folder : Optional[str] = None
     ) -> None:
-        self._config_directory = config_directory
+        if config_folder is None:
+            self._config_folder = self._default_config_path()
+        else:
+            self._config_folder = config_folder
         self.load_function_configs()
         self.load_function_error_specs()
+
+    @staticmethod
+    def _default_config_path() -> str:
+        home = os.path.expanduser("~")
+        return os.path.join(home, ".config", 'azure-ai-assistant')
 
     @classmethod
     def get_instance(
         cls,
-        config_directory : str = 'config'
+        config_folder : Optional[str] = None
     ) -> 'FunctionConfigManager':
         """
         Get the singleton instance of FunctionConfigManager.
 
-        :param config_directory: The directory containing the function specifications.
-        :type config_directory: str
+        :param config_folder: The directory containing the function specifications.
+        :type config_folder: str
 
         :return: The singleton instance of FunctionConfigManager.
         :rtype: FunctionConfigManager
         """
         if cls._instance is None:
-            cls._instance = cls(config_directory)
+            cls._instance = cls(config_folder)
         return cls._instance
 
     def load_function_configs(self) -> None:
         """
         Loads function specifications from the config directory.
         """
-        logger.info(f"Loading function specifications from {self._config_directory}")
+        logger.info(f"Loading function specifications from {self._config_folder}")
 
         # Clear the existing configs
         self._function_configs = {}
 
         # Scan the directory for JSON files
-        for file in Path(self._config_directory).glob("*_function_specs.json"):
+        for file in Path(self._config_folder).glob("*_function_specs.json"):
             self._load_function_spec(file)
 
     def _load_function_spec(self, file_path):
@@ -98,13 +108,13 @@ class FunctionConfigManager:
         """
         Loads function error specifications from the config directory.
         """
-        logger.info(f"Loading function error specifications from {self._config_directory}")
+        logger.info(f"Loading function error specifications from {self._config_folder}")
 
         # Clear the existing configs
         self._function_error_specs = {}
 
         # Load the error specs from function_error_specs.json
-        file_path = Path(self._config_directory) / "function_error_specs.json"
+        file_path = Path(self._config_folder) / "function_error_specs.json"
         logger.info(f"Loading function error specs from {file_path}")
         try:
             with open(file_path, 'r') as file:
@@ -154,7 +164,7 @@ class FunctionConfigManager:
         """
         try:
             # Define path for error specs
-            file_path = Path(self._config_directory) / "function_error_specs.json"
+            file_path = Path(self._config_folder) / "function_error_specs.json"
 
             # Write the error specs to the file
             with open(file_path, 'w') as file:
@@ -280,8 +290,8 @@ class FunctionConfigManager:
         """
         try:
             # Define paths for system and user specs
-            system_file_path = Path(self._config_directory) / "system_function_specs.json"
-            user_file_path = Path(self._config_directory) / "user_function_specs.json"
+            system_file_path = Path(self._config_folder) / "system_function_specs.json"
+            user_file_path = Path(self._config_folder) / "user_function_specs.json"
 
             new_spec_dict = json.loads(new_spec)
 
@@ -324,7 +334,7 @@ class FunctionConfigManager:
         """
         try:
             # Define path for user specs
-            user_file_path = Path(self._config_directory) / "user_function_specs.json"
+            user_file_path = Path(self._config_folder) / "user_function_specs.json"
 
             # Delete the function from user specs
             if not self._delete_function_spec(function_name, user_file_path):

@@ -26,23 +26,39 @@ class ConversationThreadClient:
 
     :param ai_client_type: The type of the AI client to use.
     :type ai_client_type: AIClientType
+    :param config_folder: The folder to save the thread config to.
+    :type config_folder: str, optional
+    :param client_args: The arguments to pass to the AI client.
+    :type client_args: dict
     """
-    def __init_private(self, ai_client_type):
+    def __init_private(
+            self, 
+            ai_client_type, 
+            config_folder : Optional[str] = None,
+            **client_args
+    ):
         self._ai_client_type = ai_client_type
-        self._ai_client : Union[OpenAI, AzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type)
-        self._thread_config = ConversationThreadConfig(self._ai_client_type, 'config/threads.json')
+        self._config_folder = config_folder
+        self._ai_client : Union[OpenAI, AzureOpenAI] = AIClientFactory.get_instance().get_client(self._ai_client_type, **client_args)
+        self._thread_config = ConversationThreadConfig(self._ai_client_type, self._config_folder)
         self._assistant_config_manager = AssistantConfigManager.get_instance()
 
     @classmethod
     def get_instance(
         cls, 
-        ai_client_type : AIClientType
+        ai_client_type : AIClientType,
+        config_folder : Optional[str] = None,
+        **client_args
     ) -> 'ConversationThreadClient':
         """
         Get the singleton instance of the ConversationThreadClient.
 
         :param ai_client_type: The type of the AI client to use.
         :type ai_client_type: AIClientType
+        :param config_folder: The folder to save the thread config to.
+        :type config_folder: str, optional
+        :param client_args: The arguments to pass to the AI client.
+        :type client_args: dict
 
         :return: The singleton instance of the ConversationThreadClient.
         :rtype: ConversationThreadClient
@@ -51,7 +67,7 @@ class ConversationThreadClient:
             with cls._lock:
                 if ai_client_type not in cls._instances:
                     instance = cls.__new__(cls)
-                    instance.__init_private(ai_client_type)
+                    instance.__init_private(ai_client_type, config_folder, **client_args)
                     cls._instances[ai_client_type] = instance
         return cls._instances[ai_client_type]
 
@@ -270,15 +286,25 @@ class ConversationThreadClient:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             attachments = self._update_message_attachments(thread_id, attachments) if attachments is not None else []
 
-            # Create the message with the attachments
-            self._ai_client.beta.threads.messages.create(
-                thread_id,
-                role=role,
-                metadata=metadata,
-                attachments=attachments,
-                content=message,
-                timeout=timeout
-            )
+            if attachments:
+                # Create the message with the attachments
+                self._ai_client.beta.threads.messages.create(
+                    thread_id,
+                    role=role,
+                    metadata=metadata,
+                    attachments=attachments,
+                    content=message,
+                    timeout=timeout
+                )
+            else:
+                # Create the message without attachments
+                self._ai_client.beta.threads.messages.create(
+                    thread_id,
+                    role=role,
+                    metadata=metadata,
+                    content=message,
+                    timeout=timeout
+                )
 
             logger.info(f"Created message: {message} in thread: {thread_id}, attachments: {attachments}")
         except Exception as e:

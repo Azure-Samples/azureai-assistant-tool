@@ -51,8 +51,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         QTimer.singleShot(100, lambda: self.deferred_init())
 
     def initialize_singletons(self):
-        self.function_config_manager = FunctionConfigManager.get_instance()
-        self.assistant_config_manager = AssistantConfigManager.get_instance()
+        self.function_config_manager = FunctionConfigManager.get_instance('config')
+        self.assistant_config_manager = AssistantConfigManager.get_instance('config')
         self.task_manager = TaskManager.get_instance(self)
         self.assistant_client_manager = AssistantClientManager.get_instance()
 
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.conversation_thread_clients : dict[AIClientType, ConversationThreadClient] = {}
         for ai_client_type in AIClientType:
             try:
-                self.conversation_thread_clients[ai_client_type] = ConversationThreadClient.get_instance(ai_client_type)
+                self.conversation_thread_clients[ai_client_type] = ConversationThreadClient.get_instance(ai_client_type, config_folder='config')
             except Exception as e:
                 self.conversation_thread_clients[ai_client_type] = None
                 logger.error(f"Error initializing conversation thread client for ai_client_type {ai_client_type.name}: {e}")
@@ -228,6 +228,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Save the conversation threads for the current active assistant
         if self.conversation_thread_clients[self.active_ai_client_type] is not None:
             self.conversation_thread_clients[self.active_ai_client_type].save_conversation_threads()
+
+        # Save assistant configurations when switching AI client types 
+        self.assistant_config_manager.save_configs()
 
         self.conversation_view.conversationView.clear()
         self.active_ai_client_type = ai_client_type

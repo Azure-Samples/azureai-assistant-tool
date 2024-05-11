@@ -4,7 +4,7 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QInputDialog, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
+from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon, QAction
 
@@ -410,6 +410,7 @@ class ConversationSidebar(QWidget):
             for name in assistant_names:
                 if not self.assistant_client_manager.get_client(name):
                     assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
+                    assistant_config.config_folder = "config"
                     if assistant_config.assistant_type == "assistant":
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
                     else:
@@ -434,7 +435,7 @@ class ConversationSidebar(QWidget):
             self.threadList.clear_files()
 
             # Get the threads for the selected AI client type
-            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
+            threads_client = ConversationThreadClient.get_instance(self._ai_client_type, config_folder='config')
             threads = threads_client.get_conversation_threads()
             self.threadList.load_threads_with_attachments(threads)
         except Exception as e:

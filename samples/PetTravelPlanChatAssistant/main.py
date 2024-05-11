@@ -1,11 +1,13 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import asyncio
 from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
+
+import os, asyncio, yaml
+import azure.identity.aio
 
 
 # Define a custom callback class that inherits from AssistantClientCallbacks
@@ -19,6 +21,9 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "streaming":
             await self.handle_message("start" if is_first_message else "message", message)
+   
+    async def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
+        pass
 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         await self.handle_message("function", function_name)
@@ -40,26 +45,60 @@ async def display_streamed_messages(message_queue, assistant_name):
         message_queue.task_done()
 
 
-# Define the main function
+async def get_client_args(ai_client_type : str):
+    try:
+        client_args = {}
+        if ai_client_type == "AZURE_OPEN_AI":
+            if os.getenv("AZURE_OPENAI_API_KEY"):
+                # Authenticate using an Azure OpenAI API key
+                # This is generally discouraged, but is provided for developers
+                # that want to develop locally inside the Docker container.
+                print("Using Azure OpenAI with key")
+                client_args["api_key"] = os.getenv("AZURE_OPENAI_API_KEY")
+            else:
+                # Authenticate using the default Azure credential chain
+                # See https://docs.microsoft.com/azure/developer/python/azure-sdk-authenticate#defaultazurecredential
+                # This will *not* work inside a Docker container.
+                print("Using Azure OpenAI with default credential")
+                default_credential = azure.identity.aio.DefaultAzureCredential(
+                    exclude_shared_token_cache_credential=True
+                )
+                client_args["azure_ad_token_provider"] = azure.identity.aio.get_bearer_token_provider(
+                    default_credential, "https://cognitiveservices.azure.com/.default"
+                )
+        elif ai_client_type == "OPEN_AI":
+            # Authenticate using an OpenAI API key
+            if os.getenv("OPENAI_API_KEY"):
+                print("Using OpenAI with key")
+                client_args["api_key"] = os.getenv("OPENAI_API_KEY")
+            else:
+                raise Exception("OpenAI API key not found.")
+        return client_args
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {}
+
 async def main():
 
     assistant_name = "PetTravelPlanChatAssistant"
     try:
         with open(f"config/{assistant_name}_assistant_config.yaml", "r") as file:
-            config = file.read()
+            config = yaml.safe_load(file)
     except FileNotFoundError:
         print(f"Configuration file for {assistant_name} not found.")
         return
 
     try:
+        client_args = await get_client_args(config["ai_client_type"])
         # Create a message queue to store streamed messages and a custom callback class
         message_queue = asyncio.Queue()
         callbacks = MyAssistantClientCallbacks(message_queue)
 
         # Create an instance of the AsyncChatAssistantClient
-        assistant_client = await AsyncChatAssistantClient.from_yaml(config, callbacks=callbacks)
+        assistant_client = await AsyncChatAssistantClient.from_yaml(yaml.dump(config), callbacks=callbacks, **client_args)
         ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
 
+        print(f"Starting chat with {assistant_client.ai_client} assistant.")
         # Create an instance of the AsyncConversationThreadClient
         conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
 

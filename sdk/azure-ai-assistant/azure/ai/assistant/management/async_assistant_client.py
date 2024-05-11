@@ -31,13 +31,16 @@ class AsyncAssistantClient(BaseAssistantClient):
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
     :type callbacks: Optional[AsyncAssistantClientCallbacks]
+    :param client_args: Additional keyword arguments for configuring the AI client.
+    :type client_args: Dict
     """
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AsyncAssistantClientCallbacks] = None
+            callbacks: Optional[AsyncAssistantClientCallbacks] = None,
+            **client_args
     ) -> None:
-        super().__init__(config_json, callbacks, async_mode=True)
+        super().__init__(config_json, callbacks, async_mode=True, **client_args)
         self._async_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = self._ai_client
         # Init with base settings, leaving async init for the factory method
 
@@ -61,7 +64,8 @@ class AsyncAssistantClient(BaseAssistantClient):
         cls,
         config_json: str,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncAssistantClient":
         """
         Creates an AsyncAssistantClient instance from JSON configuration data.
@@ -72,11 +76,14 @@ class AsyncAssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncAssistantClient.
         :rtype: AsyncAssistantClient
         """
         try:
-            instance = cls(config_json, callbacks)  # Instance creation without async init
+            instance = cls(config_json, callbacks, **client_args)
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
             await instance._async_init(is_create, timeout)  # Perform async initialization
@@ -90,7 +97,8 @@ class AsyncAssistantClient(BaseAssistantClient):
         cls,
         config_yaml: str,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncAssistantClient":
         """
         Creates an AsyncAssistantClient instance from YAML configuration data.
@@ -101,13 +109,16 @@ class AsyncAssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncAssistantClient.
         :rtype: AsyncAssistantClient
         """
         try:
             config_data = yaml.safe_load(config_yaml)
             config_json = json.dumps(config_data)
-            return await cls.from_json(config_json, callbacks, timeout)
+            return await cls.from_json(config_json, callbacks, timeout, **client_args)
         except yaml.YAMLError as e:
             logger.error(f"Invalid YAML format: {e}")
             raise EngineError(f"Invalid YAML format: {e}")
@@ -117,7 +128,8 @@ class AsyncAssistantClient(BaseAssistantClient):
         cls,
         config: AssistantConfig,
         callbacks: Optional[AsyncAssistantClientCallbacks] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        **client_args
     ) -> "AsyncAssistantClient":
         """
         Creates an AsyncAssistantClient instance from an AssistantConfig object.
@@ -128,11 +140,14 @@ class AsyncAssistantClient(BaseAssistantClient):
         :type callbacks: Optional[AsyncAssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
+        :param client_args: Additional keyword arguments for configuring the AI client.
+        :type client_args: Dict
+
         :return: An instance of AsyncAssistantClient.
         :rtype: AsyncAssistantClient
         """
         try:
-            instance = cls(config.to_json(), callbacks)  # Instance creation without async init
+            instance = cls(config.to_json(), callbacks, **client_args)
             is_create = not config.assistant_id
             await instance._async_init(is_create, timeout)  # Perform async initialization
             return instance
@@ -485,11 +500,12 @@ class AsyncAssistantClient(BaseAssistantClient):
             text_completion_config = self._assistant_config.text_completion_config
 
             logger.info(f"Creating a run for assistant: {self.assistant_config.assistant_id} and thread: {thread_id}")
-            # Azure OpenAI does not support additional instructions or temperature currently
-            if self.assistant_config.ai_client_type == AsyncAIClientType.AZURE_OPEN_AI.name:
+            # Azure OpenAI does not support all completion parameters currently
+            if text_completion_config == None:
                 run = await self._async_client.beta.threads.runs.create(
                     thread_id=thread_id,
                     assistant_id=self.assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
                     timeout=timeout
                 )
             else:
@@ -585,21 +601,30 @@ class AsyncAssistantClient(BaseAssistantClient):
 
             text_completion_config = self._assistant_config.text_completion_config
 
-            async with self._async_client.beta.threads.runs.stream(
-                thread_id=thread_id,
-                assistant_id=self._assistant_config.assistant_id,
-                instructions=self._assistant_config.instructions,
-                additional_instructions=additional_instructions,
-                temperature=None if text_completion_config is None else text_completion_config.temperature,
-                max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
-                max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
-                top_p=None if text_completion_config is None else text_completion_config.top_p,
-                response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
-                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
-                timeout=timeout
-            ) as stream:
-                await stream.until_done()
+            if text_completion_config is None:
+                async with self._async_client.beta.threads.runs.stream(
+                    thread_id=thread_id,
+                    assistant_id=self._assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
+                    timeout=timeout,
+                    event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout)
+                ) as stream:
+                    await stream.until_done()
+            else:
+                async with self._async_client.beta.threads.runs.stream(
+                    thread_id=thread_id,
+                    assistant_id=self._assistant_config.assistant_id,
+                    additional_instructions=additional_instructions,
+                    temperature=None if text_completion_config is None else text_completion_config.temperature,
+                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                    top_p=None if text_completion_config is None else text_completion_config.top_p,
+                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
+                    event_handler=AsyncStreamEventHandler(self, thread_id, timeout=timeout),
+                    timeout=timeout
+                ) as stream:
+                    await stream.until_done()
 
         except Exception as e:
             logger.error(f"Error occurred during streaming processing run: {e}")

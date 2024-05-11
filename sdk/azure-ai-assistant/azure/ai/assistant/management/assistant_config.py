@@ -656,6 +656,9 @@ class AssistantConfig:
         # Completion settings based on assistant type
         self._text_completion_config = self._setup_completion_settings(config_data)
 
+        # Config folder for local assistant and threads configuration
+        self._config_folder = None
+
     def _setup_completion_settings(self, config_data):
         if config_data.get('completion_settings', None) is not None:
             if self._assistant_type == 'chat_assistant':
@@ -787,6 +790,7 @@ class AssistantConfig:
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
+        self._config_data['config_folder'] = self._config_folder
         return self._config_data
 
     def _get_function_configs(self):
@@ -1025,6 +1029,25 @@ class AssistantConfig:
         :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, None]
         """
         return self._text_completion_config
+    
+    @property
+    def config_folder(self) -> str:
+        """Get the config folder.
+        
+        :return: The config folder.
+        :rtype: str
+        """
+        return self._config_folder
+    
+    @config_folder.setter
+    def config_folder(self, value) -> None:
+        """
+        Set the config folder.
+        
+        :param value: The config folder.
+        :type value: str
+        """
+        self._config_folder = value
 
     def _remove_trailing_spaces(self, text):
         return '\n'.join(line.rstrip() for line in text.splitlines())
