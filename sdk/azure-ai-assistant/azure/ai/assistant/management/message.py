@@ -2,162 +2,132 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.logger_module import logger
-from typing import Union
+
 from openai import AzureOpenAI, OpenAI
+from openai.types.beta.threads import (
+    ImageFileContentBlock,
+    ImageURLContentBlock,
+    TextContentBlock,
+    Message,
+    FileCitationAnnotation, 
+    FilePathAnnotation
+)
+
+from typing import Union, Optional, List, Tuple
 from PIL import Image, UnidentifiedImageError
-import os
-import io
+import os, io
 
 
-class MessageBase:
-    """
-    A class representing a message.
-
-    :param ai_client_type: The type of the AI client.
-    :type ai_client_type: AIClientType
-    :param role: The role of the sender.
-    :type role: str
-    :param sender: The name of the sender.
-    :type sender: str
-    """
-    def __init__(
-            self, 
-            ai_client_type: AIClientType, 
-            role: str, 
-            sender: str
-    ) -> None:
+class ConversationMessage:
+    def __init__(self, ai_client_type: AIClientType, original_message: Message):
         self._ai_client_type = ai_client_type
-        self._role = role
-        self._sender = sender
+        self._original_message = original_message
+        self._text_message_content = None
+        self._file_message_content = None
+        self._image_message_content = None
+        self._role = original_message.role
+        self._sender = None
+        self._assistant_config_manager = AssistantConfigManager().get_instance()
+        self._sender = self._get_sender_name(original_message)
+        self.process_message_contents(original_message)
 
-    def _get_ai_client(self) -> Union[OpenAI, AzureOpenAI]:
-        try:
-            return AIClientFactory.get_instance().get_client(self._ai_client_type)
-        except KeyError as e:
-            logger.error(f"Invalid AI client type: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to get AI client: {e}")
-            raise
+    def process_message_contents(self, original_message: Message):
+        for content_item in original_message.content:
+            if isinstance(content_item, TextContentBlock):
+                citations, file_citations = self._process_text_annotations(content_item)
+                content_value = content_item.text.value
+                if citations:
+                    content_value += '\n' + '\n'.join(citations)
+                self._text_message_content = TextMessageContent(content_value, file_citations)
+
+            elif isinstance(content_item, ImageFileContentBlock):
+                self._image_message_content = ImageMessageContent(content_item.image_file.file_id, f"{content_item.image_file.file_id}.png", self._ai_client_type)
+
+    def _get_sender_name(self, message: Message) -> str:
+        if message.role == "assistant":
+            sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
+            return sender_name if sender_name else "assistant"
+        elif message.role == "user":
+            return message.metadata.get("chat_assistant", "assistant") if message.metadata else "user"
+
+    def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List['FileCitation']]:
+        citations = []
+        file_citations = []
+
+        if content_item.text.annotations:
+            for index, annotation in enumerate(content_item.text.annotations):
+                content_item.text.value = content_item.text.value.replace(annotation.text, f' [{index}]')
+
+                if isinstance(annotation, FilePathAnnotation):
+                    file_id = annotation.file_path.file_id
+                    file_name = annotation.text.split("/")[-1]
+                    citations.append(f'[{index}] {file_name}')
+                    file_citations.append(FileCitation(file_id, file_name))
+
+                elif isinstance(annotation, FileCitationAnnotation):
+                    file_id = annotation.file_citation.file_id
+                    try:
+                        file_name = self._ai_client.files.retrieve(file_id).filename
+                    except Exception as e:
+                        logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
+                        file_name = "Unknown_" + str(file_id)
+                    citations.append(f'[{index}] {file_name}')
+                    file_citations.append(FileCitation(file_id, file_name))
+
+        return citations, file_citations
+
+    @property
+    def text_message_content(self) -> Optional['TextMessageContent']:
+        return self._text_message_content
+
+    @property
+    def file_message_content(self) -> Optional['FileMessageContent']:
+        return self._file_message_content
+
+    @property
+    def image_message_content(self) -> Optional['ImageMessageContent']:
+        return self._image_message_content
 
     @property
     def role(self) -> str:
-        """
-        Returns the role of the sender.
-
-        :return: The role of the sender.
-        :rtype: str
-        """
         return self._role
 
     @property
     def sender(self) -> str:
-        """
-        Returns the name of the sender.
-
-        :return: The name of the sender.
-        :rtype: str
-        """
         return self._sender
 
 
-class TextMessage(MessageBase):
-    """
-    A class representing a text message.
+class TextMessageContent:
+    def __init__(self, content: str, file_citations: Optional[List['FileCitation']] = None):
+        self._content = content
+        self._file_citations = file_citations
 
-    :param content: The content of the message.
-    :type content: str
-    :param ai_client_type: The type of the AI client.
-    :type ai_client_type: AIClientType
-    :param role: The role of the sender.
-    :type role: str
-    :param sender: The name of the sender.
-    :type sender: str
-    """
-    def __init__(
-            self, 
-            content : str,
-            ai_client_type: AIClientType, 
-            role : str,
-            sender : str
-    ) -> None:
-        super().__init__(ai_client_type, role, sender)
-        self.content = content
-        self.type = "text"
+    @property
+    def content(self) -> str:
+        return self._content
 
-    def __str__(self) -> str:
-        """
-        Returns the string representation of the text message.
-
-        :return: The string representation of the text message.
-        :rtype: str
-        """
-        return f"{self.sender}: {self.content}"
+    @property
+    def file_citations(self) -> Optional[List['FileCitation']]:
+        return self._file_citations
 
 
-class FileMessage(MessageBase):
-    """
-    A class representing a file message.
-
-    :param file_id: The ID of the file.
-    :type file_id: str
-    :param file_name: The name of the file.
-    :type file_name: str
-    :param ai_client_type: The type of the AI client.
-    :type ai_client_type: AIClientType
-    :param role: The role of the sender.
-    :type role: str
-    :param sender: The name of the sender.
-    :type sender: str
-    """
-    def __init__(
-            self, 
-            file_id : str,
-            file_name : str,
-            ai_client_type: AIClientType, 
-            role : str,
-            sender : str
-    ) -> None:
-        super().__init__(ai_client_type, role, sender)
+class FileMessageContent:
+    def __init__(self, file_id: str, file_name: str, ai_client_type: AIClientType):
         self._file_id = file_id
         self._file_name = file_name
-        self._type = "file"
+        self._ai_client_type = ai_client_type
 
     @property
     def file_id(self) -> str:
-        """
-        Returns the ID of the file.
-
-        :return: The ID of the file.
-        :rtype: str
-        """
         return self._file_id
 
     @property
     def file_name(self) -> str:
-        """
-        Returns the name of the file.
-
-        :return: The name of the file.
-        :rtype: str
-        """
         return self._file_name
 
-    @property
-    def type(self) -> str:
-        """
-        Returns the type of the file.
-
-        :return: The type of the file.
-        :rtype: str
-        """
-        return self._type
-
-    def retrieve_file(
-            self, 
-            output_folder_name
-    ) -> str:
+    def retrieve_file(self, output_folder_name: str) -> str:
         """
         Retrieve the file.
 
@@ -170,16 +140,14 @@ class FileMessage(MessageBase):
         logger.info(f"Retrieving file with file_id: {self.file_id} to path: {output_folder_name}")
         file_path = f"{output_folder_name}/{self.file_name}"
         try:
-            # if the file is already downloaded, return the path
             if os.path.exists(file_path):
                 logger.info(f"File already exists at {file_path}. Skipping download.")
                 return file_path
 
             ai_client = self._get_ai_client()
-            # Create the output directory if it does not exist
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
             logger.info(f"Copying file with file_id: {self.file_id} to path: {file_path}")
+
             with ai_client.with_streaming_response.files.content(self.file_id) as streamed_response:
                 streamed_response.stream_to_file(file_path)
 
@@ -188,47 +156,32 @@ class FileMessage(MessageBase):
             logger.error(f"Failed to retrieve file {self.file_id}: {e}")
             return None
 
+    def _get_ai_client(self) -> Union[OpenAI, AzureOpenAI]:
+        try:
+            return AIClientFactory.get_instance().get_client(self._ai_client_type)
+        except KeyError as e:
+            logger.error(f"Invalid AI client type: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get AI client: {e}")
+            raise
 
-class ImageMessage(FileMessage):
-    """
-    A class representing a image message.
 
-    :param file_id: The ID of the file.
-    :type file_id: str
-    :param file_name: The name of the file.
-    :type file_name: str
-    :param ai_client_type: The type of the AI client.
-    :type ai_client_type: AIClientType
-    :param role: The role of the sender.
-    :type role: str
-    :param sender: The name of the sender.
-    :type sender: str
-    """
-    def __init__(
-            self, 
-            file_id : str,
-            file_name : str,
-            ai_client_type: AIClientType, 
-            role : str,
-            sender : str
-    ):
-        super().__init__(file_id, file_name, ai_client_type, role, sender)
-        self._type = "image_file"
+class ImageMessageContent:
+    def __init__(self, file_id: str, file_name: str, ai_client_type: AIClientType):
+        self._file_id = file_id
+        self._file_name = file_name
+        self._ai_client_type = ai_client_type
 
     @property
-    def type(self) -> str:
-        """
-        Returns the type of the file.
+    def file_id(self) -> str:
+        return self._file_id
 
-        :return: The type of the file.
-        :rtype: str
-        """
-        return self._type
+    @property
+    def file_name(self) -> str:
+        return self._file_name
 
-    def retrieve_image(
-            self, 
-            output_folder_name : str
-    ) -> str:
+    def retrieve_image(self, output_folder_name: str) -> str:
         """
         Retrieve the image.
 
@@ -276,3 +229,51 @@ class ImageMessage(FileMessage):
         except Exception as e:
             logger.error(f"Unexpected error during image processing {file_id}: {e}")
         return None
+
+    def _get_ai_client(self) -> Union[OpenAI, AzureOpenAI]:
+        try:
+            return AIClientFactory.get_instance().get_client(self._ai_client_type)
+        except KeyError as e:
+            logger.error(f"Invalid AI client type: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get AI client: {e}")
+            raise
+
+
+class FileCitation:
+    """
+    A class representing a file citation.
+
+    :param file_id: The ID of the file.
+    :type file_id: str
+    :param file_name: The name of the file.
+    :type file_name: str
+    """
+    def __init__(
+            self, 
+            file_id : str,
+            file_name : str
+    ) -> None:
+        self._file_id = file_id
+        self._file_name = file_name
+
+    @property
+    def file_id(self) -> str:
+        """
+        Returns the ID of the file.
+
+        :return: The ID of the file.
+        :rtype: str
+        """
+        return self._file_id
+
+    @property
+    def file_name(self) -> str:
+        """
+        Returns the name of the file.
+
+        :return: The name of the file.
+        :rtype: str
+        """
+        return self._file_name
