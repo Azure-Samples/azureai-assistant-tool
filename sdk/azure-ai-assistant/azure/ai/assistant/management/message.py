@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.logger_module import logger
 
@@ -21,7 +20,10 @@ import os, io
 
 
 class ConversationMessage:
-    def __init__(self, ai_client, original_message: Message):
+    def __init__(self, 
+                 ai_client : Union[OpenAI, AzureOpenAI],
+                 original_message: Message
+    ):
         self._ai_client = ai_client
         self._original_message = original_message
         self._text_message_content = None
@@ -125,7 +127,11 @@ class TextMessageContent:
 
 
 class FileMessageContent:
-    def __init__(self, ai_client, file_id: str, file_name: str):
+    def __init__(self, 
+                 ai_client : Union[OpenAI, AzureOpenAI],
+                 file_id: str, 
+                 file_name: str
+    ):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
@@ -168,7 +174,11 @@ class FileMessageContent:
 
 
 class ImageMessageContent:
-    def __init__(self, ai_client, file_id: str, file_name: str):
+    def __init__(self,
+                 ai_client : Union[OpenAI, AzureOpenAI],
+                 file_id: str, 
+                 file_name: str
+    ):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
