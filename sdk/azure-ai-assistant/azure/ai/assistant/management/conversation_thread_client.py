@@ -4,7 +4,7 @@
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.conversation import Conversation
-from azure.ai.assistant.management.message import FileCitation
+from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -185,7 +185,7 @@ class ConversationThreadClient:
         """
         try:
             messages = self._get_conversation_thread_messages(thread_name, timeout)
-            conversation = Conversation(self._ai_client_type, messages, max_text_messages)
+            conversation = Conversation(self._ai_client, messages, max_text_messages)
             return conversation
         except Exception as e:
             error_message = f"Error retrieving messages content: Exception: {e}"
@@ -202,7 +202,7 @@ class ConversationThreadClient:
         :return: The conversation message.
         :rtype: ConversationMessage
         """
-        return ConversationMessage(self._ai_client_type, original_message)
+        return ConversationMessage(self._ai_client, original_message)
 
     def create_conversation_thread_message(
             self, 

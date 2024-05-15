@@ -21,8 +21,8 @@ import os, io
 
 
 class ConversationMessage:
-    def __init__(self, ai_client_type: AIClientType, original_message: Message):
-        self._ai_client_type = ai_client_type
+    def __init__(self, ai_client, original_message: Message):
+        self._ai_client = ai_client
         self._original_message = original_message
         self._text_message_content = None
         self._file_message_content = None
@@ -43,7 +43,7 @@ class ConversationMessage:
                 self._text_message_content = TextMessageContent(content_value, file_citations)
 
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message_content = ImageMessageContent(content_item.image_file.file_id, f"{content_item.image_file.file_id}.png", self._ai_client_type)
+                self._image_message_content = ImageMessageContent(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -63,12 +63,13 @@ class ConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
+                    self.file_message_content = FileMessageContent(self._ai_client, file_id, file_name)
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
                 elif isinstance(annotation, FileCitationAnnotation):
-                    file_id = annotation.file_citation.file_id
                     try:
+                        file_id = annotation.file_citation.file_id
                         file_name = self._ai_client.files.retrieve(file_id).filename
                     except Exception as e:
                         logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
@@ -97,6 +98,10 @@ class ConversationMessage:
     @property
     def sender(self) -> str:
         return self._sender
+    
+    @property
+    def original_message(self) -> Message:
+        return self._original_message
 
 
 class TextMessageContent:
@@ -114,10 +119,10 @@ class TextMessageContent:
 
 
 class FileMessageContent:
-    def __init__(self, file_id: str, file_name: str, ai_client_type: AIClientType):
+    def __init__(self, ai_client, file_id: str, file_name: str):
+        self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
-        self._ai_client_type = ai_client_type
 
     @property
     def file_id(self) -> str:
@@ -144,11 +149,10 @@ class FileMessageContent:
                 logger.info(f"File already exists at {file_path}. Skipping download.")
                 return file_path
 
-            ai_client = self._get_ai_client()
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             logger.info(f"Copying file with file_id: {self.file_id} to path: {file_path}")
 
-            with ai_client.with_streaming_response.files.content(self.file_id) as streamed_response:
+            with self._ai_client.with_streaming_response.files.content(self.file_id) as streamed_response:
                 streamed_response.stream_to_file(file_path)
 
             return file_path
@@ -156,22 +160,12 @@ class FileMessageContent:
             logger.error(f"Failed to retrieve file {self.file_id}: {e}")
             return None
 
-    def _get_ai_client(self) -> Union[OpenAI, AzureOpenAI]:
-        try:
-            return AIClientFactory.get_instance().get_client(self._ai_client_type)
-        except KeyError as e:
-            logger.error(f"Invalid AI client type: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to get AI client: {e}")
-            raise
-
 
 class ImageMessageContent:
-    def __init__(self, file_id: str, file_name: str, ai_client_type: AIClientType):
+    def __init__(self, ai_client, file_id: str, file_name: str):
+        self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
-        self._ai_client_type = ai_client_type
 
     @property
     def file_id(self) -> str:
@@ -213,8 +207,7 @@ class ImageMessageContent:
             return file_path
 
         try:
-            api_client = self._get_ai_client()
-            with api_client.with_streaming_response.files.content(file_id) as streamed_response:
+            with self._ai_client.with_streaming_response.files.content(file_id) as streamed_response:
                 with Image.open(io.BytesIO(streamed_response.read())) as img:
                     new_width = int(img.width * target_width)
                     new_height = int(img.height * target_height)
@@ -229,16 +222,6 @@ class ImageMessageContent:
         except Exception as e:
             logger.error(f"Unexpected error during image processing {file_id}: {e}")
         return None
-
-    def _get_ai_client(self) -> Union[OpenAI, AzureOpenAI]:
-        try:
-            return AIClientFactory.get_instance().get_client(self._ai_client_type)
-        except KeyError as e:
-            logger.error(f"Invalid AI client type: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to get AI client: {e}")
-            raise
 
 
 class FileCitation:

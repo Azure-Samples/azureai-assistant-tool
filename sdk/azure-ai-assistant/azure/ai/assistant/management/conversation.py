@@ -13,22 +13,31 @@ class Conversation:
     """
     A class representing a conversation.
 
-    :param ai_client_type: The type of AI client to use for the conversation.
-    :type ai_client_type: AIClientType
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: OpenAI, AzureOpenAI
     """
     def __init__(
             self, 
-            ai_client_type : AIClientType,
+            ai_client,
             messages: List[Message], 
             max_text_messages: Optional[int] = None
     ) -> None:
-        self._messages = [ConversationMessage(ai_client_type, message) for message in messages]
+        self._messages = [ConversationMessage(ai_client, message) for message in messages]
         if max_text_messages is not None:
             self._messages = self._messages[:max_text_messages]
-        self._ai_client_type = ai_client_type
 
     @property
-    def text_messages(self) -> List['TextMessageContent']:
+    def messages(self) -> List[ConversationMessage]:
+        return self._messages
+
+    def get_last_message(self, sender: str) -> ConversationMessage:
+        for message in reversed(self._messages):
+            if message.sender == sender:
+                return message
+        return None
+    
+    @property
+    def text_messages(self) -> List[TextMessageContent]:
         """
         Returns the list of text message contents in the conversation.
 
@@ -36,13 +45,17 @@ class Conversation:
         :rtype: List[TextMessageContent]
         """
         return [message.text_message_content for message in self._messages if message.text_message_content is not None]
+    
+    def get_last_text_message(self, sender: str) -> TextMessageContent:
+        """
+        Returns the last text message content in the conversation from the specified sender.
 
-    @property
-    def messages(self) -> List['ConversationMessage']:
-        return self._messages
-
-    def get_last_message(self, sender: str) -> 'ConversationMessage':
+        :param sender: The sender of the message.
+        :type sender: str
+        :return: The last text message content in the conversation from the specified sender.
+        :rtype: TextMessageContent
+        """
         for message in reversed(self._messages):
-            if message.sender == sender:
-                return message
+            if message.sender == sender and message.text_message_content is not None:
+                return message.text_message_content
         return None
