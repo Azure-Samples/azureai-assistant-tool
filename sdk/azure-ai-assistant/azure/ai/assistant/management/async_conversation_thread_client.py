@@ -4,7 +4,7 @@
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AsyncAIClientType
 from azure.ai.assistant.management.conversation import Conversation
-from azure.ai.assistant.management.message import FileCitation
+from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -185,14 +185,14 @@ class AsyncConversationThreadClient:
         """
         try:
             messages = await self._get_conversation_thread_messages(thread_name, timeout)
-            conversation = await asyncio.to_thread(Conversation(self._ai_client_type, messages, max_text_messages))
+            conversation = Conversation(self._ai_client_type, messages, max_text_messages)
             return conversation
         except Exception as e:
             error_message = f"Error retrieving messages content: Exception: {e}"
             logger.error(error_message)
             raise EngineError(error_message)
 
-    def retrieve_message(self, original_message: Message) -> 'ConversationMessage':
+    def retrieve_message(self, original_message: Message) -> ConversationMessage:
         """
         Retrieves a single conversation message.
 
@@ -204,90 +204,6 @@ class AsyncConversationThreadClient:
         """
         return ConversationMessage(self._ai_client_type, original_message)
     
-    async def _retrieve_messages(
-            self, 
-            messages: List[Message],
-            max_text_messages: Optional[int] = None
-    ) -> Conversation:
-
-        conversation = Conversation(self._ai_client_type)
-        text_messages_count = 0
-
-        for message in messages:
-            logger.info(f"Processing message: {message}")
-            if message.role == "assistant":
-                sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
-                if sender_name is None:
-                    sender_name = "assistant"
-            elif message.role == "user":
-                if message.metadata:
-                    sender_name = message.metadata.get("chat_assistant", "assistant")
-                    message.role = "assistant"
-                else:
-                    sender_name = "user"
-
-            for content_item in message.content:
-                if isinstance(content_item, TextContentBlock):
-                    content, file_citations, is_max_text_messages = await self._process_text_content_block(
-                        content_item, message.role, sender_name, max_text_messages, text_messages_count
-                    )
-                    if is_max_text_messages:
-                        return conversation
-
-                    await asyncio.to_thread(conversation.add_message, content, message.role, sender_name, file_citations)
-                    text_messages_count += 1
-
-                elif isinstance(content_item, ImageFileContentBlock):
-                    file_id = content_item.image_file.file_id
-                    file_name = f"{file_id}.png"  # Assuming file type is currently always png for images
-                    await asyncio.to_thread(conversation.add_image, file_id, file_name, message.role, sender_name)
-
-        return conversation
-    
-    async def _process_text_content_block(
-        self, 
-        content_item: TextContentBlock, 
-        message_role: str, 
-        sender_name: str,
-        max_text_messages: Optional[int] = None,
-        text_messages_count: int = 0
-    ) -> Tuple[str, List[FileCitation], bool]:
-
-        if max_text_messages is not None and text_messages_count >= max_text_messages:
-            return content_item.text.value, [], True
-
-        citations = []
-        file_citations: List[FileCitation] = []
-        if content_item.text.annotations:
-            for index, annotation in enumerate(content_item.text.annotations):
-                # Replace the text with a footnote marker
-                content_item.text.value = content_item.text.value.replace(annotation.text, f' [{index}]')
-                
-                # Handle file path annotations
-                if isinstance(annotation, FilePathAnnotation):
-                    file_id = annotation.file_path.file_id
-                    file_name = annotation.text.split("/")[-1]
-                    await asyncio.to_thread(self.conversation.add_file, file_id, file_name, message_role, sender_name)
-
-                # Handle file citation annotations
-                elif isinstance(annotation, FileCitationAnnotation):
-                    try:
-                        file_id = annotation.file_citation.file_id
-                        file = await self._ai_client.files.retrieve(file_id)
-                        file_name = file.filename
-                        file_citation = FileCitation(file_id, file_name)
-                        file_citations.append(file_citation)
-                    except Exception as e:
-                        logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
-                        file_name = "Unknown_" + str(file_id)
-                    citations.append(f'[{index}] {file_name}')
-
-        # Append citations at the end of the text content
-        if citations:
-            content_item.text.value += '\n' + '\n'.join(citations)
-
-        return content_item.text.value, file_citations, False
-
     async def create_conversation_thread_message(
             self, 
             message : str,

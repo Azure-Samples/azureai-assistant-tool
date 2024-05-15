@@ -50,7 +50,13 @@ class ConversationMessage:
             sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
             return sender_name if sender_name else "assistant"
         elif message.role == "user":
-            return message.metadata.get("chat_assistant", "assistant") if message.metadata else "user"
+            if message.metadata:
+                sender_name = message.metadata.get("chat_assistant", "assistant")
+                # Set the role to assistant if the metadata is set to assistant
+                message.role = "assistant"
+            else:
+                sender_name = "user"
+            return sender_name
 
     def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List['FileCitation']]:
         citations = []
