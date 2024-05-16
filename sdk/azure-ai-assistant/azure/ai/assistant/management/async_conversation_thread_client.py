@@ -3,8 +3,8 @@
 
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AsyncAIClientType
-from azure.ai.assistant.management.conversation import Conversation
-from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.async_conversation import AsyncConversation
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -169,7 +169,7 @@ class AsyncConversationThreadClient:
             thread_name : str,
             timeout: Optional[float] = None,
             max_text_messages: Optional[int] = None
-    ) -> Conversation:
+    ) -> AsyncConversation:
         """
         Retrieves the conversation from the given thread name.
 
@@ -185,14 +185,14 @@ class AsyncConversationThreadClient:
         """
         try:
             messages = await self._get_conversation_thread_messages(thread_name, timeout)
-            conversation = Conversation(self._ai_client, messages, max_text_messages)
+            conversation = await AsyncConversation.create(self._ai_client, messages, max_text_messages)
             return conversation
         except Exception as e:
             error_message = f"Error retrieving messages content: Exception: {e}"
             logger.error(error_message)
             raise EngineError(error_message)
 
-    async def retrieve_message(self, original_message: Message) -> ConversationMessage:
+    async def retrieve_message(self, original_message: Message) -> AsyncConversationMessage:
         """
         Retrieves a single conversation message.
 
@@ -202,7 +202,7 @@ class AsyncConversationThreadClient:
         :return: The conversation message.
         :rtype: ConversationMessage
         """
-        return ConversationMessage(self._ai_client, original_message)
+        return await AsyncConversationMessage().create(self._ai_client, original_message)
     
     async def create_conversation_thread_message(
             self, 

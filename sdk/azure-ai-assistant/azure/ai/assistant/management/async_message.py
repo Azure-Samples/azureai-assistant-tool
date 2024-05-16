@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.logger_module import logger
 
@@ -13,7 +16,7 @@ from openai.types.beta.threads import (
 
 from typing import Union, Optional, List, Tuple
 from PIL import Image
-import os, io, aiofiles, asyncio
+import os, io, asyncio
 
 
 class AsyncConversationMessage:
@@ -161,17 +164,20 @@ class AsyncFileMessageContent:
             logger.info(f"Copying file with file_id: {self.file_id} to path: {file_path}")
 
             async with self._ai_client.files.content(self.file_id) as response:
-                async with aiofiles.open(file_path, 'wb') as f:
-                    while True:
-                        chunk = await response.content.read(1024)
-                        if not chunk:
-                            break
-                        await f.write(chunk)
+                data = await response.read()
+                await asyncio.to_thread(self._write_to_file, file_path, data)
+            return file_path
 
             return file_path
         except Exception as e:
             logger.error(f"Failed to retrieve file {self.file_id}: {e}")
             return None
+        
+    @staticmethod
+    def _write_to_file(file_path: str, data: bytes):
+        """Write data to a file. This function is intended to run in a separate thread."""
+        with open(file_path, 'wb') as file:
+            file.write(data)
 
 
 class AsyncImageMessageContent:
@@ -193,30 +199,37 @@ class AsyncImageMessageContent:
     def file_name(self) -> str:
         return self._file_name
 
-    async def retrieve_image(self, output_folder_name: str) -> str:
+    async def retrieve_image(self, output_folder_name: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
         logger.info(f"Retrieving image with file_id: {self.file_id} to path: {output_folder_name}")
         file_path = os.path.join(output_folder_name, self.file_name)
         if os.path.exists(file_path):
-            logger.info(f"File already exists at {file_path}. Skipping download and resize.")
+            logger.info(f"Image already exists at {file_path}. Skipping download and resize.")
             return file_path
 
         try:
             async with self._ai_client.files.content(self.file_id) as response:
                 image_data = await response.read()
-                img = Image.open(io.BytesIO(image_data))
-
-                new_width = int(img.width * 0.5)
-                new_height = int(img.height * 0.5)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-                async with aiofiles.open(file_path, 'wb') as f:
-                    img.save(f, format='PNG')
-
-            logger.info(f"Resized image saved to {file_path}")
+                # Process and save the image in a separate thread using asyncio.to_thread
+                await asyncio.to_thread(
+                    self._process_and_save_image, image_data, file_path, target_width, target_height
+                )
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
             return None
+
+    @staticmethod
+    def _process_and_save_image(image_data: bytes, file_path: str, target_width: float, target_height: float):
+        """Process and save the image. This function is intended to run in a separate thread."""
+        try:
+            with Image.open(io.BytesIO(image_data)) as img:
+                new_width = int(img.width * target_width)
+                new_height = int(img.height * target_height)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                img.save(file_path)
+            logger.info(f"Resized image saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Error processing image: {e}")
 
 
 class FileCitation:
