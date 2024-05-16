@@ -1,42 +1,56 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.message import ConversationMessage, TextMessageContent
+from azure.ai.assistant.management.async_message import AsyncConversationMessage, TextMessageContent
 
 from openai.types.beta.threads import Message
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-from typing import Optional, List
+from typing import Optional, List, Union
+import asyncio
 
 
-class Conversation:
+class AsyncConversation:
     """
-    A class representing a conversation.
+    A class representing a conversation asynchronously.
 
     :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: OpenAI, AzureOpenAI
+    :type ai_client: AsyncOpenAI, AsyncAzureOpenAI
     """
-    def __init__(
-            self, 
-            ai_client,
-            messages: List[Message], 
+    def __init__(self) -> None:
+        self._messages = []
+    
+    @classmethod
+    async def create(
+            cls, 
+            ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'],
+            messages: List['Message'], 
             max_text_messages: Optional[int] = None
-    ) -> None:
-        self._messages = [ConversationMessage(ai_client, message) for message in messages]
+    ) -> 'AsyncConversation':
+        # Create an instance
+        instance = cls()
+        
+        # Asynchronously initialize messages
+        tasks = [AsyncConversationMessage.create(ai_client, message) for message in messages]
+        instance._messages = await asyncio.gather(*tasks)
+        
         if max_text_messages is not None:
-            self._messages = self._messages[:max_text_messages]
+            instance._messages = instance._messages[:max_text_messages]
+
+        return instance
 
     @property
-    def messages(self) -> List[ConversationMessage]:
+    def messages(self) -> List['AsyncConversationMessage']:
         return self._messages
 
-    def get_last_message(self, sender: str) -> ConversationMessage:
+    async def get_last_message(self, sender: str) -> 'AsyncConversationMessage':
         for message in reversed(self._messages):
             if message.sender == sender:
                 return message
         return None
     
     @property
-    def text_messages(self) -> List[TextMessageContent]:
+    def text_messages(self) -> List['TextMessageContent']:
         """
         Returns the list of text message contents in the conversation.
 
@@ -45,7 +59,7 @@ class Conversation:
         """
         return [message.text_message_content for message in self._messages if message.text_message_content is not None]
     
-    def get_last_text_message(self, sender: str) -> TextMessageContent:
+    async def get_last_text_message(self, sender: str) -> 'TextMessageContent':
         """
         Returns the last text message content in the conversation from the specified sender.
 
