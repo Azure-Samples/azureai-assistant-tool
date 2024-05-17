@@ -4,8 +4,9 @@
 from azure.ai.assistant.management.message import ConversationMessage, TextMessageContent
 
 from openai.types.beta.threads import Message
+from openai import AzureOpenAI, OpenAI
 
-from typing import Optional, List
+from typing import Optional, List, Union
 
 
 class Conversation:
@@ -17,7 +18,7 @@ class Conversation:
     """
     def __init__(
             self, 
-            ai_client,
+            ai_client : Union[OpenAI, AzureOpenAI],
             messages: List[Message], 
             max_text_messages: Optional[int] = None
     ) -> None:

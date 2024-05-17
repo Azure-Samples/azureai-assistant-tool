@@ -169,7 +169,7 @@ class ConversationThreadClient:
             thread_name: str,
             timeout: Optional[float] = None,
             max_text_messages: Optional[int] = None
-    ) -> 'Conversation':
+    ) -> Conversation:
         """
         Retrieves the conversation from the given thread name.
 
@@ -192,7 +192,7 @@ class ConversationThreadClient:
             logger.error(error_message)
             raise EngineError(error_message)
 
-    def retrieve_message(self, original_message: Message) -> 'ConversationMessage':
+    def retrieve_message(self, original_message: Message) -> ConversationMessage:
         """
         Retrieves a single conversation message.
 

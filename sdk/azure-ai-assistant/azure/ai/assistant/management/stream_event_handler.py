@@ -4,10 +4,12 @@
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
+from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AssistantEventHandler
+from openai.types.beta.threads import TextDeltaBlock
 from datetime import datetime
 from typing import Optional
 from typing_extensions import override
@@ -66,24 +68,34 @@ class StreamEventHandler(AssistantEventHandler):
     @override
     def on_message_delta(self, delta, snapshot) -> None:
         logger.debug(f"on_message_delta called, delta: {delta}")
+        message : ConversationMessage = self._conversation_thread_client.retrieve_message(snapshot)
+        if delta.content:
+            for content_block in delta.content:
+                if isinstance(content_block, TextDeltaBlock) and content_block.text:
+                    message.text_message_content.content = content_block.text.value
+        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, message=message)
+        self._is_first_message = False
 
     @override
     def on_message_done(self, message) -> None:
-        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
         logger.info(f"on_message_done called, message: {message}")
+        message = self._conversation_thread_client.retrieve_message(message)
+        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name, self._is_first_message, message=message)
+        self._is_first_message = False
 
     @override
     def on_text_created(self, text) -> None:
         logger.info(f"on_text_created called, text: {text}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            user_request = self._conversation_thread_client.retrieve_conversation(self._thread_name).get_last_text_message("user").content
+            conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
+            user_request = conversation.get_last_text_message("user").content
             self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
 
     @override
     def on_text_delta(self, delta, snapshot):
         logger.debug(f"on_text_delta called, delta: {delta}")
-        self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
+        #self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
         self._is_first_message = False
 
     @override
@@ -94,7 +106,8 @@ class StreamEventHandler(AssistantEventHandler):
     def on_tool_call_created(self, tool_call):
         logger.info(f"on_tool_call_created called, tool_call: {tool_call}")
         if self._is_started is False and self._is_submit_tool_call is False:
-            user_request = self._conversation_thread_client.retrieve_conversation(self._thread_name).get_last_text_message("user").content
+            conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
+            user_request = conversation.get_last_text_message("user").content
             self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
             self._is_started = True
         if self.current_run.required_action:

@@ -10,9 +10,10 @@ from PySide6.QtCore import Qt, QUrl
 
 import html, os, re, subprocess, sys
 import base64
+from typing import List
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.message import TextMessage, FileMessage, ImageMessage
+from azure.ai.assistant.management.message import ConversationMessage, TextMessageContent, FileMessageContent, ImageMessageContent
 from azure.ai.assistant.management.logger_module import logger
 
 
@@ -210,29 +211,42 @@ class ConversationView(QWidget):
             return lightness < 127
         return False
 
-    def append_messages(self, messages):
+    def append_messages(self, messages: List[ConversationMessage]):
         self.text_to_url_map = {}
+
         for message in reversed(messages):
-            if message.type == "text":
-                text_message : TextMessage = message
+            # Handle text message content
+            if message.text_message_content:
+                text_message_content = message.text_message_content
                 # Determine the color based on the role and the theme
                 if self.is_dark_mode():
                     # Colors for dark mode
-                    color = 'blue' if text_message.role != "assistant" else '#D3D3D3'
+                    color = 'blue' if message.role != "assistant" else '#D3D3D3'
                 else:
                     # Colors for light mode
-                    color = 'blue' if text_message.role != "assistant" else 'black'
-                if text_message.role == "assistant":
-                    self.append_message(text_message.sender, text_message.content, color=color)
-                else:
-                    self.append_message(text_message.sender, text_message.content, color=color)
-            elif message.type == "file":
-                file_message : FileMessage = message
-                file_path = file_message.retrieve_file(self.file_path)
-            elif message.type == "image_file":
-                image_message : ImageMessage = message
-                file_path = image_message.retrieve_image(self.file_path)
-                self.append_image(file_path, image_message.sender)
+                    color = 'blue' if message.role != "assistant" else 'black'
+
+                # Append the formatted text message
+                self.append_message(message.sender, text_message_content.content, color=color)
+
+            # Handle file message content
+            elif message.file_message_content:
+                file_message_content = message.file_message_content
+                # Synchronously retrieve and process the file
+                file_path = file_message_content.retrieve_file(self.file_path)
+                if file_path:
+                    # If needed, perform actions with the file path (like logging or displaying)
+                    print(f"File saved to: {file_path}")
+                    # Optionally append a link or message about the file
+                    self.append_message(message.sender, f"File saved: {file_path}", color='green')
+
+            # Handle image message content
+            elif message.image_message_content:
+                image_message_content = message.image_message_content
+                # Synchronously retrieve and process the image
+                image_path = image_message_content.retrieve_image(self.file_path)
+                if image_path:
+                    self.append_image(image_path, message.sender)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:

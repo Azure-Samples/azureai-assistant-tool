@@ -1,7 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.message import TextMessage
+from azure.ai.assistant.management.message import ConversationMessage
+
 
 class AssistantClientCallbacks:
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
@@ -21,7 +22,7 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : TextMessage = None):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : ConversationMessage = None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.
@@ -34,8 +35,8 @@ class AssistantClientCallbacks:
         :type thread_name: str
         :param is_first_message: Whether the message is the first message, defaults to False, used when status is "streaming"
         :type is_first_message: bool, optional
-        :param message: Can be partial text message (streaming) or full test message with file citations (completed), defaults to None
-        :type message: TextMessage, optional
+        :param message: Can be partial message (streaming text content) or full message with files, citations (completed), defaults to None
+        :type message: ConversationMessage, optional
 
         :return: None
         :rtype: None

@@ -18,19 +18,18 @@ class AsyncConversation:
     :type ai_client: AsyncOpenAI, AsyncAzureOpenAI
     """
     def __init__(self) -> None:
-        self._messages = []
+        self._messages : List[AsyncConversationMessage] = []
     
     @classmethod
     async def create(
             cls, 
-            ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'],
-            messages: List['Message'], 
+            ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI],
+            messages: List[Message], 
             max_text_messages: Optional[int] = None
     ) -> 'AsyncConversation':
         # Create an instance
         instance = cls()
         
-        # Asynchronously initialize messages
         tasks = [AsyncConversationMessage.create(ai_client, message) for message in messages]
         instance._messages = await asyncio.gather(*tasks)
         
@@ -40,17 +39,17 @@ class AsyncConversation:
         return instance
 
     @property
-    def messages(self) -> List['AsyncConversationMessage']:
+    def messages(self) -> List[AsyncConversationMessage]:
         return self._messages
 
-    async def get_last_message(self, sender: str) -> 'AsyncConversationMessage':
+    def get_last_message(self, sender: str) -> AsyncConversationMessage:
         for message in reversed(self._messages):
             if message.sender == sender:
                 return message
         return None
     
     @property
-    def text_messages(self) -> List['TextMessageContent']:
+    def text_messages(self) -> List[TextMessageContent]:
         """
         Returns the list of text message contents in the conversation.
 
@@ -59,7 +58,7 @@ class AsyncConversation:
         """
         return [message.text_message_content for message in self._messages if message.text_message_content is not None]
     
-    async def get_last_text_message(self, sender: str) -> 'TextMessageContent':
+    def get_last_text_message(self, sender: str) -> TextMessageContent:
         """
         Returns the last text message content in the conversation from the specified sender.
 

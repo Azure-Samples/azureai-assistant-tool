@@ -121,6 +121,10 @@ class TextMessageContent:
     def content(self) -> str:
         return self._content
 
+    @property.setter
+    def content(self, value: str):
+        self._content = value
+
     @property
     def file_citations(self) -> Optional[List['FileCitation']]:
         return self._file_citations
@@ -193,7 +197,7 @@ class ImageMessageContent:
 
     def retrieve_image(self, output_folder_name: str) -> str:
         """
-        Retrieve the image.
+        Retrieve the image synchronously.
 
         :param output_folder_name: The name of the output folder.
         :type output_folder_name: str
@@ -202,42 +206,37 @@ class ImageMessageContent:
         :rtype: str
         """
         logger.info(f"Retrieving image with file_id: {self.file_id} to path: {output_folder_name}")
-        file_path = self._save_and_resize_image(self.file_id, output_folder_name)
-        return file_path
+        file_path = os.path.join(output_folder_name, f"{self.file_id}.png")
 
-    def _save_and_resize_image(
-            self,
-            file_id,
-            output_folder_path,
-            target_width=0.5,
-            target_height=0.5
-    ) -> str:
-        
-        if not output_folder_path:
-            logger.warning("Output folder path is not set. Cannot process files.")
-            return None
-
-        file_path = os.path.join(output_folder_path, f"{file_id}.png")
         if os.path.exists(file_path):
             logger.info(f"File already exists at {file_path}. Skipping download and resize.")
             return file_path
 
+        # Ensure the output directory exists
+        os.makedirs(output_folder_name, exist_ok=True)
+
         try:
-            with self._ai_client.with_streaming_response.files.content(file_id) as streamed_response:
-                with Image.open(io.BytesIO(streamed_response.read())) as img:
-                    new_width = int(img.width * target_width)
-                    new_height = int(img.height * target_height)
-                    resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    resized_img.save(file_path)
+            # Get the image content synchronously
+            response = self._ai_client.files.content(self.file_id)
+            image_data = response.read()
+            file_path = self._save_and_resize_image(image_data, file_path)
             logger.info(f"Resized image saved to {file_path}")
             return file_path
-        except UnidentifiedImageError as e:
-            logger.error(f"Cannot identify image file {file_id}: {e}")
-        except IOError as e:
-            logger.error(f"IO error during image processing {file_id}: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during image processing {file_id}: {e}")
-        return None
+            logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
+            return None
+
+    def _save_and_resize_image(self, image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
+        try:
+            with Image.open(io.BytesIO(image_data)) as img:
+                new_width = int(img.width * target_width)
+                new_height = int(img.height * target_height)
+                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                resized_img.save(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Error processing image: {e}")
+            return None
 
 
 class FileCitation:

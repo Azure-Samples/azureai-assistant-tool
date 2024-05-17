@@ -21,7 +21,7 @@ import os, io, asyncio
 
 class AsyncConversationMessage:
     def __init__(self):
-        self._ai_client = None
+        self._ai_client : Union['AsyncOpenAI', 'AsyncAzureOpenAI'] = None
         self._original_message = None
         self._text_message_content = None
         self._file_message_content = None
@@ -127,6 +127,10 @@ class TextMessageContent:
     @property
     def content(self) -> str:
         return self._content
+    
+    @property.setter
+    def content(self, value: str):
+        self._content = value
 
     @property
     def file_citations(self) -> Optional[List['FileCitation']]:
@@ -168,7 +172,6 @@ class AsyncFileMessageContent:
                 await asyncio.to_thread(self._write_to_file, file_path, data)
             return file_path
 
-            return file_path
         except Exception as e:
             logger.error(f"Failed to retrieve file {self.file_id}: {e}")
             return None
@@ -199,37 +202,53 @@ class AsyncImageMessageContent:
     def file_name(self) -> str:
         return self._file_name
 
-    async def retrieve_image(self, output_folder_name: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
+    async def retrieve_image(self, output_folder_name: str) -> str:
+        """
+        Asynchronously retrieve the image.
+
+        :param output_folder_name: The name of the output folder.
+        :type output_folder_name: str
+
+        :return: The path of the retrieved image.
+        :rtype: str
+        """
         logger.info(f"Retrieving image with file_id: {self.file_id} to path: {output_folder_name}")
-        file_path = os.path.join(output_folder_name, self.file_name)
+        file_path = os.path.join(output_folder_name, f"{self.file_id}.png")
+
+        # Check if the file already exists
         if os.path.exists(file_path):
-            logger.info(f"Image already exists at {file_path}. Skipping download and resize.")
+            logger.info(f"File already exists at {file_path}. Skipping download and resize.")
             return file_path
 
+        # Ensure the output directory exists
+        os.makedirs(output_folder_name, exist_ok=True)
+
         try:
+            # Asynchronously get the image content
             async with self._ai_client.files.content(self.file_id) as response:
                 image_data = await response.read()
-                # Process and save the image in a separate thread using asyncio.to_thread
-                await asyncio.to_thread(
-                    self._process_and_save_image, image_data, file_path, target_width, target_height
+                # Process and save the image in a separate thread
+                file_path = await asyncio.to_thread(
+                    self._save_and_resize_image, image_data, file_path
                 )
+                logger.info(f"Resized image saved to {file_path}")
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
             return None
 
     @staticmethod
-    def _process_and_save_image(image_data: bytes, file_path: str, target_width: float, target_height: float):
-        """Process and save the image. This function is intended to run in a separate thread."""
+    def _save_and_resize_image(image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
         try:
             with Image.open(io.BytesIO(image_data)) as img:
                 new_width = int(img.width * target_width)
                 new_height = int(img.height * target_height)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                img.save(file_path)
-            logger.info(f"Resized image saved to {file_path}")
+                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                resized_img.save(file_path)
+            return file_path
         except Exception as e:
             logger.error(f"Error processing image: {e}")
+            return None
 
 
 class FileCitation:
