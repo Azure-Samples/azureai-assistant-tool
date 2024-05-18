@@ -185,6 +185,7 @@ class AsyncConversationThreadClient:
         """
         try:
             messages = await self._get_conversation_thread_messages(thread_name, timeout)
+            logger.info(f"Retrieved messages content: {messages}")
             conversation = await AsyncConversation.create(self._ai_client, messages, max_text_messages)
             return conversation
         except Exception as e:
