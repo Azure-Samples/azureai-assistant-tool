@@ -121,7 +121,7 @@ class TextMessageContent:
     def content(self) -> str:
         return self._content
 
-    @property.setter
+    @content.setter
     def content(self, value: str):
         self._content = value
 
