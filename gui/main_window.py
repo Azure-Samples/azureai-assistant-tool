@@ -469,15 +469,15 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
-        if run_status == "in_progress" and conversation.text_messages:
+        if run_status == "in_progress" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
             self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.text_messages)
+            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
 
-        elif run_status == "completed" and conversation.text_messages:
+        elif run_status == "completed" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is completed, conversation updated")
             self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.text_messages)
+            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
 
             if self.conversation_sidebar.is_listening:
                 self.speech_input_handler.start_listening_from_mic()
@@ -491,7 +491,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
 
         self.conversation_view_clear_signal.update_signal.emit()
-        self.conversation_append_messages_signal.append_signal.emit(conversation.text_messages)
+        self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
 
     def on_run_cancelled(self, assistant_name, run_identifier, run_end_time):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")

@@ -2,6 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.text_message import TextMessageContent, FileCitation
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AzureOpenAI, OpenAI
@@ -60,7 +61,7 @@ class ConversationMessage:
                 sender_name = "user"
             return sender_name
 
-    def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List['FileCitation']]:
+    def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List[FileCitation]]:
         citations = []
         file_citations = []
 
@@ -88,7 +89,7 @@ class ConversationMessage:
         return citations, file_citations
 
     @property
-    def text_message_content(self) -> Optional['TextMessageContent']:
+    def text_message_content(self) -> Optional[TextMessageContent]:
         return self._text_message_content
 
     @property
@@ -110,24 +111,6 @@ class ConversationMessage:
     @property
     def original_message(self) -> Message:
         return self._original_message
-
-
-class TextMessageContent:
-    def __init__(self, content: str, file_citations: Optional[List['FileCitation']] = None):
-        self._content = content
-        self._file_citations = file_citations
-
-    @property
-    def content(self) -> str:
-        return self._content
-
-    @content.setter
-    def content(self, value: str):
-        self._content = value
-
-    @property
-    def file_citations(self) -> Optional[List['FileCitation']]:
-        return self._file_citations
 
 
 class FileMessageContent:
@@ -237,41 +220,3 @@ class ImageMessageContent:
         except Exception as e:
             logger.error(f"Error processing image: {e}")
             return None
-
-
-class FileCitation:
-    """
-    A class representing a file citation.
-
-    :param file_id: The ID of the file.
-    :type file_id: str
-    :param file_name: The name of the file.
-    :type file_name: str
-    """
-    def __init__(
-            self, 
-            file_id : str,
-            file_name : str
-    ) -> None:
-        self._file_id = file_id
-        self._file_name = file_name
-
-    @property
-    def file_id(self) -> str:
-        """
-        Returns the ID of the file.
-
-        :return: The ID of the file.
-        :rtype: str
-        """
-        return self._file_id
-
-    @property
-    def file_name(self) -> str:
-        """
-        Returns the name of the file.
-
-        :return: The name of the file.
-        :rtype: str
-        """
-        return self._file_name

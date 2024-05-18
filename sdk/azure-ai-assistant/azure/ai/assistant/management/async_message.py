@@ -2,6 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.text_message import TextMessageContent, FileCitation
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI
@@ -21,7 +22,7 @@ import os, io, asyncio
 
 class AsyncConversationMessage:
     def __init__(self):
-        self._ai_client : Union['AsyncOpenAI', 'AsyncAzureOpenAI'] = None
+        self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = None
         self._original_message = None
         self._text_message_content = None
         self._file_message_content = None
@@ -31,7 +32,7 @@ class AsyncConversationMessage:
         self._assistant_config_manager = None
 
     @classmethod
-    async def create(cls, ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'], original_message: 'Message'):
+    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], original_message: Message):
         instance = cls()
         instance._ai_client = ai_client
         instance._original_message = original_message
@@ -41,7 +42,7 @@ class AsyncConversationMessage:
         await instance.process_message_contents(original_message)
         return instance
 
-    async def process_message_contents(self, original_message: 'Message'):
+    async def process_message_contents(self, original_message: Message):
         for content_item in original_message.content:
             if isinstance(content_item, TextContentBlock):
                 citations, file_citations = await self._process_text_annotations(content_item)
@@ -54,7 +55,7 @@ class AsyncConversationMessage:
                     self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"
                 )
 
-    def _get_sender_name(self, message: 'Message') -> str:
+    def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
             sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
             return sender_name if sender_name else "assistant"
@@ -66,7 +67,7 @@ class AsyncConversationMessage:
                 sender_name = "user"
             return sender_name
 
-    async def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List['FileCitation']]:
+    async def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List[FileCitation]]:
         citations = []
         file_citations = []
 
@@ -84,7 +85,7 @@ class AsyncConversationMessage:
                 elif isinstance(annotation, FileCitationAnnotation):
                     try:
                         file_id = annotation.file_citation.file_id
-                        file_info = await self._ai_client.files.retrieve(file_id)  # Assuming this is an async call
+                        file_info = await self._ai_client.files.retrieve(file_id)
                         file_name = file_info.filename
                     except Exception as e:
                         logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
@@ -95,7 +96,7 @@ class AsyncConversationMessage:
         return citations, file_citations
 
     @property
-    def text_message_content(self) -> Optional['TextMessageContent']:
+    def text_message_content(self) -> Optional[TextMessageContent]:
         return self._text_message_content
 
     @property
@@ -115,36 +116,18 @@ class AsyncConversationMessage:
         return self._sender
 
     @property
-    def original_message(self) -> 'Message':
+    def original_message(self) -> Message:
         return self._original_message
 
 
-class TextMessageContent:
-    def __init__(self, content: str, file_citations: Optional[List['FileCitation']] = None):
-        self._content = content
-        self._file_citations = file_citations
-
-    @property
-    def content(self) -> str:
-        return self._content
-    
-    @content.setter
-    def content(self, value: str):
-        self._content = value
-
-    @property
-    def file_citations(self) -> Optional[List['FileCitation']]:
-        return self._file_citations
-
-
 class AsyncFileMessageContent:
-    def __init__(self, ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'], file_id: str, file_name: str):
+    def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
 
     @classmethod
-    async def create(cls, ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'], file_id: str, file_name: str):
+    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         instance = cls(ai_client, file_id, file_name)
         return instance
 
@@ -184,13 +167,13 @@ class AsyncFileMessageContent:
 
 
 class AsyncImageMessageContent:
-    def __init__(self, ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'], file_id: str, file_name: str):
+    def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
 
     @classmethod
-    async def create(cls, ai_client: Union['AsyncOpenAI', 'AsyncAzureOpenAI'], file_id: str, file_name: str):
+    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         instance = cls(ai_client, file_id, file_name)
         return instance
 
@@ -249,17 +232,3 @@ class AsyncImageMessageContent:
         except Exception as e:
             logger.error(f"Error processing image: {e}")
             return None
-
-
-class FileCitation:
-    def __init__(self, file_id: str, file_name: str) -> None:
-        self._file_id = file_id
-        self._file_name = file_name
-
-    @property
-    def file_id(self) -> str:
-        return self._file_id
-
-    @property
-    def file_name(self) -> str:
-        return self._file_name

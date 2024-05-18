@@ -13,7 +13,7 @@ import base64
 from typing import List
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.message import ConversationMessage, TextMessageContent, FileMessageContent, ImageMessageContent
+from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
 
 

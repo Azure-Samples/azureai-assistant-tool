@@ -31,7 +31,7 @@ class Conversation:
         return self._messages
 
     def get_last_message(self, sender: str) -> ConversationMessage:
-        for message in reversed(self._messages):
+        for message in (self._messages):
             if message.sender == sender:
                 return message
         return None
@@ -55,7 +55,7 @@ class Conversation:
         :return: The last text message content in the conversation from the specified sender.
         :rtype: TextMessageContent
         """
-        for message in reversed(self._messages):
+        for message in (self._messages):
             if message.sender == sender and message.text_message_content is not None:
                 return message.text_message_content
         return None
