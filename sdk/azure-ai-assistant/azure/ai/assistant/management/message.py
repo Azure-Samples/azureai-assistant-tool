@@ -56,7 +56,7 @@ class ConversationMessage:
             if message.metadata:
                 sender_name = message.metadata.get("chat_assistant", "assistant")
                 # Set the role to assistant if the metadata is set to assistant
-                message.role = "assistant"
+                self._role = "assistant"
             else:
                 sender_name = "user"
             return sender_name
