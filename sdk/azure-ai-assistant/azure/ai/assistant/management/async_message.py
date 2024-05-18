@@ -38,7 +38,7 @@ class AsyncConversationMessage:
         instance._original_message = original_message
         instance._role = original_message.role
         instance._assistant_config_manager = AssistantConfigManager().get_instance()
-        instance._sender = await instance._get_sender_name(original_message)
+        instance._sender = instance._get_sender_name(original_message)
         await instance._process_message_contents(original_message)
         return instance
 
