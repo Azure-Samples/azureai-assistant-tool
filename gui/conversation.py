@@ -235,9 +235,6 @@ class ConversationView(QWidget):
                 # Synchronously retrieve and process the file
                 file_path = file_message.retrieve_file(self.file_path)
                 if file_path:
-                    # If needed, perform actions with the file path (like logging or displaying)
-                    print(f"File saved to: {file_path}")
-                    # Optionally append a link or message about the file
                     self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
