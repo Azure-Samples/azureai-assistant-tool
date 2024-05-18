@@ -2,7 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.text_message import TextMessageContent, FileCitation
+from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI
@@ -24,9 +24,9 @@ class AsyncConversationMessage:
     def __init__(self):
         self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = None
         self._original_message = None
-        self._text_message_content = None
-        self._file_message_content = None
-        self._image_message_content = None
+        self._text_message = None
+        self._file_message = None
+        self._image_message = None
         self._role = None
         self._sender = None
         self._assistant_config_manager = None
@@ -39,19 +39,19 @@ class AsyncConversationMessage:
         instance._role = original_message.role
         instance._assistant_config_manager = AssistantConfigManager().get_instance()
         instance._sender = await instance._get_sender_name(original_message)
-        await instance.process_message_contents(original_message)
+        await instance._process_message_contents(original_message)
         return instance
 
-    async def process_message_contents(self, original_message: Message):
+    async def _process_message_contents(self, original_message: Message):
         for content_item in original_message.content:
             if isinstance(content_item, TextContentBlock):
                 citations, file_citations = await self._process_text_annotations(content_item)
                 content_value = content_item.text.value
                 if citations:
                     content_value += '\n' + '\n'.join(citations)
-                self._text_message_content = TextMessageContent(content_value, file_citations)
+                self._text_message = TextMessage(content_value, file_citations)
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message_content = await AsyncImageMessageContent.create(
+                self._image_message = await AsyncImageMessage.create(
                     self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"
                 )
 
@@ -78,7 +78,7 @@ class AsyncConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
-                    self.file_message_content = await AsyncFileMessageContent.create(self._ai_client, file_id, file_name)
+                    self._file_message = await AsyncFileMessage.create(self._ai_client, file_id, file_name)
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
@@ -96,16 +96,16 @@ class AsyncConversationMessage:
         return citations, file_citations
 
     @property
-    def text_message_content(self) -> Optional[TextMessageContent]:
-        return self._text_message_content
+    def text_message(self) -> Optional[TextMessage]:
+        return self._text_message
 
     @property
-    def file_message_content(self) -> Optional['AsyncFileMessageContent']:
-        return self._file_message_content
+    def file_message(self) -> Optional['AsyncFileMessage']:
+        return self._file_message
 
     @property
-    def image_message_content(self) -> Optional['AsyncImageMessageContent']:
-        return self._image_message_content
+    def image_message(self) -> Optional['AsyncImageMessage']:
+        return self._image_message
 
     @property
     def role(self) -> str:
@@ -120,7 +120,7 @@ class AsyncConversationMessage:
         return self._original_message
 
 
-class AsyncFileMessageContent:
+class AsyncFileMessage:
     def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
@@ -166,7 +166,7 @@ class AsyncFileMessageContent:
             file.write(data)
 
 
-class AsyncImageMessageContent:
+class AsyncImageMessage:
     def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id

@@ -2,7 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.text_message import TextMessageContent, FileCitation
+from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AzureOpenAI, OpenAI
@@ -27,26 +27,26 @@ class ConversationMessage:
     ):
         self._ai_client = ai_client
         self._original_message = original_message
-        self._text_message_content = None
-        self._file_message_content = None
-        self._image_message_content = None
+        self._text_message = None
+        self._file_message = None
+        self._image_message = None
         self._role = original_message.role
         self._sender = None
         self._assistant_config_manager = AssistantConfigManager().get_instance()
         self._sender = self._get_sender_name(original_message)
-        self.process_message_contents(original_message)
+        self._process_message_contents(original_message)
 
-    def process_message_contents(self, original_message: Message):
+    def _process_message_contents(self, original_message: Message):
         for content_item in original_message.content:
             if isinstance(content_item, TextContentBlock):
                 citations, file_citations = self._process_text_annotations(content_item)
                 content_value = content_item.text.value
                 if citations:
                     content_value += '\n' + '\n'.join(citations)
-                self._text_message_content = TextMessageContent(content_value, file_citations)
+                self._text_message = TextMessage(content_value, file_citations)
 
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message_content = ImageMessageContent(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
+                self._image_message = ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -72,7 +72,7 @@ class ConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
-                    self.file_message_content = FileMessageContent(self._ai_client, file_id, file_name)
+                    self._file_message = FileMessage(self._ai_client, file_id, file_name)
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
@@ -89,16 +89,16 @@ class ConversationMessage:
         return citations, file_citations
 
     @property
-    def text_message_content(self) -> Optional[TextMessageContent]:
-        return self._text_message_content
+    def text_message(self) -> Optional[TextMessage]:
+        return self._text_message
 
     @property
-    def file_message_content(self) -> Optional['FileMessageContent']:
-        return self._file_message_content
+    def file_message(self) -> Optional['FileMessage']:
+        return self._file_message
 
     @property
-    def image_message_content(self) -> Optional['ImageMessageContent']:
-        return self._image_message_content
+    def image_message(self) -> Optional['ImageMessage']:
+        return self._image_message
 
     @property
     def role(self) -> str:
@@ -113,7 +113,7 @@ class ConversationMessage:
         return self._original_message
 
 
-class FileMessageContent:
+class FileMessage:
     def __init__(self, 
                  ai_client : Union[OpenAI, AzureOpenAI],
                  file_id: str, 
@@ -160,7 +160,7 @@ class FileMessageContent:
             return None
 
 
-class ImageMessageContent:
+class ImageMessage:
     def __init__(self,
                  ai_client : Union[OpenAI, AzureOpenAI],
                  file_id: str, 

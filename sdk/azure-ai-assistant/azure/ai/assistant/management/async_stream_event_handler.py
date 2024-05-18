@@ -73,7 +73,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
         if delta.content:
             for content_block in delta.content:
                 if isinstance(content_block, TextDeltaBlock) and content_block.text:
-                    message.text_message_content.content = content_block.text.value
+                    message.text_message.content = content_block.text.value
         await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, message=message)
         self._is_first_message = False
 

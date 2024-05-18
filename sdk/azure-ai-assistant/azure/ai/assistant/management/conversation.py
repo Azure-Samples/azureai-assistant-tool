@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.message import ConversationMessage, TextMessageContent
+from azure.ai.assistant.management.message import ConversationMessage, TextMessage
 
 from openai.types.beta.threads import Message
 from openai import AzureOpenAI, OpenAI
@@ -37,25 +37,25 @@ class Conversation:
         return None
     
     @property
-    def text_messages(self) -> List[TextMessageContent]:
+    def text_messages(self) -> List[TextMessage]:
         """
         Returns the list of text message contents in the conversation.
 
         :return: The list of text message contents in the conversation.
-        :rtype: List[TextMessageContent]
+        :rtype: List[TextMessage]
         """
-        return [message.text_message_content for message in self._messages if message.text_message_content is not None]
+        return [message.text_message for message in self._messages if message.text_message is not None]
     
-    def get_last_text_message(self, sender: str) -> TextMessageContent:
+    def get_last_text_message(self, sender: str) -> TextMessage:
         """
         Returns the last text message content in the conversation from the specified sender.
 
         :param sender: The sender of the message.
         :type sender: str
         :return: The last text message content in the conversation from the specified sender.
-        :rtype: TextMessageContent
+        :rtype: TextMessage
         """
         for message in (self._messages):
-            if message.sender == sender and message.text_message_content is not None:
-                return message.text_message_content
+            if message.sender == sender and message.text_message is not None:
+                return message.text_message
         return None

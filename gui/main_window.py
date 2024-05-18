@@ -463,9 +463,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return
 
         if run_status == "streaming":
-            if message.text_message_content:
+            if message.text_message:
                 logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
-                self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message.text_message_content.content, is_first_message)
+                self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message.text_message.content, is_first_message)
             return
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
@@ -518,8 +518,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:
-            if message.file_message_content:
-                file_path = message.file_message_content.retrieve_file(assistant_config.output_folder_path)
+            if message.file_message:
+                file_path = message.file_message.retrieve_file(assistant_config.output_folder_path)
                 logger.debug(f"File downloaded to {file_path} on run end")
 
     # Callbacks for TaskManagerCallbacks

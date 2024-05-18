@@ -216,8 +216,8 @@ class ConversationView(QWidget):
 
         for message in reversed(messages):
             # Handle text message content
-            if message.text_message_content:
-                text_message_content = message.text_message_content
+            if message.text_message:
+                text_message = message.text_message
                 # Determine the color based on the role and the theme
                 if self.is_dark_mode():
                     # Colors for dark mode
@@ -227,13 +227,13 @@ class ConversationView(QWidget):
                     color = 'blue' if message.role != "assistant" else 'black'
 
                 # Append the formatted text message
-                self.append_message(message.sender, text_message_content.content, color=color)
+                self.append_message(message.sender, text_message.content, color=color)
 
             # Handle file message content
-            elif message.file_message_content:
-                file_message_content = message.file_message_content
+            elif message.file_message:
+                file_message = message.file_message
                 # Synchronously retrieve and process the file
-                file_path = file_message_content.retrieve_file(self.file_path)
+                file_path = file_message.retrieve_file(self.file_path)
                 if file_path:
                     # If needed, perform actions with the file path (like logging or displaying)
                     print(f"File saved to: {file_path}")
@@ -241,10 +241,10 @@ class ConversationView(QWidget):
                     self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
-            elif message.image_message_content:
-                image_message_content = message.image_message_content
+            elif message.image_message:
+                image_message = message.image_message
                 # Synchronously retrieve and process the image
-                image_path = image_message_content.retrieve_image(self.file_path)
+                image_path = image_message.retrieve_image(self.file_path)
                 if image_path:
                     self.append_image(image_path, message.sender)
 
