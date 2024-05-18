@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
+
 
 class AsyncAssistantClientCallbacks:
     async def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
@@ -20,7 +22,7 @@ class AsyncAssistantClientCallbacks:
         """
         pass
 
-    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.
@@ -33,8 +35,8 @@ class AsyncAssistantClientCallbacks:
         :type thread_name: str
         :param is_first_message: Whether the message is the first message, defaults to False, used when status is "streaming"
         :type is_first_message: bool, optional
-        :param message: The partial message during the run, defaults to None. Used when status is "streaming"
-        :type message: str, optional
+        :param message: Can be partial message (streaming with text content) or full test message with files, citations (completed), defaults to None
+        :type message: AsyncConversationMessage, optional
 
         :return: None
         :rtype: None

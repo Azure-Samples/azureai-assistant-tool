@@ -4,10 +4,13 @@
 
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.logger_module import logger
 
 from openai import AsyncAssistantEventHandler
+from openai.types.beta.threads import TextDeltaBlock
+
 from datetime import datetime
 from typing import Optional
 from typing_extensions import override
@@ -66,11 +69,20 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     @override
     async def on_message_delta(self, delta, snapshot) -> None:
         logger.debug(f"on_message_delta called, delta: {delta}")
+        message : AsyncConversationMessage = await self._conversation_thread_client.retrieve_message(snapshot)
+        if delta.content:
+            for content_block in delta.content:
+                if isinstance(content_block, TextDeltaBlock) and content_block.text:
+                    message.text_message.content = content_block.text.value
+        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, message=message)
+        self._is_first_message = False
 
     @override
     async def on_message_done(self, message) -> None:
-        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name)
         logger.info(f"on_message_done called, message: {message}")
+        message = await self._conversation_thread_client.retrieve_message(message)
+        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name, self._is_first_message, message=message)
+        self._is_first_message = False
 
     @override
     async def on_text_created(self, text) -> None:
@@ -84,8 +96,6 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     @override
     async def on_text_delta(self, delta, snapshot):
         logger.debug(f"on_text_delta called, delta: {delta}")
-        await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "streaming", self._thread_name, self._is_first_message, delta.value)
-        self._is_first_message = False
 
     @override
     async def on_text_done(self, text) -> None:

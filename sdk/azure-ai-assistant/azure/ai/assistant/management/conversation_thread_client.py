@@ -4,17 +4,16 @@
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.conversation import Conversation
-from typing import Optional
-from openai import AzureOpenAI, OpenAI
-from typing import Union, List
-from openai.types.beta.threads import (
-    ImageFileContentBlock,
-    TextContentBlock
-)
-from openai.types.beta.threads import Message, FileCitationAnnotation, FilePathAnnotation
+from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
+
+from openai import AzureOpenAI, OpenAI
+
+from openai.types.beta.threads import Message
+
+from typing import Union, List, Optional
 import threading
 
 
@@ -186,76 +185,25 @@ class ConversationThreadClient:
         """
         try:
             messages = self._get_conversation_thread_messages(thread_name, timeout)
-            conversation = self._retrieve_messages(messages, max_text_messages=max_text_messages)
+            logger.info(f"Retrieved messages content: {messages}")
+            conversation = Conversation(self._ai_client, messages, max_text_messages)
             return conversation
         except Exception as e:
             error_message = f"Error retrieving messages content: Exception: {e}"
             logger.error(error_message)
             raise EngineError(error_message)
 
-    def _retrieve_messages(
-            self, 
-            messages: List[Message],
-            max_text_messages: Optional[int] = None
-    ) -> Conversation:
+    def retrieve_message(self, original_message: Message) -> ConversationMessage:
+        """
+        Retrieves a single conversation message.
 
-        conversation = Conversation(self._ai_client_type)
-        text_messages_count = 0
+        :param original_message: The original message to retrieve.
+        :type original_message: Message
 
-        for message in messages:
-            logger.info(f"Processing message: {message}")
-            if message.role == "assistant":
-                sender_name = self._assistant_config_manager.get_assistant_name_by_assistant_id(message.assistant_id)
-                if sender_name is None:
-                    sender_name = "assistant"
-            elif message.role == "user":
-                if message.metadata:
-                    sender_name = message.metadata.get("chat_assistant", "assistant")
-                    message.role = "assistant"
-                else:
-                    sender_name = "user"
-
-            for content_item in message.content:
-                if isinstance(content_item, TextContentBlock):
-                    if max_text_messages is not None and text_messages_count >= max_text_messages:
-                        return conversation
-
-                    citations = []
-                    if content_item.text.annotations:
-                        for index, annotation in enumerate(content_item.text.annotations):
-                            # Replace the text with a footnote marker
-                            content_item.text.value = content_item.text.value.replace(annotation.text, f' [{index}]')
-                            
-                            # Handle file path annotations
-                            if isinstance(annotation, FilePathAnnotation):
-                                file_id = annotation.file_path.file_id
-                                file_name = annotation.text.split("/")[-1]
-                                conversation.add_file(file_id, file_name, message.role, sender_name)
-                                citations.append(f'[{index}] {file_name}')
-
-                            # Handle file citation annotations
-                            elif isinstance(annotation, FileCitationAnnotation):
-                                file_id = annotation.file_citation.file_id
-                                try:
-                                    file_name = self._ai_client.files.retrieve(file_id).filename
-                                except Exception as e:
-                                    logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
-                                    file_name = "Unknown_" + str(file_id)
-                                citations.append(f'[{index}] {file_name}')
-
-                    # Append citations at the end of the text content
-                    if citations:
-                        content_item.text.value += '\n' + '\n'.join(citations)
-
-                    conversation.add_message(content_item.text.value, message.role, sender_name)
-                    text_messages_count += 1
-
-                elif isinstance(content_item, ImageFileContentBlock):
-                    file_id = content_item.image_file.file_id
-                    file_name = f"{file_id}.png"  # Assuming file type is currently always png for images
-                    conversation.add_image(file_id, file_name, message.role, sender_name)
-
-        return conversation
+        :return: The conversation message.
+        :rtype: ConversationMessage
+        """
+        return ConversationMessage(self._ai_client, original_message)
 
     def create_conversation_thread_message(
             self, 
