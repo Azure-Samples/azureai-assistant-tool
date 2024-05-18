@@ -23,18 +23,19 @@ import os, io
 class ConversationMessage:
     def __init__(self, 
                  ai_client : Union[OpenAI, AzureOpenAI],
-                 original_message: Message
+                 original_message: Message = None
     ):
         self._ai_client = ai_client
         self._original_message = original_message
         self._text_message = None
         self._file_message = None
         self._image_message = None
-        self._role = original_message.role
+        self._role = original_message.role if original_message else "assistant"
         self._sender = None
         self._assistant_config_manager = AssistantConfigManager.get_instance()
-        self._sender = self._get_sender_name(original_message)
-        self._process_message_contents(original_message)
+        if original_message:
+            self._sender = self._get_sender_name(original_message)
+            self._process_message_contents(original_message)
 
     def _process_message_contents(self, original_message: Message):
         for content_item in original_message.content:
@@ -91,6 +92,10 @@ class ConversationMessage:
     @property
     def text_message(self) -> Optional[TextMessage]:
         return self._text_message
+
+    @text_message.setter
+    def text_message(self, value: TextMessage):
+        self._text_message = value
 
     @property
     def file_message(self) -> Optional['FileMessage']:

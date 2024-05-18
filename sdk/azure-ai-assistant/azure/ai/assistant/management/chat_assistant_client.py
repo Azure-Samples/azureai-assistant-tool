@@ -3,6 +3,8 @@
 
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.text_message import TextMessage
 from azure.ai.assistant.management.base_chat_assistant_client import BaseChatAssistantClient
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
@@ -183,11 +185,11 @@ class ChatAssistantClient(BaseChatAssistantClient):
             if thread_name:
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
                 conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
-                for message in reversed(conversation.text_messages):
+                for message in reversed(conversation.messages):
                     if message.role == "user":
-                        self._messages.append({"role": "user", "content": message.content})
+                        self._messages.append({"role": "user", "content": message.text_message.content})
                     if message.role == "assistant":
-                        self._messages.append({"role": "assistant", "content": message.content})
+                        self._messages.append({"role": "assistant", "content": message.text_message.content})
             elif user_request:
                 self._messages.append({"role": "user", "content": user_request})
 
@@ -305,7 +307,9 @@ class ChatAssistantClient(BaseChatAssistantClient):
         for chunk in response:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
-                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, delta.content)
+                message : ConversationMessage = ConversationMessage(self.ai_client)
+                message.text_message = TextMessage(delta.content)
+                self._callbacks.on_run_update(self._name, run_id, "streaming", thread_name, is_first_message, message)
                 collected_messages.append(delta.content)
                 is_first_message = False
             if delta and delta.tool_calls:

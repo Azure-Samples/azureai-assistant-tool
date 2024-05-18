@@ -32,14 +32,18 @@ class AsyncConversationMessage:
         self._assistant_config_manager = None
 
     @classmethod
-    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], original_message: Message):
+    async def create(cls, 
+                     ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI],
+                     original_message: Message = None
+    ) -> 'AsyncConversationMessage':
         instance = cls()
         instance._ai_client = ai_client
         instance._original_message = original_message
-        instance._role = original_message.role
+        instance._role = original_message.role if original_message else "assistant"
         instance._assistant_config_manager = AssistantConfigManager.get_instance()
-        instance._sender = instance._get_sender_name(original_message)
-        await instance._process_message_contents(original_message)
+        if original_message:
+            instance._sender = instance._get_sender_name(original_message) 
+            await instance._process_message_contents(original_message)
         return instance
 
     async def _process_message_contents(self, original_message: Message):
@@ -98,6 +102,10 @@ class AsyncConversationMessage:
     @property
     def text_message(self) -> Optional[TextMessage]:
         return self._text_message
+
+    @text_message.setter
+    def text_message(self, value: TextMessage):
+        self._text_message = value
 
     @property
     def file_message(self) -> Optional['AsyncFileMessage']:
