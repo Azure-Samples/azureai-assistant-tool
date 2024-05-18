@@ -230,7 +230,7 @@ class ConversationView(QWidget):
                 self.append_message(message.sender, text_message.content, color=color)
 
             # Handle file message content
-            elif message.file_message:
+            if message.file_message:
                 file_message = message.file_message
                 # Synchronously retrieve and process the file
                 file_path = file_message.retrieve_file(self.file_path)
@@ -241,7 +241,7 @@ class ConversationView(QWidget):
                     self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
-            elif message.image_message:
+            if message.image_message:
                 image_message = message.image_message
                 # Synchronously retrieve and process the image
                 image_path = image_message.retrieve_image(self.file_path)

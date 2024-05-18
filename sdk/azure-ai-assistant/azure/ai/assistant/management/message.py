@@ -32,7 +32,7 @@ class ConversationMessage:
         self._image_message = None
         self._role = original_message.role
         self._sender = None
-        self._assistant_config_manager = AssistantConfigManager().get_instance()
+        self._assistant_config_manager = AssistantConfigManager.get_instance()
         self._sender = self._get_sender_name(original_message)
         self._process_message_contents(original_message)
 
