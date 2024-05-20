@@ -21,6 +21,14 @@ import os, io
 
 
 class ConversationMessage:
+    """
+    A class representing a conversation message.
+
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: OpenAI, AzureOpenAI
+    :param original_message: The original message.
+    :type original_message: Message
+    """
     def __init__(self, 
                  ai_client : Union[OpenAI, AzureOpenAI],
                  original_message: Message = None
@@ -91,34 +99,86 @@ class ConversationMessage:
 
     @property
     def text_message(self) -> Optional[TextMessage]:
+        """
+        Returns the text message content.
+
+        :return: The text message content.
+        :rtype: Optional[TextMessage]
+        """
         return self._text_message
 
     @text_message.setter
     def text_message(self, value: TextMessage):
+        """
+        Sets the text message content.
+
+        :param value: The text message content.
+        :type value: TextMessage
+        """
         self._text_message = value
 
     @property
     def file_message(self) -> Optional['FileMessage']:
+        """
+        Returns the file message content.
+
+        :return: The file message content.
+        :rtype: Optional[FileMessage]
+        """
         return self._file_message
 
     @property
     def image_message(self) -> Optional['ImageMessage']:
+        """
+        Returns the image message content.
+
+        :return: The image message content.
+        :rtype: Optional[ImageMessage]
+        """
         return self._image_message
 
     @property
     def role(self) -> str:
+        """
+        Returns the role of the sender.
+
+        :return: The role of the sender.
+        :rtype: str
+        """
         return self._role
 
     @property
     def sender(self) -> str:
+        """
+        Returns the sender of the message.
+
+        :return: The sender of the message.
+        :rtype: str
+        """
         return self._sender
     
     @property
     def original_message(self) -> Message:
+        """
+        Returns the original message.
+
+        :return: The original message.
+        :rtype: Message
+        """
         return self._original_message
 
 
 class FileMessage:
+    """
+    A class representing a file message.
+
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: OpenAI, AzureOpenAI
+    :param file_id: The file ID.
+    :type file_id: str
+    :param file_name: The file name.
+    :type file_name: str
+    """
     def __init__(self, 
                  ai_client : Union[OpenAI, AzureOpenAI],
                  file_id: str, 
@@ -130,10 +190,22 @@ class FileMessage:
 
     @property
     def file_id(self) -> str:
+        """
+        Returns the file ID.
+
+        :return: The file ID.
+        :rtype: str
+        """
         return self._file_id
 
     @property
     def file_name(self) -> str:
+        """
+        Returns the file name.
+
+        :return: The file name.
+        :rtype: str
+        """
         return self._file_name
 
     def retrieve_file(self, output_folder_name: str) -> str:
@@ -166,6 +238,16 @@ class FileMessage:
 
 
 class ImageMessage:
+    """
+    A class representing an image message.
+
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: OpenAI, AzureOpenAI
+    :param file_id: The file ID.
+    :type file_id: str
+    :param file_name: The file name.
+    :type file_name: str
+    """
     def __init__(self,
                  ai_client : Union[OpenAI, AzureOpenAI],
                  file_id: str, 
@@ -177,10 +259,22 @@ class ImageMessage:
 
     @property
     def file_id(self) -> str:
+        """
+        Returns the file ID.
+
+        :return: The file ID.
+        :rtype: str
+        """
         return self._file_id
 
     @property
     def file_name(self) -> str:
+        """
+        Returns the file name.
+
+        :return: The file name.
+        :rtype: str
+        """
         return self._file_name
 
     def retrieve_image(self, output_folder_name: str) -> str:

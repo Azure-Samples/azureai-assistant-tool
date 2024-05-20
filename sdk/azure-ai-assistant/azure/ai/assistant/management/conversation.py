@@ -15,6 +15,13 @@ class Conversation:
 
     :param ai_client: The type of AI client to use for the conversation.
     :type ai_client: OpenAI, AzureOpenAI
+    :param messages: The list of messages in the conversation.
+    :type messages: List[Message]
+    :param max_text_messages: The maximum number of text messages to include in the conversation.
+    :type max_text_messages: Optional[int]
+
+    :return: A new instance of the Conversation class.
+    :rtype: Conversation
     """
     def __init__(
             self, 
@@ -28,9 +35,24 @@ class Conversation:
 
     @property
     def messages(self) -> List[ConversationMessage]:
+        """
+        Returns the list of messages in the conversation.
+
+        :return: The list of messages in the conversation.
+        :rtype: List[ConversationMessage]
+        """
         return self._messages
 
     def get_last_message(self, sender: str) -> ConversationMessage:
+        """
+        Returns the last message in the conversation from the specified sender.
+
+        :param sender: The sender of the message.
+        :type sender: str
+
+        :return: The last message in the conversation from the specified sender.
+        :rtype: ConversationMessage
+        """
         for message in (self._messages):
             if message.sender == sender:
                 return message

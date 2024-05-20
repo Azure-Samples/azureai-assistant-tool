@@ -21,6 +21,9 @@ import os, io, asyncio
 
 
 class AsyncConversationMessage:
+    """
+    A class representing a conversation message asynchronously.
+    """
     def __init__(self):
         self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = None
         self._original_message = None
@@ -36,6 +39,17 @@ class AsyncConversationMessage:
                      ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI],
                      original_message: Message = None
     ) -> 'AsyncConversationMessage':
+        """
+        Creates a new instance of the AsyncConversationMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param original_message: The original message.
+        :type original_message: Message
+
+        :return: A new instance of the AsyncConversationMessage class.
+        :rtype: AsyncConversationMessage
+        """
         instance = cls()
         instance._ai_client = ai_client
         instance._original_message = original_message
@@ -101,34 +115,86 @@ class AsyncConversationMessage:
 
     @property
     def text_message(self) -> Optional[TextMessage]:
+        """"
+        Returns the text message content of the conversation message.
+
+        :return: The text message content of the conversation message.
+        :rtype: Optional[TextMessage]
+        """
         return self._text_message
 
     @text_message.setter
     def text_message(self, value: TextMessage):
+        """
+        Sets the text message content of the conversation message.
+
+        :param value: The text message content of the conversation message.
+        :type value: TextMessage
+        """
         self._text_message = value
 
     @property
     def file_message(self) -> Optional['AsyncFileMessage']:
+        """
+        Returns the file message content of the conversation message.
+
+        :return: The file message content of the conversation message.
+        :rtype: Optional[AsyncFileMessage]
+        """
         return self._file_message
 
     @property
     def image_message(self) -> Optional['AsyncImageMessage']:
+        """
+        Returns the image message content of the conversation message.
+
+        :return: The image message content of the conversation message.
+        :rtype: Optional[AsyncImageMessage]
+        """
         return self._image_message
 
     @property
     def role(self) -> str:
+        """
+        Returns the role of the sender of the conversation message.
+
+        :return: The role of the sender of the conversation message.
+        :rtype: str
+        """
         return self._role
 
     @property
     def sender(self) -> str:
+        """
+        Returns the name of the sender of the conversation message.
+
+        :return: The name of the sender of the conversation message.
+        :rtype: str
+        """
         return self._sender
 
     @property
     def original_message(self) -> Message:
+        """
+        Returns the original message.
+
+        :return: The original message.
+        :rtype: Message
+        """
         return self._original_message
 
 
 class AsyncFileMessage:
+    """
+    A class representing a file message asynchronously.
+
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+    :param file_id: The file ID.
+    :type file_id: str
+    :param file_name: The file name.
+    :type file_name: str
+    """
     def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
@@ -136,18 +202,52 @@ class AsyncFileMessage:
 
     @classmethod
     async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
+        """
+        Creates a new instance of the AsyncFileMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param file_id: The file ID.
+        :type file_id: str
+        :param file_name: The file name.
+        :type file_name: str
+
+        :return: A new instance of the AsyncFileMessage class.
+        :rtype: AsyncFileMessage
+        """
         instance = cls(ai_client, file_id, file_name)
         return instance
 
     @property
     def file_id(self) -> str:
+        """
+        Returns the file ID.
+
+        :return: The file ID.
+        :rtype: str
+        """
         return self._file_id
 
     @property
     def file_name(self) -> str:
+        """
+        Returns the file name.
+
+        :return: The file name.
+        :rtype: str
+        """
         return self._file_name
 
     async def retrieve_file(self, output_folder_name: str) -> str:
+        """
+        Asynchronously retrieve the file.
+
+        :param output_folder_name: The name of the output folder.
+        :type output_folder_name: str
+
+        :return: The path of the retrieved file.
+        :rtype: str
+        """
         logger.info(f"Retrieving file with file_id: {self.file_id} to path: {output_folder_name}")
         file_path = f"{output_folder_name}/{self.file_name}"
         if os.path.exists(file_path):
@@ -175,6 +275,16 @@ class AsyncFileMessage:
 
 
 class AsyncImageMessage:
+    """
+    A class representing an image message asynchronously.
+
+    :param ai_client: The type of AI client to use for the conversation.
+    :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+    :param file_id: The file ID.
+    :type file_id: str
+    :param file_name: The file name.
+    :type file_name: str
+    """
     def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
@@ -182,15 +292,40 @@ class AsyncImageMessage:
 
     @classmethod
     async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
+        """
+        Creates a new instance of the AsyncImageMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param file_id: The file ID.
+        :type file_id: str
+        :param file_name: The file name.
+        :type file_name: str
+
+        :return: A new instance of the AsyncImageMessage class.
+        :rtype: AsyncImageMessage
+        """
         instance = cls(ai_client, file_id, file_name)
         return instance
 
     @property
     def file_id(self) -> str:
+        """
+        Returns the file ID.
+
+        :return: The file ID.
+        :rtype: str
+        """
         return self._file_id
 
     @property
     def file_name(self) -> str:
+        """
+        Returns the file name.
+
+        :return: The file name.
+        :rtype: str
+        """
         return self._file_name
 
     async def retrieve_image(self, output_folder_name: str) -> str:

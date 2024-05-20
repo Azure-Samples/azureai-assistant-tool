@@ -13,9 +13,6 @@ import asyncio
 class AsyncConversation:
     """
     A class representing a conversation asynchronously.
-
-    :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: AsyncOpenAI, AsyncAzureOpenAI
     """
     def __init__(self) -> None:
         self._messages : List[AsyncConversationMessage] = []
@@ -27,7 +24,19 @@ class AsyncConversation:
             messages: List[Message], 
             max_text_messages: Optional[int] = None
     ) -> 'AsyncConversation':
-        # Create an instance
+        """
+        Creates a new instance of the AsyncConversation class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param messages: The list of messages in the conversation.
+        :type messages: List[Message]
+        :param max_text_messages: The maximum number of text messages to include in the conversation.
+        :type max_text_messages: Optional[int]
+
+        :return: A new instance of the AsyncConversation class.
+        :rtype: AsyncConversation
+        """
         instance = cls()
         
         tasks = [AsyncConversationMessage.create(ai_client, message) for message in messages]
@@ -40,9 +49,24 @@ class AsyncConversation:
 
     @property
     def messages(self) -> List[AsyncConversationMessage]:
+        """
+        Returns the list of messages in the conversation.
+
+        :return: The list of messages in the conversation.
+        :rtype: List[AsyncConversationMessage]
+        """
         return self._messages
 
     def get_last_message(self, sender: str) -> AsyncConversationMessage:
+        """
+        Returns the last message in the conversation from the specified sender.
+
+        :param sender: The sender of the message.
+        :type sender: str
+
+        :return: The last message in the conversation from the specified sender.
+        :rtype: AsyncConversationMessage
+        """
         for message in (self._messages):
             if message.sender == sender:
                 return message
