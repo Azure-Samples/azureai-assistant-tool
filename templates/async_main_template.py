@@ -45,7 +45,7 @@ async def main():
 
         # Print the last assistant response from the conversation
         assistant_message = conversation.get_last_text_message(assistant_client.name)
-        print(f"{assistant_message.sender}: {assistant_message.content}")
+        print(f"{assistant_client.name}: {assistant_message.content}")
 
         # add new line for better readability
         print()
