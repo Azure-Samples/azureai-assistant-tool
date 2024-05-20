@@ -5,6 +5,9 @@ from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatA
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
+from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.text_message import TextMessage
 
 import os, asyncio, yaml
 import azure.identity.aio
@@ -18,10 +21,16 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     async def handle_message(self, action, message=""):
         await self.message_queue.put((action, message))
 
-    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
         if run_status == "streaming":
-            await self.handle_message("start" if is_first_message else "message", message)
-   
+            await self.handle_message("start" if is_first_message else "message", message.text_message.content)
+        elif run_status == "completed":
+            if message:
+                text_message : TextMessage = message.text_message
+                if text_message.file_citations:
+                    for file_citation in text_message.file_citations:
+                        print(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
+
     async def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
         pass
 
@@ -94,6 +103,9 @@ async def main():
         message_queue = asyncio.Queue()
         callbacks = MyAssistantClientCallbacks(message_queue)
 
+        # Use the AssistantConfigManager to save the assistant configuration locally at the end of the session
+        assistant_config_manager = AssistantConfigManager.get_instance('config')
+
         # Create an instance of the AsyncChatAssistantClient
         assistant_client = await AsyncChatAssistantClient.from_yaml(yaml.dump(config), callbacks=callbacks, **client_args)
         ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
@@ -128,6 +140,7 @@ async def main():
         await message_queue.join()
         display_task.cancel()
         await conversation_thread_client.close()
+        assistant_config_manager.save_config(assistant_client.name)
 
 if __name__ == "__main__":
     asyncio.run(main())

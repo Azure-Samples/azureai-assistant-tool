@@ -18,10 +18,11 @@ class MyAssistantClientCallbacks(AssistantClientCallbacks):
         if run_status == "streaming":
             await self.handle_message("start" if is_first_message else "message", message.text_message.content)
         elif run_status == "completed":
-            text_message : TextMessage = message.text_message
-            if text_message.file_citations:
-                for file_citation in text_message.file_citations:
-                    print(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
+            if message:
+                text_message : TextMessage = message.text_message
+                if text_message.file_citations:
+                    for file_citation in text_message.file_citations:
+                        print(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
                 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         await self.handle_message("function", function_name)

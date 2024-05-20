@@ -8,6 +8,7 @@ from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_task_manager import AsyncTaskManager, AsyncMultiTask
 from azure.ai.assistant.management.async_task_manager_callbacks import AsyncTaskManagerCallbacks
+from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 
 from typing import Dict, List
 import json, re
@@ -74,7 +75,7 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
         else:
             conversation = await self.conversation_thread_client.retrieve_conversation(thread_name)
             message = conversation.get_last_text_message(assistant_name)
-            print(f"\n{message}")
+            print(f"\n{message.content}")
             if assistant_name == "CodeProgrammerAgent":
                 # Extract the JSON code block from the response by using the FileCreatorAgent
                 await self._assistants["FileCreatorAgent"].process_messages(user_request=message.content)
@@ -153,6 +154,8 @@ def requires_user_confirmation(assistant_response: str):
 
 
 async def main():
+    # Use the AssistantConfigManager to save the assistant configurations at the end of the session
+    assistant_config_manager = AssistantConfigManager.get_instance('config')
     assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent", "FileCreatorAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = await initialize_assistants(assistant_names, orchestrator)
@@ -182,6 +185,8 @@ async def main():
         multi_task = AsyncMultiTask(tasks)
         await task_manager.schedule_task(multi_task)
         await orchestrator.wait_for_all_tasks()
+
+    assistant_config_manager.save_configs()
 
     await conversation_thread_client.close()
 
