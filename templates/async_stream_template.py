@@ -1,13 +1,13 @@
 import asyncio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
-from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.text_message import TextMessage
 
 # Define a custom callback class that inherits from AssistantClientCallbacks
-class MyAssistantClientCallbacks(AssistantClientCallbacks):
+class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     def __init__(self, message_queue):
         self.message_queue = message_queue
 

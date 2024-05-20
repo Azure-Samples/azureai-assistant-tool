@@ -1018,7 +1018,7 @@ class ExportAssistantDialog(QDialog):
             shutil.copyfile(user_functions_src, os.path.join(functions_path, "user_functions.py"))
 
         # Read template, replace placeholder, and create main.py
-        template_path = os.path.join("templates", "main_template.py")
+        template_path = os.path.join("templates", "async_stream_template.py")
         try:
             with open(template_path, "r") as template_file:
                 template_content = template_file.read()
