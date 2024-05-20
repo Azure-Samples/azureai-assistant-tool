@@ -1,24 +1,31 @@
 import asyncio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
-from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
-
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
+from azure.ai.assistant.management.text_message import TextMessage
 
 # Define a custom callback class that inherits from AssistantClientCallbacks
-class MyAssistantClientCallbacks(AssistantClientCallbacks):
+class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     def __init__(self, message_queue):
         self.message_queue = message_queue
 
     async def handle_message(self, action, message=""):
         await self.message_queue.put((action, message))
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
         if run_status == "streaming":
-            asyncio.create_task(self.handle_message("start" if is_first_message else "message", message))
-
-    def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
-        asyncio.create_task(self.handle_message("function", function_name))
+            await self.handle_message("start" if is_first_message else "message", message.text_message.content)
+        elif run_status == "completed":
+            if message:
+                text_message : TextMessage = message.text_message
+                if text_message.file_citations:
+                    for file_citation in text_message.file_citations:
+                        print(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
+                
+    async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
+        await self.handle_message("function", function_name)
 
 # Define a function to display streamed messages
 async def display_streamed_messages(message_queue, assistant_name):

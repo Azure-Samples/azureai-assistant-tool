@@ -22,6 +22,7 @@ from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCall
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.management.message import ConversationMessage
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.speech_input_handler import SpeechInputHandler
@@ -42,7 +43,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         }
         self.connection_timeout : float = 90.0
         self.use_system_assistant_for_thread_name : bool = False
-        self.use_streaming_for_assistant : bool = False
+        self.use_streaming_for_assistant : bool = True
         self.user_text_summarization_in_synthesis : bool = False
         self.active_ai_client_type = None
         self.in_background = False
@@ -453,7 +454,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             assistant_name, run_identifier, function_name, arguments, response
         )
 
-    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message = False, message=None):
+    def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message = False, message : ConversationMessage = None):
         logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier}, status {run_status}, and thread name {thread_name}")
 
         is_current_thread = self.conversation_thread_clients[self.active_ai_client_type].is_current_conversation_thread(thread_name)
@@ -462,8 +463,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return
 
         if run_status == "streaming":
-            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
-            self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message, is_first_message)
+            if message.text_message:
+                logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
+                self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message.text_message.content, is_first_message)
             return
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
@@ -516,8 +518,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:
-            if message.type == "file":
-                file_path = message.retrieve_file(assistant_config.output_folder_path)
+            if message.file_message:
+                file_path = message.file_message.retrieve_file(assistant_config.output_folder_path)
                 logger.debug(f"File downloaded to {file_path} on run end")
 
     # Callbacks for TaskManagerCallbacks

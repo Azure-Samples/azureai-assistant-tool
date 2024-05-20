@@ -743,9 +743,10 @@ class AssistantConfigDialog(QDialog):
             # Accessing code interpreter files from the tool resources
             if self.assistant_config.tool_resources:
                 code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
-                for file_path, file_id in code_interpreter_files.items():
-                    self.code_interpreter_files[file_path] = file_id
-                    self.codeFileList.addItem(f"{file_path}")
+                if code_interpreter_files:
+                    for file_path, file_id in code_interpreter_files.items():
+                        self.code_interpreter_files[file_path] = file_id
+                        self.codeFileList.addItem(f"{file_path}")
                 self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
                 for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
@@ -1018,7 +1019,7 @@ class ExportAssistantDialog(QDialog):
             shutil.copyfile(user_functions_src, os.path.join(functions_path, "user_functions.py"))
 
         # Read template, replace placeholder, and create main.py
-        template_path = os.path.join("templates", "main_template.py")
+        template_path = os.path.join("templates", "async_stream_template.py")
         try:
             with open(template_path, "r") as template_file:
                 template_content = template_file.read()

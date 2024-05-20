@@ -5,7 +5,7 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
 
-from openai import AzureOpenAI, OpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 from openai.types.beta.threads import (
     ImageFileContentBlock,
     ImageURLContentBlock,
@@ -16,46 +16,62 @@ from openai.types.beta.threads import (
 )
 
 from typing import Union, Optional, List, Tuple
-from PIL import Image, UnidentifiedImageError
-import os, io
+from PIL import Image
+import os, io, asyncio
 
 
-class ConversationMessage:
+class AsyncConversationMessage:
     """
-    A class representing a conversation message.
-
-    :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: OpenAI, AzureOpenAI
-    :param original_message: The original message.
-    :type original_message: Message
+    A class representing a conversation message asynchronously.
     """
-    def __init__(self, 
-                 ai_client : Union[OpenAI, AzureOpenAI],
-                 original_message: Message = None
-    ):
-        self._ai_client = ai_client
-        self._original_message = original_message
+    def __init__(self):
+        self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = None
+        self._original_message = None
         self._text_message = None
         self._file_message = None
         self._image_message = None
-        self._role = original_message.role if original_message else "assistant"
+        self._role = None
         self._sender = None
-        self._assistant_config_manager = AssistantConfigManager.get_instance()
-        if original_message:
-            self._sender = self._get_sender_name(original_message)
-            self._process_message_contents(original_message)
+        self._assistant_config_manager = None
 
-    def _process_message_contents(self, original_message: Message):
+    @classmethod
+    async def create(cls, 
+                     ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI],
+                     original_message: Message = None
+    ) -> 'AsyncConversationMessage':
+        """
+        Creates a new instance of the AsyncConversationMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param original_message: The original message.
+        :type original_message: Message
+
+        :return: A new instance of the AsyncConversationMessage class.
+        :rtype: AsyncConversationMessage
+        """
+        instance = cls()
+        instance._ai_client = ai_client
+        instance._original_message = original_message
+        instance._role = original_message.role if original_message else "assistant"
+        instance._assistant_config_manager = AssistantConfigManager.get_instance()
+        if original_message:
+            instance._sender = instance._get_sender_name(original_message) 
+            await instance._process_message_contents(original_message)
+        return instance
+
+    async def _process_message_contents(self, original_message: Message):
         for content_item in original_message.content:
             if isinstance(content_item, TextContentBlock):
-                citations, file_citations = self._process_text_annotations(content_item)
+                citations, file_citations = await self._process_text_annotations(content_item)
                 content_value = content_item.text.value
                 if citations:
                     content_value += '\n' + '\n'.join(citations)
                 self._text_message = TextMessage(content_value, file_citations)
-
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message = ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
+                self._image_message = await AsyncImageMessage.create(
+                    self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"
+                )
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -64,13 +80,12 @@ class ConversationMessage:
         elif message.role == "user":
             if message.metadata:
                 sender_name = message.metadata.get("chat_assistant", "assistant")
-                # Set the role to assistant if the metadata is set to assistant
                 self._role = "assistant"
             else:
                 sender_name = "user"
             return sender_name
 
-    def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List[FileCitation]]:
+    async def _process_text_annotations(self, content_item: TextContentBlock) -> Tuple[List[str], List[FileCitation]]:
         citations = []
         file_citations = []
 
@@ -81,14 +96,15 @@ class ConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
-                    self._file_message = FileMessage(self._ai_client, file_id, file_name)
+                    self._file_message = await AsyncFileMessage.create(self._ai_client, file_id, file_name)
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
                 elif isinstance(annotation, FileCitationAnnotation):
                     try:
                         file_id = annotation.file_citation.file_id
-                        file_name = self._ai_client.files.retrieve(file_id).filename
+                        file_info = await self._ai_client.files.retrieve(file_id)
+                        file_name = file_info.filename
                     except Exception as e:
                         logger.error(f"Failed to retrieve filename for file_id {file_id}: {e}")
                         file_name = "Unknown_" + str(file_id)
@@ -99,10 +115,10 @@ class ConversationMessage:
 
     @property
     def text_message(self) -> Optional[TextMessage]:
-        """
-        Returns the text message content.
+        """"
+        Returns the text message content of the conversation message.
 
-        :return: The text message content.
+        :return: The text message content of the conversation message.
         :rtype: Optional[TextMessage]
         """
         return self._text_message
@@ -110,39 +126,39 @@ class ConversationMessage:
     @text_message.setter
     def text_message(self, value: TextMessage):
         """
-        Sets the text message content.
+        Sets the text message content of the conversation message.
 
-        :param value: The text message content.
+        :param value: The text message content of the conversation message.
         :type value: TextMessage
         """
         self._text_message = value
 
     @property
-    def file_message(self) -> Optional['FileMessage']:
+    def file_message(self) -> Optional['AsyncFileMessage']:
         """
-        Returns the file message content.
+        Returns the file message content of the conversation message.
 
-        :return: The file message content.
-        :rtype: Optional[FileMessage]
+        :return: The file message content of the conversation message.
+        :rtype: Optional[AsyncFileMessage]
         """
         return self._file_message
 
     @property
-    def image_message(self) -> Optional['ImageMessage']:
+    def image_message(self) -> Optional['AsyncImageMessage']:
         """
-        Returns the image message content.
+        Returns the image message content of the conversation message.
 
-        :return: The image message content.
-        :rtype: Optional[ImageMessage]
+        :return: The image message content of the conversation message.
+        :rtype: Optional[AsyncImageMessage]
         """
         return self._image_message
 
     @property
     def role(self) -> str:
         """
-        Returns the role of the sender.
+        Returns the role of the sender of the conversation message.
 
-        :return: The role of the sender.
+        :return: The role of the sender of the conversation message.
         :rtype: str
         """
         return self._role
@@ -150,13 +166,13 @@ class ConversationMessage:
     @property
     def sender(self) -> str:
         """
-        Returns the sender of the message.
+        Returns the name of the sender of the conversation message.
 
-        :return: The sender of the message.
+        :return: The name of the sender of the conversation message.
         :rtype: str
         """
         return self._sender
-    
+
     @property
     def original_message(self) -> Message:
         """
@@ -168,25 +184,39 @@ class ConversationMessage:
         return self._original_message
 
 
-class FileMessage:
+class AsyncFileMessage:
     """
-    A class representing a file message.
+    A class representing a file message asynchronously.
 
     :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: OpenAI, AzureOpenAI
+    :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
     :param file_id: The file ID.
     :type file_id: str
     :param file_name: The file name.
     :type file_name: str
     """
-    def __init__(self, 
-                 ai_client : Union[OpenAI, AzureOpenAI],
-                 file_id: str, 
-                 file_name: str
-    ):
+    def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
+
+    @classmethod
+    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
+        """
+        Creates a new instance of the AsyncFileMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param file_id: The file ID.
+        :type file_id: str
+        :param file_name: The file name.
+        :type file_name: str
+
+        :return: A new instance of the AsyncFileMessage class.
+        :rtype: AsyncFileMessage
+        """
+        instance = cls(ai_client, file_id, file_name)
+        return instance
 
     @property
     def file_id(self) -> str:
@@ -208,9 +238,9 @@ class FileMessage:
         """
         return self._file_name
 
-    def retrieve_file(self, output_folder_name: str) -> str:
+    async def retrieve_file(self, output_folder_name: str) -> str:
         """
-        Retrieve the file.
+        Asynchronously retrieve the file.
 
         :param output_folder_name: The name of the output folder.
         :type output_folder_name: str
@@ -220,42 +250,63 @@ class FileMessage:
         """
         logger.info(f"Retrieving file with file_id: {self.file_id} to path: {output_folder_name}")
         file_path = f"{output_folder_name}/{self.file_name}"
-        try:
-            if os.path.exists(file_path):
-                logger.info(f"File already exists at {file_path}. Skipping download.")
-                return file_path
+        if os.path.exists(file_path):
+            logger.info(f"File already exists at {file_path}. Skipping download.")
+            return file_path
 
+        try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             logger.info(f"Copying file with file_id: {self.file_id} to path: {file_path}")
 
-            with self._ai_client.with_streaming_response.files.content(self.file_id) as streamed_response:
-                streamed_response.stream_to_file(file_path)
-
+            async with self._ai_client.files.content(self.file_id) as response:
+                data = await response.read()
+                await asyncio.to_thread(self._write_to_file, file_path, data)
             return file_path
+
         except Exception as e:
             logger.error(f"Failed to retrieve file {self.file_id}: {e}")
             return None
+        
+    @staticmethod
+    def _write_to_file(file_path: str, data: bytes):
+        """Write data to a file. This function is intended to run in a separate thread."""
+        with open(file_path, 'wb') as file:
+            file.write(data)
 
 
-class ImageMessage:
+class AsyncImageMessage:
     """
-    A class representing an image message.
+    A class representing an image message asynchronously.
 
     :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: OpenAI, AzureOpenAI
+    :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
     :param file_id: The file ID.
     :type file_id: str
     :param file_name: The file name.
     :type file_name: str
     """
-    def __init__(self,
-                 ai_client : Union[OpenAI, AzureOpenAI],
-                 file_id: str, 
-                 file_name: str
-    ):
+    def __init__(self, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
         self._ai_client = ai_client
         self._file_id = file_id
         self._file_name = file_name
+
+    @classmethod
+    async def create(cls, ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI], file_id: str, file_name: str):
+        """
+        Creates a new instance of the AsyncImageMessage class.
+
+        :param ai_client: The type of AI client to use for the conversation.
+        :type ai_client: Union[AsyncOpenAI, AsyncAzureOpenAI]
+        :param file_id: The file ID.
+        :type file_id: str
+        :param file_name: The file name.
+        :type file_name: str
+
+        :return: A new instance of the AsyncImageMessage class.
+        :rtype: AsyncImageMessage
+        """
+        instance = cls(ai_client, file_id, file_name)
+        return instance
 
     @property
     def file_id(self) -> str:
@@ -277,9 +328,9 @@ class ImageMessage:
         """
         return self._file_name
 
-    def retrieve_image(self, output_folder_name: str) -> str:
+    async def retrieve_image(self, output_folder_name: str) -> str:
         """
-        Retrieve the image synchronously.
+        Asynchronously retrieve the image.
 
         :param output_folder_name: The name of the output folder.
         :type output_folder_name: str
@@ -290,6 +341,7 @@ class ImageMessage:
         logger.info(f"Retrieving image with file_id: {self.file_id} to path: {output_folder_name}")
         file_path = os.path.join(output_folder_name, f"{self.file_id}.png")
 
+        # Check if the file already exists
         if os.path.exists(file_path):
             logger.info(f"File already exists at {file_path}. Skipping download and resize.")
             return file_path
@@ -298,17 +350,21 @@ class ImageMessage:
         os.makedirs(output_folder_name, exist_ok=True)
 
         try:
-            # Get the image content synchronously
-            response = self._ai_client.files.content(self.file_id)
-            image_data = response.read()
-            file_path = self._save_and_resize_image(image_data, file_path)
-            logger.info(f"Resized image saved to {file_path}")
+            # Asynchronously get the image content
+            async with self._ai_client.files.content(self.file_id) as response:
+                image_data = await response.read()
+                # Process and save the image in a separate thread
+                file_path = await asyncio.to_thread(
+                    self._save_and_resize_image, image_data, file_path
+                )
+                logger.info(f"Resized image saved to {file_path}")
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
             return None
 
-    def _save_and_resize_image(self, image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
+    @staticmethod
+    def _save_and_resize_image(image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
         try:
             with Image.open(io.BytesIO(image_data)) as img:
                 new_width = int(img.width * target_width)

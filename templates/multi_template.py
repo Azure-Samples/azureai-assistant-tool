@@ -42,15 +42,15 @@ class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
             assistant_client.process_messages(self.thread_name)
             conversation = self.conversation_thread_client.retrieve_conversation(self.thread_name)
             for message in reversed(conversation.messages):
-                if isinstance(message, TextMessage):
+                if message.text_message:
                     if message.sender == assistant_name:
-                        print(f"{message.sender}: {message.content}")
-                elif isinstance(message, FileMessage):
-                    print(f"{message.sender}: provided file {message.file_name}")
-                    message.retrieve_file(assistant_client.assistant_config.output_folder_path)
-                elif isinstance(message, ImageMessage):
-                    print(f"{message.sender}: provided image {message.file_name}")
-                    message.retrieve_image(assistant_client.assistant_config.output_folder_path)
+                        print(f"{message.sender}: {message.text_message.content}")
+                if message.file_message:
+                    print(f"{message.sender}: provided file {message.file_message.file_name}")
+                    message.file_message.retrieve_file(assistant_client.assistant_config.output_folder_path)
+                if message.image_message:
+                    print(f"{message.sender}: provided image {message.image_message.file_name}")
+                    message.image_message.retrieve_image(assistant_client.assistant_config.output_folder_path)
 
     def on_task_completed(self, task : MultiTask, schedule_id, result):
         print(f"Task {task.id} completed with schedule ID: {schedule_id}. Result: {result}")
