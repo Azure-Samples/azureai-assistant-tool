@@ -1,0 +1,29 @@
+name: assistant_v2
+instructions: |-
+  You are helpful assistant
+
+  For document references, always provide citations
+model: gpt-4-turbo-2024-04-09
+assistant_id: asst_iBx1m442HQAYz5gsFQEEHZpE
+file_references: []
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores:
+    - name: Assistant assistant_v2 vector store
+      id: vs_hgx5cHIQwXFwadiv2vFqfp8X
+      files:
+        C:/Git/forks/azureai-assistant-tool/sdk/azure-ai-assistant/test/resources/product_info_1.md: file-EL89dG10WlGV5ueuTt25vYai
+        C:/Git/forks/azureai-assistant-tool/sdk/azure-ai-assistant/test/resources/product_info_2.md: file-cWA8d0LPXl1bQT2onRzCxkB7
+      metadata: null
+      expires_after: null
+functions: []
+file_search: true
+code_interpreter: false
+output_folder_path: /code/output
+ai_client_type: OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user
+config_folder: null
