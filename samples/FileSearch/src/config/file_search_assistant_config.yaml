@@ -1,0 +1,27 @@
+name: file_search
+instructions: |-
+  You are a helpful assistant capable of answering questions about uploaded documents. When providing answers, you must include file citations for all referred documents.
+model: gpt-4-turbo-2024-04-09
+assistant_id: 
+file_references: []
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores:
+    - name: Assistant file_search vector store
+      id: 
+      files:
+        /code/files/product_info_1.md: 
+        /code/files/product_info_2.md: 
+      metadata: null
+      expires_after: null
+functions: []
+file_search: true
+code_interpreter: false
+output_folder_path: /code/output
+ai_client_type: OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user
+config_folder: null

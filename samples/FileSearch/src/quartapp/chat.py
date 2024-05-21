@@ -6,12 +6,10 @@ from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_message import AsyncConversationMessage
+from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 import azure.identity.aio
 
 from quart import Blueprint, jsonify, request, Response, render_template, current_app
-from opentelemetry import trace
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from promptflow.tracing import start_trace
 
 import asyncio
 import json, os
@@ -56,10 +54,6 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
 async def read_config(assistant_name):
     config_path = f"config/{assistant_name}_assistant_config.yaml"
     try:
-        # Log the current directory and its contents
-        current_directory = os.getcwd()
-        directory_contents = os.listdir(current_directory)
-
         # Attempt to read the configuration file
         current_app.logger.info(f"Reading assistant configuration from {config_path}")
         with open(config_path, "r") as file:
@@ -72,28 +66,9 @@ async def read_config(assistant_name):
         current_app.logger.error(f"An error occurred: {e}")
         return None
 
-def setup_app_insights():
-    current_app.logger.info("Setup app insights")
-
-    from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
-
-    # Configure Azure Monitor as the Exporter
-    trace_exporter = AzureMonitorTraceExporter(
-        connection_string="InstrumentationKey=f4a52e2b-483d-4d6f-bb4a-c46c305d2409;IngestionEndpoint=https://swedencentral-0.in.applicationinsights.azure.com/;ApplicationId=588fa1ec-14dc-4eaf-8ac3-822cb8f9342f"
-        #os.getenv('APPINSIGHTS_CONNECTION_STRING')
-    )
-
-    # Add the Azure exporter to the tracer provider
-    trace.get_tracer_provider().add_span_processor(
-        SimpleSpanProcessor(trace_exporter)
-    )
-
 @bp.before_app_serving
 async def configure_assistant_client():
-    #start_trace()
-    #setup_app_insights()
-    #config = await read_config("PetTravelPlanChatAssistant")
-    config = await read_config("assistant_v2")
+    config = await read_config("file_search")
     client_args = {}
     if config:
         if os.getenv("OPENAI_API_KEY"):
@@ -128,6 +103,9 @@ async def configure_assistant_client():
                     default_credential, "https://cognitiveservices.azure.com/.default"
                 )
 
+        # Create an instance of the AssistantConfigManager to save the updated assistant configuration to config folder once assistant client is initialized
+        assistant_config_manager = AssistantConfigManager.get_instance('config')
+
         # Create a new message queue for this session
         message_queue = asyncio.Queue()
         
@@ -138,6 +116,12 @@ async def configure_assistant_client():
         current_app.logger.info(f"Initializing AsyncAssistantClient with callbacks, api_version: {api_version}")
 
         bp.assistant_client = await AsyncAssistantClient.from_yaml(config, callbacks=callbacks, **client_args)
+
+        current_app.logger.info(f"Assistant client id: {bp.assistant_client.assistant_config.assistant_id}")
+        current_app.logger.info(f"Assistant tool resources: {bp.assistant_client.assistant_config.tool_resources.to_dict()}")
+
+        # Save the assistant configuration to the config folder
+        assistant_config_manager.save_config(bp.assistant_client.name)
 
         ai_client_type = AsyncAIClientType[bp.assistant_client.assistant_config.ai_client_type]
         bp.conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
