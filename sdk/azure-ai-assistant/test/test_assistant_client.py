@@ -15,7 +15,8 @@ from pathlib import Path
 
 
 RESOURCES_PATH = Path(__file__).parent / 'resources'
-MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4-1106-preview')
+MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4o')
+CLIENT_TYPE = os.environ.get('AI_CLIENT_TYPE', 'AZURE_OPEN_AI')
 
 def generate_test_config(updates=None):
     """
@@ -33,7 +34,7 @@ def generate_test_config(updates=None):
         "file_search": False,
         "code_interpreter": False,
         "output_folder_path": "output",
-        "ai_client_type": "OPEN_AI"
+        "ai_client_type": CLIENT_TYPE
     }
 
     if updates:
@@ -55,7 +56,6 @@ def test_assistant_client_init():
 
     client = AssistantClient(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -67,7 +67,6 @@ def test_assistant_client_from_json():
 
     client = AssistantClient.from_json(config_json)
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -80,7 +79,6 @@ def test_assistant_client_sync_from_cloud():
     client = AssistantClient.from_json(config_json)
     client = client.sync_from_cloud()
     assert client.name == "assistant_test"
-    assert client._ai_client_type == AIClientType.OPEN_AI
     assert client._ai_client is not None
     assert client._callbacks is not None
     assert client._functions == {}
@@ -221,7 +219,7 @@ def test_assistant_client_create_thread_and_process_message():
     config_json = json.dumps(config)
 
     client = AssistantClient.from_json(config_json)
-    thread_client = ConversationThreadClient.get_instance(AIClientType.OPEN_AI)
+    thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
     thread_name = thread_client.create_conversation_thread()
     thread_client.create_conversation_thread_message("Hello!", thread_name)
     client.process_messages(thread_name)
