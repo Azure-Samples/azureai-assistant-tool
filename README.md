@@ -123,7 +123,7 @@ Create and assign persistent environment variables for your key and endpoint.
 
 #### ⌨️ Command Line (CLI)
 
-1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-02-15-preview` for assistants.
+1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-05-01-preview` for assistants.
 
 **Windows:**
 Use setx or set command depending on your preference.
