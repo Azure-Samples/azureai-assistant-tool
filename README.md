@@ -7,7 +7,7 @@
 ![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
 </div>
 <div align="center">
-⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightening speed⚡
+⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightning speed⚡
 </div>
 <br>
 
