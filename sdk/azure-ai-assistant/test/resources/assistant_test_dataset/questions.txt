@@ -1,0 +1,51 @@
+Inventory List (inventory.csv)
+Question: What is the price of the HD Monitor?
+Expected Answer: The price of the HD Monitor is $199.99.
+
+Question: How many units of the Gaming Keyboard are in stock?
+Expected Answer: There are 80 units of the Gaming Keyboard in stock.
+
+Question: What is the average review rating for the Noise Cancelling Headphones?
+Expected Answer: The average review rating for the Noise Cancelling Headphones is 4.8.
+
+Question: Provide a description for the Action Camera.
+Expected Answer: The Action Camera is a 4K action camera with a waterproof case.
+
+Customer Orders (orders.csv)
+Question: What is the order status of Order ID 1006?
+Expected Answer: The order status of Order ID 1006 is Delivered.
+
+Question: How many Wireless Chargers were purchased by William Harris?
+Expected Answer: William Harris purchased 3 Wireless Chargers.
+
+Question: On what date was Order ID 1015 placed?
+Expected Answer: Order ID 1015 was placed on 2024-05-15.
+
+Question: Which product did Laura Garcia purchase?
+Expected Answer: Laura Garcia purchased the Noise Cancelling Headphones.
+
+Customer Reviews (reviews.csv)
+Question: What rating did John Smith give to the Wireless Mouse?
+Expected Answer: John Smith gave the Wireless Mouse a rating of 4.
+
+Question: Who reviewed the Smart Thermostat and what was the rating?
+Expected Answer: The Smart Thermostat was reviewed by Ethan Young, who gave it a rating of 5.
+
+Question: Provide the review text for the Digital Photo Frame.
+Expected Answer: The review text for the Digital Photo Frame is: "Photo frame is good, but app is buggy."
+
+Question: On what date did David Lee review the Webcam?
+Expected Answer: David Lee reviewed the Webcam on 2024-05-07.
+
+Sales Data (sales.csv)
+Question: How many units of the Robot Vacuum were sold on 2024-05-18?
+Expected Answer: 3 units of the Robot Vacuum were sold on 2024-05-18.
+
+Question: What was the total revenue for the Smartphone on 2024-05-08?
+Expected Answer: The total revenue for the Smartphone on 2024-05-08 was $2799.96.
+
+Question: In which region were the most units of the USB Hub sold?
+Expected Answer: The most units of the USB Hub were sold in North America.
+
+Question: What was the total revenue generated from the sale of the Smart Light Bulb on 2024-05-14?
+Expected Answer: The total revenue generated from the sale of the Smart Light Bulb on 2024-05-14 was $299.80.

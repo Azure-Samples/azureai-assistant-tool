@@ -1,0 +1,162 @@
+[
+    {
+        "ProductID": "1",
+        "ProductName": "Wireless Mouse",
+        "Price": "25.99",
+        "Stock": "150",
+        "AverageRating": "4.5",
+        "Description": "Ergonomic wireless mouse with 2.4 GHz connection."
+    },
+    {
+        "ProductID": "2",
+        "ProductName": "Gaming Keyboard",
+        "Price": "59.99",
+        "Stock": "80",
+        "AverageRating": "4.7",
+        "Description": "Mechanical gaming keyboard with customizable RGB lighting."
+    },
+    {
+        "ProductID": "3",
+        "ProductName": "HD Monitor",
+        "Price": "199.99",
+        "Stock": "60",
+        "AverageRating": "4.3",
+        "Description": "24-inch full HD monitor with HDMI and VGA ports."
+    },
+    {
+        "ProductID": "4",
+        "ProductName": "External Hard Drive",
+        "Price": "89.99",
+        "Stock": "120",
+        "AverageRating": "4.4",
+        "Description": "1TB external hard drive with USB 3.0 support."
+    },
+    {
+        "ProductID": "5",
+        "ProductName": "Laptop Stand",
+        "Price": "29.99",
+        "Stock": "200",
+        "AverageRating": "4.6",
+        "Description": "Adjustable laptop stand with cooling fan."
+    },
+    {
+        "ProductID": "6",
+        "ProductName": "Webcam",
+        "Price": "49.99",
+        "Stock": "95",
+        "AverageRating": "4.2",
+        "Description": "1080p HD webcam with built-in microphone."
+    },
+    {
+        "ProductID": "7",
+        "ProductName": "Noise Cancelling Headphones",
+        "Price": "129.99",
+        "Stock": "70",
+        "AverageRating": "4.8",
+        "Description": "Over-ear noise-cancelling headphones with Bluetooth."
+    },
+    {
+        "ProductID": "8",
+        "ProductName": "Smartphone",
+        "Price": "699.99",
+        "Stock": "50",
+        "AverageRating": "4.5",
+        "Description": "Latest model smartphone with 128GB storage."
+    },
+    {
+        "ProductID": "9",
+        "ProductName": "Tablet",
+        "Price": "329.99",
+        "Stock": "40",
+        "AverageRating": "4.4",
+        "Description": "10-inch tablet with 64GB storage and Wi-Fi."
+    },
+    {
+        "ProductID": "10",
+        "ProductName": "Smartwatch",
+        "Price": "199.99",
+        "Stock": "90",
+        "AverageRating": "4.6",
+        "Description": "Fitness smartwatch with heart rate monitor and GPS."
+    },
+    {
+        "ProductID": "11",
+        "ProductName": "Portable Speaker",
+        "Price": "79.99",
+        "Stock": "110",
+        "AverageRating": "4.7",
+        "Description": "Bluetooth portable speaker with 20 hours of battery life."
+    },
+    {
+        "ProductID": "12",
+        "ProductName": "Wireless Charger",
+        "Price": "39.99",
+        "Stock": "140",
+        "AverageRating": "4.3",
+        "Description": "Fast wireless charger with dual charging capability."
+    },
+    {
+        "ProductID": "13",
+        "ProductName": "USB Hub",
+        "Price": "19.99",
+        "Stock": "180",
+        "AverageRating": "4.2",
+        "Description": "4-port USB 3.0 hub with individual power switches."
+    },
+    {
+        "ProductID": "14",
+        "ProductName": "Smart Light Bulb",
+        "Price": "14.99",
+        "Stock": "200",
+        "AverageRating": "4.4",
+        "Description": "Wi-Fi enabled smart light bulb with voice control."
+    },
+    {
+        "ProductID": "15",
+        "ProductName": "Action Camera",
+        "Price": "99.99",
+        "Stock": "55",
+        "AverageRating": "4.5",
+        "Description": "4K action camera with waterproof case."
+    },
+    {
+        "ProductID": "16",
+        "ProductName": "Bluetooth Earbuds",
+        "Price": "59.99",
+        "Stock": "130",
+        "AverageRating": "4.6",
+        "Description": "True wireless Bluetooth earbuds with charging case."
+    },
+    {
+        "ProductID": "17",
+        "ProductName": "Smart Thermostat",
+        "Price": "149.99",
+        "Stock": "65",
+        "AverageRating": "4.7",
+        "Description": "Wi-Fi smart thermostat with energy-saving features."
+    },
+    {
+        "ProductID": "18",
+        "ProductName": "Robot Vacuum",
+        "Price": "299.99",
+        "Stock": "30",
+        "AverageRating": "4.5",
+        "Description": "Smart robot vacuum cleaner with app control."
+    },
+    {
+        "ProductID": "19",
+        "ProductName": "Electric Toothbrush",
+        "Price": "49.99",
+        "Stock": "150",
+        "AverageRating": "4.4",
+        "Description": "Rechargeable electric toothbrush with multiple brushing modes."
+    },
+    {
+        "ProductID": "20",
+        "ProductName": "Digital Photo Frame",
+        "Price": "79.99",
+        "Stock": "75",
+        "AverageRating": "4.3",
+        "Description": "10-inch digital photo frame with Wi-Fi and cloud storage."
+    }
+]

@@ -13,10 +13,18 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 import time
 from pathlib import Path
 
+from promptflow.core import AzureOpenAIModelConfiguration
+from promptflow.evals.evaluators import RelevanceEvaluator
 
 RESOURCES_PATH = Path(__file__).parent / 'resources'
 MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4o')
-CLIENT_TYPE = os.environ.get('AI_CLIENT_TYPE', 'AZURE_OPEN_AI')
+CLIENT_TYPE = os.environ.get('AI_CLIENT_TYPE', 'OPEN_AI')
+
+PROMPTFLOW_CONFIG = AzureOpenAIModelConfiguration(
+    azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.environ.get("AZURE_OPENAI_API_KEY"),
+    azure_deployment=os.environ.get("AZURE_OPENAI_DEPLOYMENT", 'gpt-4o'),
+)
 
 def generate_test_config(updates=None):
     """
@@ -226,4 +234,95 @@ def test_assistant_client_create_thread_and_process_message():
     conversation = thread_client.retrieve_conversation(thread_name)
     last_message = conversation.get_last_text_message(client.assistant_config.name)
     assert last_message is not None
+    client.purge()
+
+def test_assistant_client_relevance_eval_with_file_search():
+    #initialize data
+    file1 = str(RESOURCES_PATH / "assistant_test_dataset/inventory.json")
+    file2 = str(RESOURCES_PATH / "assistant_test_dataset/orders.json")
+    file3 = str(RESOURCES_PATH / "assistant_test_dataset/reviews.json")
+    file4 = str(RESOURCES_PATH / "assistant_test_dataset/sales.json")
+    questions = str(RESOURCES_PATH / "assistant_test_dataset/questions.txt")
+    tool_resources = {
+        "file_search": {
+            "vector_stores": [
+                {
+                    "name": "test_vector_store",
+                    "id": None,
+                    "files": {
+                        file1: None,
+                        file2: None,
+                        file3: None,
+                        file4: None,
+                    },
+                    "metadata": {},
+                    "expires_after": None
+                }
+            ]
+        }
+    }
+    updates = {
+        "tool_resources": tool_resources,
+        "file_search": True
+    }
+
+    #create assistant client
+    config = generate_test_config(updates)
+    config_json = json.dumps(config)
+    client = AssistantClient.from_json(config_json)
+
+    #test assistant was created with all files
+    assert client.assistant_config.file_search == True
+    vs_id = client.assistant_config.tool_resources.file_search_vector_stores[0].id
+    assert vs_id is not None
+    file_id_1 = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file1]
+    file_id_2 = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file2]
+    file_id_3 = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file3]
+    file_id_4 = client.assistant_config.tool_resources.file_search_vector_stores[0].files[file4]
+    assert file_id_1 is not None and file_id_2 is not None and file_id_3 is not None and file_id_4 is not None
+
+    #initialize thread
+    thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
+    thread_name = thread_client.create_conversation_thread()
+
+    #pass assistant questions and eval answers
+    evaluator = RelevanceEvaluator(PROMPTFLOW_CONFIG)
+    with open(questions, 'r') as f:
+        for line in f:
+            if line.startswith("Question:"):
+                #ask question
+                question = line.split(":")[1].strip()
+                thread_client.create_conversation_thread_message(question, thread_name)
+                client.process_messages(thread_name)
+                conversation = thread_client.retrieve_conversation(thread_name)
+                last_message = conversation.get_last_text_message(client.assistant_config.name)
+
+                #get response and citation files
+                response = last_message.content.split("\n")[0].split("[0]")[0].strip()
+                citations = []
+                for citation in last_message.file_citations:
+                    citations.append(str(RESOURCES_PATH / "assistant_test_dataset" /citation.file_name))
+                
+                #evaluate response
+                eval_context = ""
+                for citation in citations:
+                    with open(citation, 'r') as f:
+                        data = json.load(f)
+                        eval_context += json.dumps(data) + "\n"
+                if eval_context == "":
+                    eval_context = "no context available"
+                score = evaluator(
+                    question=question,
+                    answer=response,
+                    context=eval_context,
+                )
+                assert score.get('gpt_relevance') > 0.0
+                
+
+    #clean up
+    client.ai_client.beta.vector_stores.delete(vector_store_id=vs_id)
+    client.ai_client.files.delete(file_id_1)
+    client.ai_client.files.delete(file_id_2)
+    client.ai_client.files.delete(file_id_3)
+    client.ai_client.files.delete(file_id_4)
     client.purge()

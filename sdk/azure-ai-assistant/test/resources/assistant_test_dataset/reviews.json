@@ -1,0 +1,142 @@
+[
+    {
+        "ProductID": "1",
+        "CustomerName": "John Smith",
+        "ReviewRating": "4",
+        "ReviewText": "Great mouse, works well for daily use.",
+        "ReviewDate": "2024-05-02"
+    },
+    {
+        "ProductID": "2",
+        "CustomerName": "Sarah Brown",
+        "ReviewRating": "5",
+        "ReviewText": "Excellent keyboard, very responsive.",
+        "ReviewDate": "2024-05-03"
+    },
+    {
+        "ProductID": "3",
+        "CustomerName": "Emily Davis",
+        "ReviewRating": "4",
+        "ReviewText": "Good monitor but the color could be better.",
+        "ReviewDate": "2024-05-04"
+    },
+    {
+        "ProductID": "4",
+        "CustomerName": "Michael Johnson",
+        "ReviewRating": "5",
+        "ReviewText": "Highly recommend this hard drive!",
+        "ReviewDate": "2024-05-05"
+    },
+    {
+        "ProductID": "5",
+        "CustomerName": "Jessica Wilson",
+        "ReviewRating": "3",
+        "ReviewText": "Stand is okay but the fan is noisy.",
+        "ReviewDate": "2024-05-06"
+    },
+    {
+        "ProductID": "6",
+        "CustomerName": "David Lee",
+        "ReviewRating": "4",
+        "ReviewText": "Webcam quality is decent for the price.",
+        "ReviewDate": "2024-05-07"
+    },
+    {
+        "ProductID": "7",
+        "CustomerName": "Laura Garcia",
+        "ReviewRating": "5",
+        "ReviewText": "Fantastic headphones great sound quality.",
+        "ReviewDate": "2024-05-08"
+    },
+    {
+        "ProductID": "8",
+        "CustomerName": "Daniel Martinez",
+        "ReviewRating": "4",
+        "ReviewText": "Good phone but battery life is short.",
+        "ReviewDate": "2024-05-09"
+    },
+    {
+        "ProductID": "9",
+        "CustomerName": "Emma Thompson",
+        "ReviewRating": "5",
+        "ReviewText": "Tablet is perfect for streaming and browsing.",
+        "ReviewDate": "2024-05-10"
+    },
+    {
+        "ProductID": "10",
+        "CustomerName": "James Anderson",
+        "ReviewRating": "5",
+        "ReviewText": "Smartwatch is very accurate and useful.",
+        "ReviewDate": "2024-05-11"
+    },
+    {
+        "ProductID": "11",
+        "CustomerName": "Olivia Rodriguez",
+        "ReviewRating": "5",
+        "ReviewText": "Speaker has amazing sound and battery life.",
+        "ReviewDate": "2024-05-12"
+    },
+    {
+        "ProductID": "12",
+        "CustomerName": "William Harris",
+        "ReviewRating": "4",
+        "ReviewText": "Works well but a bit slow to charge.",
+        "ReviewDate": "2024-05-13"
+    },
+    {
+        "ProductID": "13",
+        "CustomerName": "Ava Clark",
+        "ReviewRating": "3",
+        "ReviewText": "USB hub works but ports are too close.",
+        "ReviewDate": "2024-05-14"
+    },
+    {
+        "ProductID": "14",
+        "CustomerName": "Isabella Lewis",
+        "ReviewRating": "4",
+        "ReviewText": "Good light bulb easy to set up.",
+        "ReviewDate": "2024-05-15"
+    },
+    {
+        "ProductID": "15",
+        "CustomerName": "Mia Walker",
+        "ReviewRating": "5",
+        "ReviewText": "Great camera for outdoor activities.",
+        "ReviewDate": "2024-05-16"
+    },
+    {
+        "ProductID": "16",
+        "CustomerName": "Noah Allen",
+        "ReviewRating": "4",
+        "ReviewText": "Earbuds fit well but sound could be better.",
+        "ReviewDate": "2024-05-17"
+    },
+    {
+        "ProductID": "17",
+        "CustomerName": "Ethan Young",
+        "ReviewRating": "5",
+        "ReviewText": "Smart thermostat is very convenient.",
+        "ReviewDate": "2024-05-18"
+    },
+    {
+        "ProductID": "18",
+        "CustomerName": "Lucas King",
+        "ReviewRating": "4",
+        "ReviewText": "Vacuum works well but sometimes gets stuck.",
+        "ReviewDate": "2024-05-19"
+    },
+    {
+        "ProductID": "19",
+        "CustomerName": "Sophia Wright",
+        "ReviewRating": "5",
+        "ReviewText": "Toothbrush is fantastic cleans thoroughly.",
+        "ReviewDate": "2024-05-20"
+    },
+    {
+        "ProductID": "20",
+        "CustomerName": "Alexander Scott",
+        "ReviewRating": "4",
+        "ReviewText": "Photo frame is good but app is buggy.",
+        "ReviewDate": "2024-05-21"
+    }
+]

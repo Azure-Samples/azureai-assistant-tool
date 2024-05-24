@@ -1,0 +1,142 @@
+[
+    {
+        "ProductID": "1",
+        "DateOfSale": "2024-05-01",
+        "UnitsSold": "10",
+        "TotalRevenue": "259.90",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "2",
+        "DateOfSale": "2024-05-02",
+        "UnitsSold": "5",
+        "TotalRevenue": "299.95",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "3",
+        "DateOfSale": "2024-05-03",
+        "UnitsSold": "8",
+        "TotalRevenue": "1599.92",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "4",
+        "DateOfSale": "2024-05-04",
+        "UnitsSold": "12",
+        "TotalRevenue": "1079.88",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "5",
+        "DateOfSale": "2024-05-05",
+        "UnitsSold": "15",
+        "TotalRevenue": "449.85",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "6",
+        "DateOfSale": "2024-05-06",
+        "UnitsSold": "7",
+        "TotalRevenue": "349.93",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "7",
+        "DateOfSale": "2024-05-07",
+        "UnitsSold": "9",
+        "TotalRevenue": "1169.91",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "8",
+        "DateOfSale": "2024-05-08",
+        "UnitsSold": "4",
+        "TotalRevenue": "2799.96",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "9",
+        "DateOfSale": "2024-05-09",
+        "UnitsSold": "6",
+        "TotalRevenue": "1979.94",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "10",
+        "DateOfSale": "2024-05-10",
+        "UnitsSold": "11",
+        "TotalRevenue": "2199.89",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "11",
+        "DateOfSale": "2024-05-11",
+        "UnitsSold": "10",
+        "TotalRevenue": "799.90",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "12",
+        "DateOfSale": "2024-05-12",
+        "UnitsSold": "14",
+        "TotalRevenue": "559.86",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "13",
+        "DateOfSale": "2024-05-13",
+        "UnitsSold": "18",
+        "TotalRevenue": "359.82",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "14",
+        "DateOfSale": "2024-05-14",
+        "UnitsSold": "20",
+        "TotalRevenue": "299.80",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "15",
+        "DateOfSale": "2024-05-15",
+        "UnitsSold": "6",
+        "TotalRevenue": "599.94",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "16",
+        "DateOfSale": "2024-05-16",
+        "UnitsSold": "13",
+        "TotalRevenue": "779.87",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "17",
+        "DateOfSale": "2024-05-17",
+        "UnitsSold": "5",
+        "TotalRevenue": "749.95",
+        "Region": "Europe"
+    },
+    {
+        "ProductID": "18",
+        "DateOfSale": "2024-05-18",
+        "UnitsSold": "3",
+        "TotalRevenue": "899.97",
+        "Region": "Asia"
+    },
+    {
+        "ProductID": "19",
+        "DateOfSale": "2024-05-19",
+        "UnitsSold": "17",
+        "TotalRevenue": "849.83",
+        "Region": "North America"
+    },
+    {
+        "ProductID": "20",
+        "DateOfSale": "2024-05-20",
+        "UnitsSold": "8",
+        "TotalRevenue": "639.92",
+        "Region": "Europe"
+    }
+]
