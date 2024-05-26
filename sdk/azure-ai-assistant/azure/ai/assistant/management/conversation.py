@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.message import ConversationMessage, TextMessage
+from azure.ai.assistant.management.message import ConversationMessage, TextMessage, ImageMessage
 
 from openai.types.beta.threads import Message
 from openai import AzureOpenAI, OpenAI
@@ -81,3 +81,24 @@ class Conversation:
             if message.sender == sender and message.text_message is not None:
                 return message.text_message
         return None
+    
+    @property
+    def image_messages(self) -> List[ImageMessage]:
+        """
+        Returns the list of image message contents in the conversation.
+
+        :return: The list of image message contents in the conversation.
+        :rtype: List[ImageMessage]
+        """
+        return [message.image_message for message in self._messages if message.image_message is not None]
+    
+    def contains_image_file_id(self, file_id: str) -> bool:
+        """
+        Checks if the list of image messages contains a specific file ID.
+
+        :param file_id: The file ID to check.
+        :type file_id: str
+        :return: True if the file ID is found, False otherwise.
+        :rtype: bool
+        """
+        return any(image_message.file_id == file_id for image_message in self.image_messages)

@@ -53,7 +53,8 @@ class CustomListWidget(QListWidget):
         context_menu = QMenu(self)
         attach_file_search_action = context_menu.addAction("Attach File for File Search")
         attach_file_code_action = context_menu.addAction("Attach File for Code Interpreter")
-        
+        attach_image_action = context_menu.addAction("Attach Image File")
+
         current_item = self.currentItem()
         remove_file_menu = None
         if current_item:
@@ -62,7 +63,7 @@ class CustomListWidget(QListWidget):
                 remove_file_menu = context_menu.addMenu("Remove File")
                 for file_info in self.itemToFileMap[row]:
                     actual_file_path = file_info['file_path']
-                    tool_type = file_info['tools'][0]['type']
+                    tool_type = file_info['tools'][0]['type'] if file_info['tools'] else "Image"
 
                     file_label = f"{os.path.basename(actual_file_path)} ({tool_type})"
                     action = remove_file_menu.addAction(file_label)
@@ -74,14 +75,20 @@ class CustomListWidget(QListWidget):
             self.attach_file_to_selected_item("file_search")
         elif selected_action == attach_file_code_action:
             self.attach_file_to_selected_item("code_interpreter")
+        elif selected_action == attach_image_action:
+            self.attach_file_to_selected_item(None, is_image=True)
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
             self.remove_specific_file_from_selected_item(file_info, row)
 
-    def attach_file_to_selected_item(self, mode):
+    def attach_file_to_selected_item(self, mode, is_image=False):
         """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
-        file_path, _ = file_dialog.getOpenFileName(self, "Select File")
+        if is_image:
+            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.xpm *.jpg)")
+        else:
+            file_path, _ = file_dialog.getOpenFileName(self, "Select File")
+
         if file_path:
             current_item = self.currentItem()
             if current_item:
@@ -89,12 +96,12 @@ class CustomListWidget(QListWidget):
                 if row not in self.itemToFileMap:
                     self.itemToFileMap[row] = []
 
-                self.itemToFileMap[row].append({
+                file_info = {
                     "file_id": None,  # This will be updated later
                     "file_path": file_path,
-                    "tools": [{"type": mode}]  # Store the tool type for later use
-                })
-
+                    "tools": [] if is_image else [{"type": mode}]  # No tools for image files
+                }
+                self.itemToFileMap[row].append(file_info)
                 self.update_item_icon(current_item, self.itemToFileMap[row])
 
     def remove_specific_file_from_selected_item(self, file_info, row):
@@ -138,7 +145,7 @@ class CustomListWidget(QListWidget):
                 })
             return attachments
         return []
-    
+
     def set_attachments_for_selected_item(self, attachments):
         """Set the attachments for the currently selected item."""
         current_item = self.currentItem()
