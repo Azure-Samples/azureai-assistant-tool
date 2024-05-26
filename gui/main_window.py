@@ -389,6 +389,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.debug(f"process_input: attachments updated: {attachments}")
             self.conversation_sidebar.set_attachments_for_selected_thread(attachments)
 
+            conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
+            self.update_conversation_messages(conversation)
+            
             for assistant_name in assistants:
                 # Signal the start of processing
                 self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
@@ -421,6 +424,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             new_thread_name = "Scheduled_" + new_thread_name
         unique_thread_title = self.conversation_thread_clients[self.active_ai_client_type].set_conversation_thread_name(new_thread_name, thread_name)
         return unique_thread_title
+
+    def update_conversation_messages(self, conversation):
+        self.conversation_view_clear_signal.update_signal.emit()
+        self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
 
     # Callbacks for ConversationSidebarCallbacks
     def on_listening_started(self):
@@ -471,13 +478,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         if run_status == "in_progress" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
-            self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+            self.update_conversation_messages(conversation)
 
         elif run_status == "completed" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is completed, conversation updated")
-            self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+            self.update_conversation_messages(conversation)
 
             if self.conversation_sidebar.is_listening:
                 self.speech_input_handler.start_listening_from_mic()
@@ -489,9 +494,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # failed state is terminal state, so update all messages in conversation view after the run has ended
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
-
-        self.conversation_view_clear_signal.update_signal.emit()
-        self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+        self.update_conversation_messages(conversation)
 
     def on_run_cancelled(self, assistant_name, run_identifier, run_end_time):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")
