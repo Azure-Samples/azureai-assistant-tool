@@ -111,7 +111,9 @@ class ConversationInputView(QTextEdit):
         image_thumbnail.save(buffer, "PNG")
         base64_data = buffer.data().toBase64().data().decode()
         html = f'<img src="data:image/png;base64,{base64_data}" alt="{file_path}" />'
-        self.insertHtml(html)
+        
+        cursor = self.textCursor()
+        cursor.insertHtml(html)
         self.image_file_paths[file_path] = html
 
     def check_for_deleted_images(self, html_before: str, html_after: str):

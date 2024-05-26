@@ -188,6 +188,9 @@ class CustomListWidget(QListWidget):
                 row = self.row(current_item)
                 item_text = current_item.text()
                 self.takeItem(row)
+                # delete the attachments for the deleted item
+                if row in self.itemToFileMap:
+                    del self.itemToFileMap[row]
                 self.itemDeleted.emit(item_text)
         else:
             super().keyPressEvent(event)

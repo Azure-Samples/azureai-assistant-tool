@@ -16,8 +16,8 @@ from openai.types.beta.threads import (
 )
 
 from typing import Union, Optional, List, Tuple
-from PIL import Image, UnidentifiedImageError
-import os, io
+from PIL import Image
+import os, io, base64
 
 
 class ConversationMessage:
@@ -276,6 +276,39 @@ class ImageMessage:
         :rtype: str
         """
         return self._file_name
+
+    def get_image_base64(self, target_width: float = 0.5, target_height: float = 0.5) -> str:
+        """
+        Retrieve the image as a base64 encoded string after resizing it.
+
+        :param target_width: The target width as a fraction of the original width.
+        :type target_width: float
+        :param target_height: The target height as a fraction of the original height.
+        :type target_height: float
+
+        :return: The base64 encoded string of the resized image.
+        :rtype: str
+        """
+        logger.info(f"Retrieving and resizing image with file_id: {self.file_id} as base64 encoded string")
+        try:
+            # Get the image content synchronously
+            response = self._ai_client.files.content(self.file_id)
+            image_data = response.read()
+            
+            with Image.open(io.BytesIO(image_data)) as img:
+                new_width = int(img.width * target_width)
+                new_height = int(img.height * target_height)
+                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                buffer = io.BytesIO()
+                # Save the resized image in PNG format to the buffer
+                resized_img.save(buffer, format="PNG")
+                img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            return img_base64
+        except Exception as e:
+            logger.error(f"Unexpected error during image base64 encoding {self.file_id}: {e}")
+            return None
 
     def retrieve_image(self, output_folder_name: str) -> str:
         """
