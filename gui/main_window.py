@@ -31,7 +31,22 @@ from gui.assistant_client_manager import AssistantClientManager
 from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
 from gui.conversation import ConversationView
-from gui.signals import ConversationAppendChunkSignal, AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
+from gui.signals import (
+    ConversationAppendChunkSignal,
+    AppendConversationSignal,
+    ConversationViewClear,
+    StartProcessingSignal,
+    SpeechSynthesisCompleteSignal,
+    StartStatusAnimationSignal,
+    StopProcessingSignal,
+    StopStatusAnimationSignal,
+    UpdateConversationTitleSignal,
+    UserInputSendSignal,
+    UserInputSignal,
+    ErrorSignal,
+    ConversationAppendMessagesSignal,
+    ConversationAppendImageSignal
+)
 from gui.utils import init_system_assistant
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -158,6 +173,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal = ErrorSignal()
         self.conversation_view_clear_signal = ConversationViewClear()
         self.conversation_append_messages_signal = ConversationAppendMessagesSignal()
+        self.conversation_append_image_signal = ConversationAppendImageSignal()
         self.conversation_append_chunk_signal = ConversationAppendChunkSignal()
 
         # Connect the signals to slots (methods)
@@ -173,6 +189,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
         self.conversation_view_clear_signal.update_signal.connect(self.conversation_view.conversationView.clear)
         self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_messages)
+        self.conversation_append_image_signal.append_signal.connect(self.conversation_view.append_image)
         self.conversation_append_chunk_signal.append_signal.connect(self.conversation_view.append_message_chunk)
 
     def initialize_ui_layout(self):
@@ -391,7 +408,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
             self.update_conversation_messages(conversation)
-            
+
             for assistant_name in assistants:
                 # Signal the start of processing
                 self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
@@ -428,6 +445,20 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def update_conversation_messages(self, conversation):
         self.conversation_view_clear_signal.update_signal.emit()
         self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+
+    def add_image_to_selected_thread(self, image_path):
+        attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
+        attachments.append({
+            "file_name": os.path.basename(image_path),
+            "file_path": image_path,
+            "tools": []  # No specific tools for images
+        })
+        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments)
+
+    def remove_image_from_selected_thread(self, image_path):
+        attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
+        attachments = [att for att in attachments if att["file_path"] != image_path]
+        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments)
 
     # Callbacks for ConversationSidebarCallbacks
     def on_listening_started(self):

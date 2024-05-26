@@ -4,17 +4,18 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette
-from PySide6.QtCore import Qt, QUrl
-
-import html, os, re, subprocess, sys
-import base64
-from typing import List
-
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
+from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette, QImage
+from PySide6.QtCore import Qt, QUrl, QMimeData, QIODevice, QBuffer
+from bs4 import BeautifulSoup
+
+import html, os, re, subprocess, sys, tempfile
+import base64, random, time
+from typing import List
 
 
 class ConversationInputView(QTextEdit):
@@ -24,6 +25,7 @@ class ConversationInputView(QTextEdit):
         super().__init__(parent)
         self.main_window = main_window  # Store a reference to the main window
         self.setInitialPlaceholderText()
+        self.image_file_paths = {}  # Dictionary to track image file paths
 
     def setInitialPlaceholderText(self):
         self.setText(self.PLACEHOLDER_TEXT)
@@ -39,8 +41,23 @@ class ConversationInputView(QTextEdit):
         if self.toPlainText() == self.PLACEHOLDER_TEXT and not event.text().isspace():
             self.clear()
 
+        cursor = self.textCursor()
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            # Check if the cursor is positioned at an image
+            cursor_pos = cursor.position()
+            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+            if cursor.charFormat().isImageFormat():
+                logger.debug("Image found at cursor position, deleting image...")
+                html_before = self.toHtml()
+                cursor.removeSelectedText()
+                html_after = self.toHtml()
+                self.check_for_deleted_images(html_before, html_after)
+            else:
+                # Let the parent class handle other delete/backspace operations
+                cursor.setPosition(cursor_pos)
+                super().keyPressEvent(event)
         # Check if Enter key is pressed
-        if event.key() == Qt.Key_Return and not event.modifiers():
+        elif event.key() == Qt.Key_Return and not event.modifiers():
             # Call on_user_input on the main window reference
             self.main_window.on_user_input_complete(self.toPlainText())
             self.clear()
@@ -52,8 +69,16 @@ class ConversationInputView(QTextEdit):
             # Let the parent class handle all other key events
             super().keyPressEvent(event)
 
-    def insertFromMimeData(self, mimeData):
-        if mimeData.hasText():
+    def insertFromMimeData(self, mimeData: QMimeData):
+        if mimeData.hasImage():
+            image = QImage(mimeData.imageData())
+            temp_dir = tempfile.gettempdir()
+            mime_file_name = self.generate_unique_filename("image.png")
+            temp_file_path = os.path.join(temp_dir, mime_file_name)
+            image.save(temp_file_path)
+            self.add_image_thumbnail(image, temp_file_path)
+            self.main_window.add_image_to_selected_thread(temp_file_path)
+        elif mimeData.hasText():
             text = mimeData.text()
             # Convert URL to local file path
             fileUrl = QUrl(text)
@@ -71,6 +96,39 @@ class ConversationInputView(QTextEdit):
             else:
                 # If it's not a file URL, proceed with the default paste operation
                 super().insertFromMimeData(mimeData)
+        else:
+            super().insertFromMimeData(mimeData)
+
+    def generate_unique_filename(self, base_name):
+        name, ext = os.path.splitext(base_name)
+        unique_name = f"{name}_{int(time.time())}_{random.randint(1000, 9999)}{ext}"
+        return unique_name
+
+    def add_image_thumbnail(self, image: QImage, file_path: str):
+        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio)  # Resize to 100x100 pixels
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image_thumbnail.save(buffer, "PNG")
+        base64_data = buffer.data().toBase64().data().decode()
+        html = f'<img src="data:image/png;base64,{base64_data}" alt="{file_path}" />'
+        self.insertHtml(html)
+        self.image_file_paths[file_path] = html
+
+    def check_for_deleted_images(self, html_before: str, html_after: str):
+        soup_before = BeautifulSoup(html_before, 'html.parser')
+        soup_after = BeautifulSoup(html_after, 'html.parser')
+
+        file_paths_before = {img['alt'] for img in soup_before.find_all('img') if 'alt' in img.attrs}
+        file_paths_after = {img['alt'] for img in soup_after.find_all('img') if 'alt' in img.attrs}
+
+        # Identify which images are missing
+        missing_file_paths = file_paths_before - file_paths_after
+
+        # Remove missing images from tracked paths and attachments
+        for file_path in missing_file_paths:
+            if file_path in self.image_file_paths:
+                del self.image_file_paths[file_path]
+                self.main_window.remove_image_from_selected_thread(file_path)
 
     def mouseReleaseEvent(self, event):
         cursor = self.cursorForPosition(event.pos())
@@ -243,14 +301,14 @@ class ConversationView(QWidget):
                 # Synchronously retrieve and process the image
                 image_path = image_message.retrieve_image(self.file_path)
                 if image_path:
-                    self.append_image(image_path, message.sender)
+                    self.append_image(image_path)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
         return encoded_string
 
-    def append_image(self, image_path, assistant_name):
+    def append_image(self, image_path):
         base64_image = self.convert_image_to_base64(image_path)
         # Move cursor to the end for each insertion
         cursor = self.conversationView.textCursor()

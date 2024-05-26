@@ -26,6 +26,9 @@ class ConversationViewClear(QObject):
 class ConversationAppendMessagesSignal(QObject):
     append_signal = Signal(list)
 
+class ConversationAppendImageSignal(QObject):
+    append_signal = Signal(str)
+
 class ConversationAppendChunkSignal(QObject):
     append_signal = Signal(str, str, bool)
 
