@@ -17,8 +17,7 @@ from openai.types.beta.threads import (
 )
 
 from typing import Union, Optional, List, Tuple
-from PIL import Image
-import os, io, asyncio, base64
+import os, asyncio, base64
 
 
 class AsyncConversationMessage:

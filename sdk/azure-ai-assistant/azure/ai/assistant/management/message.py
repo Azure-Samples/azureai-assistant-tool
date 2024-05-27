@@ -17,8 +17,7 @@ from openai.types.beta.threads import (
 )
 
 from typing import Union, Optional, List, Tuple
-from PIL import Image
-import os, io, base64
+import os, base64
 
 
 class ConversationMessage:
@@ -39,6 +38,7 @@ class ConversationMessage:
         self._text_message = None
         self._file_message = None
         self._image_message = None
+        self._image_urls = []
         self._role = original_message.role if original_message else "assistant"
         self._sender = None
         self._assistant_config_manager = AssistantConfigManager.get_instance()
@@ -57,6 +57,9 @@ class ConversationMessage:
 
             elif isinstance(content_item, ImageFileContentBlock):
                 self._image_message = ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
+
+            elif isinstance(content_item, ImageURLContentBlock):
+                self._image_urls.append(content_item.image_url.url)
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -137,6 +140,16 @@ class ConversationMessage:
         :rtype: Optional[ImageMessage]
         """
         return self._image_message
+
+    @property
+    def image_urls(self) -> List[str]:
+        """
+        Returns the list of image URLs.
+
+        :return: The list of image URLs.
+        :rtype: List[str]
+        """
+        return self._image_urls
 
     @property
     def role(self) -> str:

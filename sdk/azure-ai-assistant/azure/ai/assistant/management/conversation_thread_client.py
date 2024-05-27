@@ -5,6 +5,7 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.conversation import Conversation
 from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.message_utils import _extract_image_urls
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
@@ -239,6 +240,16 @@ class ConversationThreadClient:
                     "text": message
                 }
             ]
+
+            image_urls = _extract_image_urls(message)
+            for image_url in image_urls:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_url,
+                        "detail": "high"
+                    }
+                })
 
             if image_attachments:
                 # Retrieve the conversation to check if the image file is already included

@@ -186,9 +186,9 @@ class ClickableTextEdit(QTextEdit):
             subprocess.call(["open", file_path])
 
     def find_urls(self, text):
-        url_pattern = r'https?://\S+'
+        url_pattern = r'\b(https?://[^\s)]+)'
         for match in re.finditer(url_pattern, text):
-            yield (match.group(0), match.start(), match.end())
+            yield (match.group(1), match.start(1), match.end(1))
 
 
 class ConversationView(QWidget):
@@ -377,13 +377,13 @@ class ConversationView(QWidget):
         self.conversationView.update()
 
     def format_urls(self, text):
-        # Regular expression to match URLs
-        url_pattern = r'(https?://\S+)'
+        # Regular expression to match URLs, ensuring parentheses are handled correctly
+        url_pattern = r'((https?://[^\s)]+))'
         url_regex = re.compile(url_pattern)
 
         # Replace URLs with HTML anchor tags
         def replace_with_link(match):
-            url = match.group(0)
+            url = match.group(1)
             return f'<a href="{url}" style="color:blue;">{url}</a>'
 
         return url_regex.sub(replace_with_link, text)

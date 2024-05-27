@@ -1,10 +1,15 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import io
+import io, re
 from PIL import Image
 from azure.ai.assistant.management.logger_module import logger
 
+
+def _extract_image_urls(message: str) -> list:
+    urls = re.findall(r'(https?://\S+)', message)
+    image_urls = [url for url in urls if url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+    return image_urls
 
 def _resize_image(image_data: bytes, target_width: float, target_height: float) -> bytes:
     try:
