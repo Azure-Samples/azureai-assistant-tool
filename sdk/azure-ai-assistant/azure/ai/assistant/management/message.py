@@ -4,7 +4,7 @@
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
-from message_utils import _resize_image, _save_image
+from azure.ai.assistant.management.message_utils import _resize_image, _save_image
 
 from openai import AzureOpenAI, OpenAI
 from openai.types.beta.threads import (
