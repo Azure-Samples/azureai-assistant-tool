@@ -241,7 +241,6 @@ class ConversationThreadClient:
             ]
 
             if image_attachments:
-
                 # Retrieve the conversation to check if the image file is already included
                 conversation = self.retrieve_conversation(thread_name)
                 for image_attachment in image_attachments:

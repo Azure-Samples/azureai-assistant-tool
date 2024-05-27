@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
+from message_utils import _resize_image, _save_image
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from openai.types.beta.threads import (
@@ -17,7 +18,7 @@ from openai.types.beta.threads import (
 
 from typing import Union, Optional, List, Tuple
 from PIL import Image
-import os, io, asyncio
+import os, io, asyncio, base64
 
 
 class AsyncConversationMessage:
@@ -328,6 +329,34 @@ class AsyncImageMessage:
         """
         return self._file_name
 
+    async def get_image_base64(self, target_width: float = 0.5, target_height: float = 0.5) -> str:
+        """
+        Asynchronously retrieve the image as a base64 encoded string after resizing it.
+
+        :param target_width: The target width as a fraction of the original width.
+        :type target_width: float
+        :param target_height: The target height as a fraction of the original height.
+        :type target_height: float
+
+        :return: The base64 encoded string of the resized image.
+        :rtype: str
+        """
+        logger.info(f"Retrieving and resizing image with file_id: {self.file_id} as base64 encoded string")
+        try:
+            # Asynchronously get the image content
+            async with self._ai_client.files.content(self.file_id) as response:
+                image_data = await response.read()
+                # Resize the image in a separate thread
+                resized_image_data = await asyncio.to_thread(
+                    _resize_image, image_data, target_width, target_height
+                )
+                img_base64 = base64.b64encode(resized_image_data).decode('utf-8')
+                
+            return img_base64
+        except Exception as e:
+            logger.error(f"Unexpected error during image base64 encoding {self.file_id}: {e}")
+            return None
+
     async def retrieve_image(self, output_folder_name: str) -> str:
         """
         Asynchronously retrieve the image.
@@ -354,24 +383,12 @@ class AsyncImageMessage:
             async with self._ai_client.files.content(self.file_id) as response:
                 image_data = await response.read()
                 # Process and save the image in a separate thread
-                file_path = await asyncio.to_thread(
-                    self._save_and_resize_image, image_data, file_path
+                resized_image_data = await asyncio.to_thread(
+                    _resize_image, image_data, 0.5, 0.5
                 )
+                await asyncio.to_thread(_save_image, resized_image_data, file_path)
                 logger.info(f"Resized image saved to {file_path}")
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
-            return None
-
-    @staticmethod
-    def _save_and_resize_image(image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
-        try:
-            with Image.open(io.BytesIO(image_data)) as img:
-                new_width = int(img.width * target_width)
-                new_height = int(img.height * target_height)
-                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                resized_img.save(file_path)
-            return file_path
-        except Exception as e:
-            logger.error(f"Error processing image: {e}")
             return None

@@ -203,10 +203,16 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
                 conversation = await self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
                 for message in reversed(conversation.messages):
-                    if message.role == "user":
-                        self._messages.append({"role": "user", "content": message.text_message.content})
-                    if message.role == "assistant":
-                        self._messages.append({"role": "assistant", "content": message.text_message.content})
+                    content = []
+                    if message.text_message:
+                        content.append({"type": "text", "text": message.text_message.content})
+                    if message.image_message:
+                        img_base64 = await message.image_message.get_image_base64()
+                        if img_base64:
+                            img_str = f"data:image/jpeg;base64,{img_base64}"
+                            content.append({"type": "image_url", "image_url": {"url": img_str}})
+                    if content:
+                        self._messages.append({"role": message.role, "content": content})
             elif user_request:
                 self._messages.append({"role": "user", "content": user_request})
 

@@ -229,10 +229,30 @@ class AsyncConversationThreadClient:
         :type timeout: float, optional
         """
         try:
-
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            attachments = await self._update_message_attachments(thread_id, attachments) if attachments is not None else []
+            attachments, image_attachments = await self._update_message_attachments(thread_id, attachments) if attachments is not None else []
+
+            content = [
+                {
+                    "type": "text",
+                    "text": message
+                }
+            ]
+
+            if image_attachments:
+                # Retrieve the conversation to check if the image file is already included
+                conversation = await self.retrieve_conversation(thread_name)
+                for image_attachment in image_attachments:
+                    # if image attachment is not already in the conversation, add it
+                    if not conversation.contains_image_file_id(image_attachment["file_id"]):
+                        content.append({
+                            "type": "image_file",
+                            "image_file": {
+                                "file_id": image_attachment["file_id"],
+                                "detail": "high"
+                            }
+                        })
 
             if attachments:
                 # Create the message with the attachments
@@ -241,7 +261,7 @@ class AsyncConversationThreadClient:
                     role=role,
                     metadata=metadata,
                     attachments=attachments,
-                    content=message,
+                    content=content,
                     timeout=timeout
                 )
             else:
@@ -250,7 +270,7 @@ class AsyncConversationThreadClient:
                     thread_id,
                     role=role,
                     metadata=metadata,
-                    content=message,
+                    content=content,
                     timeout=timeout
                 )
 
@@ -271,6 +291,7 @@ class AsyncConversationThreadClient:
                 await self._ai_client.files.delete(file_id=attachment['file_id'])
 
             all_updated_attachments = []
+            image_attachments = []
             for attachment in new_attachments:
                 file_name = attachment['file_name']
                 file_id = attachment.get('file_id')
@@ -278,20 +299,29 @@ class AsyncConversationThreadClient:
                 tools = attachment.get('tools', [])
 
                 if file_id is None:
-                    file_object = await self._ai_client.files.create(file=open(file_path, "rb"), purpose='assistants')
-                    new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
-                    self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])
-                    all_updated_attachments.append(new_attachment)
+                    if not tools:  # This is an image file
+                        file_object = await self._ai_client.files.create(file=open(file_path, "rb"), purpose='vision')
+                        new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
+                        image_attachments.append(new_attachment)
+                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])  # Add image attachment to thread config
+                    else:  # This is a tool file
+                        file_object = await self._ai_client.files.create(file=open(file_path, "rb"), purpose='assistants')
+                        new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
+                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])
+                        all_updated_attachments.append(new_attachment)
                 else:
                     current_attachment = existing_attachments_by_id.get(file_id, {})
                     if not current_attachment or current_attachment['tools'] != tools:
                         current_attachment['tools'] = tools
                         self._thread_config.update_attachment_in_thread(thread_id, current_attachment)
-                    all_updated_attachments.append(current_attachment)
+                    if not tools:  # Image file
+                        image_attachments.append(current_attachment)
+                    else:  # Tool file
+                        all_updated_attachments.append(current_attachment)
 
-            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments)
+            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments + image_attachments)
             updated_attachments = [{'file_id': att['file_id'], 'tools': att['tools']} for att in all_updated_attachments]
-            return updated_attachments
+            return updated_attachments, image_attachments
         except Exception as e:
             logger.error(f"Failed to update attachments for thread {thread_id}: {str(e)}")
             raise
@@ -338,12 +368,12 @@ class AsyncConversationThreadClient:
             logger.error(f"Failed to retrieve threads: {e}")
             raise EngineError(f"Failed to retrieve threads: {e}")
 
-    def get_config(self) -> dict:
+    def get_config(self) -> ConversationThreadConfig:
         """
         Retrieves the threads config.
 
         :return: The threads config.
-        :rtype: dict
+        :rtype: ConversationThreadConfig
         """
         try:
             return self._thread_config

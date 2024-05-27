@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
+from message_utils import _resize_image, _save_image
 
 from openai import AzureOpenAI, OpenAI
 from openai.types.beta.threads import (
@@ -295,15 +296,8 @@ class ImageMessage:
             response = self._ai_client.files.content(self.file_id)
             image_data = response.read()
             
-            with Image.open(io.BytesIO(image_data)) as img:
-                new_width = int(img.width * target_width)
-                new_height = int(img.height * target_height)
-                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-                buffer = io.BytesIO()
-                # Save the resized image in PNG format to the buffer
-                resized_img.save(buffer, format="PNG")
-                img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            resized_image_data = _resize_image(image_data, target_width, target_height)
+            img_base64 = base64.b64encode(resized_image_data).decode('utf-8')
             
             return img_base64
         except Exception as e:
@@ -334,21 +328,10 @@ class ImageMessage:
             # Get the image content synchronously
             response = self._ai_client.files.content(self.file_id)
             image_data = response.read()
-            file_path = self._save_and_resize_image(image_data, file_path)
+            resized_image_data = _resize_image(image_data, 0.5, 0.5)
+            _save_image(resized_image_data, file_path)
             logger.info(f"Resized image saved to {file_path}")
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
-            return None
-
-    def _save_and_resize_image(self, image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
-        try:
-            with Image.open(io.BytesIO(image_data)) as img:
-                new_width = int(img.width * target_width)
-                new_height = int(img.height * target_height)
-                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                resized_img.save(file_path)
-            return file_path
-        except Exception as e:
-            logger.error(f"Error processing image: {e}")
             return None
