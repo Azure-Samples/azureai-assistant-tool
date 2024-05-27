@@ -791,7 +791,7 @@ class AssistantConfigDialog(QDialog):
                 self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
-                self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 10))
+                self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
