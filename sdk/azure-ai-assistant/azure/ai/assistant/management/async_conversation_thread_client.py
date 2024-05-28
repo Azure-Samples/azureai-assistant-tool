@@ -231,7 +231,10 @@ class AsyncConversationThreadClient:
         try:
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            attachments, image_attachments = await self._update_message_attachments(thread_id, attachments) if attachments is not None else []
+            if attachments is not None:
+                attachments, image_attachments = await self._update_message_attachments(thread_id, attachments)
+            else:
+                attachments, image_attachments = [], []
 
             content = [
                 {

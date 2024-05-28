@@ -161,7 +161,7 @@ class CustomListWidget(QListWidget):
         for thread in threads:
             item = QListWidgetItem(thread['thread_name'])
             self.addItem(item)
-            thread_tooltip_text = "You can add/remove files by right-clicking this item. NOTE: ChatAssistant will not be able to access the files."
+            thread_tooltip_text = "You can add/remove files by right-clicking this item."
             item.setToolTip(thread_tooltip_text)
 
             # Get attachments from the thread data
@@ -484,7 +484,7 @@ class ConversationSidebar(QWidget):
             logger.debug(f"Total time taken to create a new conversation thread: {end_time - start_time} seconds")
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
-            thread_tooltip_text = f"You can add/remove files by right-clicking this item. NOTE: ChatAssistant will not be able to access the files."
+            thread_tooltip_text = f"You can add/remove files by right-clicking this item."
             new_item.setToolTip(thread_tooltip_text)
 
             if not is_scheduled_task:
