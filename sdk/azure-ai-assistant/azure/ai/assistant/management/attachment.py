@@ -36,6 +36,11 @@ class AttachmentTool:
             "type": self.type.value
         }
 
+    def __eq__(self, other):
+        if isinstance(other, AttachmentTool):
+            return self.type == other.type
+        return False
+
     def __str__(self):
         return f"AttachmentTool: {self.type.name}"
 
@@ -168,6 +173,13 @@ class Attachment:
         :rtype: Optional[AttachmentTool]
         """
         return self._tool
+
+    def __eq__(self, other):
+        if isinstance(other, Attachment):
+            return (self.file_path == other.file_path and
+                    self.attachment_type == other.attachment_type and
+                    self.tool == other.tool)
+        return False
 
     def __str__(self):
         return f"Attachment: {self.file_name} ({self.attachment_type.name}) with tool: {self.tool}"

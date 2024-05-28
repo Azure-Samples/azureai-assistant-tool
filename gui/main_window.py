@@ -404,7 +404,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             attachments = [Attachment.from_dict(att_dict) for att_dict in attachments_dicts]
             thread_client.create_conversation_thread_message(user_input, thread_name, attachments=attachments, timeout=self.connection_timeout)
             thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
-            attachments_dicts = thread_client.get_config().get_attachments_of_thread(thread_id)
+            updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+            attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
             logger.debug(f"process_input: attachments updated: {attachments_dicts}")
             self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
 

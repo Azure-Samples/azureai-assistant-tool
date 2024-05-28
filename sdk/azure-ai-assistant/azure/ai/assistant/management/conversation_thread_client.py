@@ -294,13 +294,13 @@ class ConversationThreadClient:
     def _update_message_attachments(self, thread_id: str, new_attachments: List[Attachment]) -> Tuple[List[dict], List[Attachment]]:
         try:
             existing_attachments = self._thread_config.get_attachments_of_thread(thread_id)
-            existing_attachments_by_id = {att['file_id']: att for att in existing_attachments if att['file_id']}
+            existing_attachments_by_id = {att.file_id: att for att in existing_attachments if att.file_id}
             new_file_ids = {att.file_id for att in new_attachments if att.file_id}
-            attachments_to_remove = [att for att in existing_attachments if att['file_id'] not in new_file_ids]
+            attachments_to_remove = [att for att in existing_attachments if att.file_id not in new_file_ids]
 
             for attachment in attachments_to_remove:
-                self._thread_config.remove_attachment_from_thread(thread_id, attachment['file_id'])
-                self._ai_client.files.delete(file_id=attachment['file_id'])
+                self._thread_config.remove_attachment_from_thread(thread_id, attachment.file_id)
+                self._ai_client.files.delete(file_id=attachment.file_id)
 
             all_updated_attachments = []
             image_attachments = []
@@ -313,28 +313,24 @@ class ConversationThreadClient:
                 if file_id is None:
                     if attachment_type == AttachmentType.IMAGE_FILE and tool is None:  # This is a plain image file
                         file_object = self._ai_client.files.create(file=open(file_path, "rb"), purpose='vision')
-                        new_attachment = Attachment(file_path=file_path, attachment_type=AttachmentType.IMAGE_FILE)
-                        new_attachment.file_id = file_object.id
-                        image_attachments.append(new_attachment)
-                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment.to_dict()])  # Add image attachment to thread config
+                        attachment.file_id = file_object.id
+                        image_attachments.append(attachment)
+                        self._thread_config.add_attachments_to_thread(thread_id, [attachment])  # Add image attachment to thread config
                     else:  # This is a tool file
                         file_object = self._ai_client.files.create(file=open(file_path, "rb"), purpose='assistants')
-                        new_attachment = Attachment(file_path=file_path, attachment_type=attachment_type, tool=tool)
-                        new_attachment.file_id = file_object.id
-                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment.to_dict()])
-                        all_updated_attachments.append(new_attachment)
+                        attachment.file_id = file_object.id
+                        self._thread_config.add_attachments_to_thread(thread_id, [attachment])
+                        all_updated_attachments.append(attachment)
                 else:
-                    current_attachment_dict = existing_attachments_by_id.get(file_id, {})
-                    current_attachment = Attachment.from_dict(current_attachment_dict)
-                    if not current_attachment_dict or current_attachment_dict['tools'] != ([tool.to_dict()] if tool else []):
-                        current_attachment_dict['tools'] = [tool.to_dict()] if tool else []
-                        self._thread_config.update_attachment_in_thread(thread_id, current_attachment_dict)
+                    current_attachment = existing_attachments_by_id.get(file_id)
+                    if current_attachment and current_attachment != attachment:
+                        self._thread_config.update_attachment_in_thread(thread_id, current_attachment)
                     if attachment_type == AttachmentType.IMAGE_FILE and tool is None:  # Image file
                         image_attachments.append(current_attachment)
                     else:  # Tool file
                         all_updated_attachments.append(current_attachment)
 
-            self._thread_config.set_attachments_of_thread(thread_id, [att.to_dict() for att in all_updated_attachments + image_attachments])
+            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments + image_attachments)
             updated_attachments = [{'file_id': att.file_id, 'tools': [att.tool.to_dict()] if att.tool else []} for att in all_updated_attachments]
             return updated_attachments, image_attachments
         except Exception as e:
