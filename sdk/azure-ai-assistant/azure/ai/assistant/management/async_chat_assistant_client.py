@@ -211,6 +211,9 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                         if img_base64:
                             img_str = f"data:image/jpeg;base64,{img_base64}"
                             content.append({"type": "image_url", "image_url": {"url": img_str}})
+                    if message.image_urls:
+                        for image_url in message.image_urls:
+                            content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
                     if content:
                         self._messages.append({"role": message.role, "content": content})
             elif user_request:

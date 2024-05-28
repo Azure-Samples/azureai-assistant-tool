@@ -30,6 +30,7 @@ class AsyncConversationMessage:
         self._text_message = None
         self._file_message = None
         self._image_message = None
+        self._image_urls = []
         self._role = None
         self._sender = None
         self._assistant_config_manager = None
@@ -72,6 +73,8 @@ class AsyncConversationMessage:
                 self._image_message = await AsyncImageMessage.create(
                     self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"
                 )
+            elif isinstance(content_item, ImageURLContentBlock):
+                self._image_urls.append(content_item.image_url.url)
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -152,6 +155,16 @@ class AsyncConversationMessage:
         :rtype: Optional[AsyncImageMessage]
         """
         return self._image_message
+
+    @property
+    def image_urls(self) -> List[str]:
+        """
+        Returns the list of image URLs.
+
+        :return: The list of image URLs.
+        :rtype: List[str]
+        """
+        return self._image_urls
 
     @property
     def role(self) -> str:
