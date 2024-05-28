@@ -1,9 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.conversation import Conversation
+from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.message_utils import _extract_image_urls
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -14,7 +15,7 @@ from openai import AzureOpenAI, OpenAI
 
 from openai.types.beta.threads import Message
 
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 import threading
 
 
@@ -207,11 +208,11 @@ class ConversationThreadClient:
         return ConversationMessage(self._ai_client, original_message)
 
     def create_conversation_thread_message(
-            self, 
+            self,
             message: str,
             thread_name: str,
             role: Optional[str] = "user",
-            attachments: Optional[list] = None,
+            attachments: Optional[List[Attachment]] = None,
             timeout: Optional[float] = None,
             metadata: Optional[dict] = None
         ) -> None:
@@ -225,14 +226,14 @@ class ConversationThreadClient:
         :param role: The role of the message sender. Default is "user".
         :type role: str, optional
         :param attachments: The list of attachments to add to the message.
-        :type attachments: list, optional
+        :type attachments: List[Attachment], optional
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: float, optional
         """
         try:
             # Handle file updates and get file IDs
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
-            attachments, image_attachments = self._update_message_attachments(thread_id, attachments) if attachments is not None else ([], [])
+            updated_attachments, image_attachments = self._update_message_attachments(thread_id, attachments) if attachments is not None else ([], [])
 
             content = [
                 {
@@ -256,11 +257,11 @@ class ConversationThreadClient:
                 conversation = self.retrieve_conversation(thread_name)
                 for image_attachment in image_attachments:
                     # if image attachment is not already in the conversation, add it
-                    if not conversation.contains_image_file_id(image_attachment["file_id"]):
+                    if not conversation.contains_image_file_id(image_attachment.file_id):
                         content.append({
                             "type": "image_file",
                             "image_file": {
-                                "file_id": image_attachment["file_id"],
+                                "file_id": image_attachment.file_id,
                                 "detail": "high"
                             }
                         })
@@ -271,7 +272,7 @@ class ConversationThreadClient:
                     thread_id,
                     role=role,
                     metadata=metadata,
-                    attachments=attachments,
+                    attachments=updated_attachments,
                     content=content,
                     timeout=timeout
                 )
@@ -290,11 +291,11 @@ class ConversationThreadClient:
             logger.error(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}, images: {image_attachments}: {e}")
             raise EngineError(f"Failed to create message: {message} in thread: {thread_id}, files: {attachments}, images: {image_attachments}: {e}")
 
-    def _update_message_attachments(self, thread_id: str, new_attachments: list):
+    def _update_message_attachments(self, thread_id: str, new_attachments: List[Attachment]) -> Tuple[List[dict], List[Attachment]]:
         try:
             existing_attachments = self._thread_config.get_attachments_of_thread(thread_id)
             existing_attachments_by_id = {att['file_id']: att for att in existing_attachments if att['file_id']}
-            new_file_ids = {att['file_id'] for att in new_attachments if att['file_id']}
+            new_file_ids = {att.file_id for att in new_attachments if att.file_id}
             attachments_to_remove = [att for att in existing_attachments if att['file_id'] not in new_file_ids]
 
             for attachment in attachments_to_remove:
@@ -304,34 +305,37 @@ class ConversationThreadClient:
             all_updated_attachments = []
             image_attachments = []
             for attachment in new_attachments:
-                file_name = attachment['file_name']
-                file_id = attachment.get('file_id')
-                file_path = attachment.get('file_path')
-                tools = attachment.get('tools', [])
+                file_id = attachment.file_id
+                file_path = attachment.file_path
+                attachment_type = attachment.attachment_type
+                tool = attachment.tool
 
                 if file_id is None:
-                    if not tools:  # This is an image file
+                    if attachment_type == AttachmentType.IMAGE_FILE and tool is None:  # This is a plain image file
                         file_object = self._ai_client.files.create(file=open(file_path, "rb"), purpose='vision')
-                        new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
+                        new_attachment = Attachment(file_path=file_path, attachment_type=AttachmentType.IMAGE_FILE)
+                        new_attachment.file_id = file_object.id
                         image_attachments.append(new_attachment)
-                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])  # Add image attachment to thread config
+                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment.to_dict()])  # Add image attachment to thread config
                     else:  # This is a tool file
                         file_object = self._ai_client.files.create(file=open(file_path, "rb"), purpose='assistants')
-                        new_attachment = {'file_name': file_name, 'file_id': file_object.id, 'file_path': file_path, 'tools': tools}
-                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment])
+                        new_attachment = Attachment(file_path=file_path, attachment_type=attachment_type, tool=tool)
+                        new_attachment.file_id = file_object.id
+                        self._thread_config.add_attachments_to_thread(thread_id, [new_attachment.to_dict()])
                         all_updated_attachments.append(new_attachment)
                 else:
-                    current_attachment = existing_attachments_by_id.get(file_id, {})
-                    if not current_attachment or current_attachment['tools'] != tools:
-                        current_attachment['tools'] = tools
-                        self._thread_config.update_attachment_in_thread(thread_id, current_attachment)
-                    if not tools:  # Image file
+                    current_attachment_dict = existing_attachments_by_id.get(file_id, {})
+                    current_attachment = Attachment.from_dict(current_attachment_dict)
+                    if not current_attachment_dict or current_attachment_dict['tools'] != ([tool.to_dict()] if tool else []):
+                        current_attachment_dict['tools'] = [tool.to_dict()] if tool else []
+                        self._thread_config.update_attachment_in_thread(thread_id, current_attachment_dict)
+                    if attachment_type == AttachmentType.IMAGE_FILE and tool is None:  # Image file
                         image_attachments.append(current_attachment)
                     else:  # Tool file
                         all_updated_attachments.append(current_attachment)
 
-            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments + image_attachments)
-            updated_attachments = [{'file_id': att['file_id'], 'tools': att['tools']} for att in all_updated_attachments]
+            self._thread_config.set_attachments_of_thread(thread_id, [att.to_dict() for att in all_updated_attachments + image_attachments])
+            updated_attachments = [{'file_id': att.file_id, 'tools': [att.tool.to_dict()] if att.tool else []} for att in all_updated_attachments]
             return updated_attachments, image_attachments
         except Exception as e:
             logger.error(f"Failed to update attachments for thread {thread_id}: {str(e)}")

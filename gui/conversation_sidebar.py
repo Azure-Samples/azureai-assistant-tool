@@ -79,13 +79,13 @@ class CustomListWidget(QListWidget):
             self.attach_file_to_selected_item(None, is_image=True)
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
-            self.remove_specific_file_from_selected_item(file_info, row)
+            self.remove_specific_file_from_selected_item(file_info, self.row(current_item))
 
     def attach_file_to_selected_item(self, mode, is_image=False):
         """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
         if is_image:
-            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.xpm *.jpg)")
+            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.jpg *.jpeg *.gif *.webp)")
         else:
             file_path, _ = file_dialog.getOpenFileName(self, "Select File")
 
@@ -99,6 +99,7 @@ class CustomListWidget(QListWidget):
                 file_info = {
                     "file_id": None,  # This will be updated later
                     "file_path": file_path,
+                    "attachment_type": "image_file" if is_image else "document_file",
                     "tools": [] if is_image else [{"type": mode}]  # No tools for image files
                 }
                 self.itemToFileMap[row].append(file_info)
@@ -135,12 +136,14 @@ class CustomListWidget(QListWidget):
                 file_name = os.path.basename(file_path)
                 file_id = file_info.get('file_id', None)
                 tools = file_info.get('tools', [])
+                attachment_type = file_info.get('attachment_type', 'document_file')
 
                 # Create a structured entry for the attachments list including file_path
                 attachments.append({
                     "file_name": file_name,
                     "file_id": file_id,
                     "file_path": file_path,  # Include the full file path for upload or further processing
+                    "attachment_type": attachment_type,
                     "tools": tools
                 })
             return attachments
