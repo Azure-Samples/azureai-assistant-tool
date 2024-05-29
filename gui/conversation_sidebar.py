@@ -161,6 +161,7 @@ class CustomListWidget(QListWidget):
 
     def load_threads_with_attachments(self, threads):
         """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
+        self.clear_files()  # Clear itemToFileMap before loading new threads
         for thread in threads:
             item = QListWidgetItem(thread['thread_name'])
             self.addItem(item)
@@ -541,11 +542,31 @@ class ConversationSidebar(QWidget):
 
     def on_selected_thread_delete(self, thread_name):
         try:
+            # Get current scroll position and selected row
+            current_scroll_position = self.threadList.verticalScrollBar().value()
+            current_row = self.threadList.currentRow()
+
             # Remove the selected thread from the assistant manager
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
             threads_client.delete_conversation_thread(thread_name)
+            threads_client.save_conversation_threads()
+            
+            # Clear and reload the thread list
+            self.threadList.clear()
+            threads = threads_client.get_conversation_threads()
+            self.threadList.load_threads_with_attachments(threads)
+            
+            # Restore the scroll position
+            self.threadList.verticalScrollBar().setValue(current_scroll_position)
+            
+            # Restore the selected row
+            if current_row >= self.threadList.count():
+                current_row = self.threadList.count() - 1
+            self.threadList.setCurrentRow(current_row)
+            
             # Clear the selection in the sidebar
             self.threadList.clearSelection()
+            
             # Clear the conversation area
             self.main_window.conversation_view.conversationView.clear()
         except Exception as e:
