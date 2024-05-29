@@ -407,3 +407,5 @@ class AsyncConversationThreadClient:
         Closes the conversation thread client.
         """
         await self._ai_client.close()
+        # delete the instance for the AI client type, so that a new instance can be recreated
+        del self._instances[self._ai_client_type]

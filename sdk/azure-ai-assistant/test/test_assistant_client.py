@@ -7,6 +7,7 @@ import os
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantConfig, VectorStoreConfig
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 
@@ -222,6 +223,21 @@ def test_assistant_client_create_thread_and_process_message():
     thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
     thread_name = thread_client.create_conversation_thread()
     thread_client.create_conversation_thread_message("Hello!", thread_name)
+    client.process_messages(thread_name)
+    conversation = thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_text_message(client.assistant_config.name)
+    assert last_message is not None
+    client.purge()
+
+def test_assistant_client_create_thread_and_process_message_with_attachment():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = AssistantClient.from_json(config_json)
+    thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
+    thread_name = thread_client.create_conversation_thread()
+    attachment = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment])
     client.process_messages(thread_name)
     conversation = thread_client.retrieve_conversation(thread_name)
     last_message = conversation.get_last_text_message(client.assistant_config.name)
