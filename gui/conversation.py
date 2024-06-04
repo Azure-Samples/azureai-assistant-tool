@@ -70,14 +70,34 @@ class ConversationInputView(QTextEdit):
             super().keyPressEvent(event)
 
     def insertFromMimeData(self, mimeData: QMimeData):
+        IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
         if mimeData.hasImage():
             image = QImage(mimeData.imageData())
-            temp_dir = tempfile.gettempdir()
-            mime_file_name = self.generate_unique_filename("image.png")
-            temp_file_path = os.path.join(temp_dir, mime_file_name)
-            image.save(temp_file_path)
-            self.add_image_thumbnail(image, temp_file_path)
-            self.main_window.add_image_to_selected_thread(temp_file_path)
+            if not image.isNull():
+                logger.debug("Inserting image from clipboard...")
+                temp_dir = tempfile.gettempdir()
+                mime_file_name = self.generate_unique_filename("image.png")
+                temp_file_path = os.path.join(temp_dir, mime_file_name)
+                image.save(temp_file_path)
+                self.add_image_thumbnail(image, temp_file_path)
+                self.main_window.add_image_to_selected_thread(temp_file_path)
+        elif mimeData.hasUrls():
+            logger.debug("Inserting image from URL...")
+            for url in mimeData.urls():
+                if url.isLocalFile():
+                    filePath = url.toLocalFile()
+                    logger.debug(f"Local file path: {filePath}")
+                    if filePath.lower().endswith(IMAGE_FORMATS):
+                        image = QImage(filePath)
+                        if not image.isNull():
+                            self.add_image_thumbnail(image, filePath)
+                            self.main_window.add_image_to_selected_thread(filePath)
+                        else:
+                            logger.error(f"Could not load image from file: {filePath}")
+                    else:
+                        logger.warning(f"Unsupported file type: {filePath}")
+                else:
+                    logger.warning(f"Non-local file URLs are not supported: {url.toString()}")
         elif mimeData.hasText():
             text = mimeData.text()
             # Convert URL to local file path
