@@ -8,7 +8,7 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QMessageBox
 from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette, QImage
 from PySide6.QtCore import Qt, QUrl, QMimeData, QIODevice, QBuffer
 from bs4 import BeautifulSoup
@@ -96,6 +96,7 @@ class ConversationInputView(QTextEdit):
                             logger.error(f"Could not load image from file: {filePath}")
                     else:
                         logger.warning(f"Unsupported file type: {filePath}")
+                        QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
                 else:
                     logger.warning(f"Non-local file URLs are not supported: {url.toString()}")
         elif mimeData.hasText():
