@@ -37,7 +37,7 @@ class ConversationMessage:
         self._original_message = original_message
         self._text_message = None
         self._file_message = None
-        self._image_message = None
+        self._image_messages = []
         self._image_urls = []
         self._role = original_message.role if original_message else "assistant"
         self._sender = None
@@ -56,7 +56,7 @@ class ConversationMessage:
                 self._text_message = TextMessage(content_value, file_citations)
 
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message = ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
+                self._image_messages.append(ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"))
 
             elif isinstance(content_item, ImageURLContentBlock):
                 self._image_urls.append(content_item.image_url.url)
@@ -132,14 +132,14 @@ class ConversationMessage:
         return self._file_message
 
     @property
-    def image_message(self) -> Optional['ImageMessage']:
+    def image_messages(self) -> List['ImageMessage']:
         """
-        Returns the image message content.
+        Returns the list of image messages.
 
         :return: The image message content.
-        :rtype: Optional[ImageMessage]
+        :rtype: List[ImageMessage]
         """
-        return self._image_message
+        return self._image_messages
 
     @property
     def image_urls(self) -> List[str]:

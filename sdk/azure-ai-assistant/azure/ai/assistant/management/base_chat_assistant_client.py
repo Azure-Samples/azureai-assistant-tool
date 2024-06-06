@@ -100,11 +100,12 @@ class BaseChatAssistantClient(BaseAssistantClient):
             content = []
             if message.text_message:
                 content.append({"type": "text", "text": message.text_message.content})
-            if message.image_message:
-                img_base64 = message.image_message.get_image_base64()
-                if img_base64:
-                    img_str = f"data:image/jpeg;base64,{img_base64}"
-                    content.append({"type": "image_url", "image_url": {"url": img_str, "detail": "high"}})
+            if len(message.image_messages) > 0:
+                for image_message in message.image_messages:
+                    img_base64 = image_message.get_image_base64()
+                    if img_base64:
+                        img_str = f"data:image/jpeg;base64,{img_base64}"
+                        content.append({"type": "image_url", "image_url": {"url": img_str, "detail": "high"}})
             if message.image_urls:
                 for image_url in message.image_urls:
                     content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
