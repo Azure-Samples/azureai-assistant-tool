@@ -319,12 +319,12 @@ class ConversationView(QWidget):
                     self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
-            if message.image_message:
-                image_message = message.image_message
-                # Synchronously retrieve and process the image
-                image_path = image_message.retrieve_image(self.file_path)
-                if image_path:
-                    self.append_image(image_path)
+            if len(message.image_messages) > 0:
+                for image_message in message.image_messages:
+                    # Synchronously retrieve and process the image
+                    image_path = image_message.retrieve_image(self.file_path)
+                    if image_path:
+                        self.append_image(image_path)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:
