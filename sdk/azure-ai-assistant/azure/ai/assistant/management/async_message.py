@@ -29,7 +29,7 @@ class AsyncConversationMessage:
         self._original_message = None
         self._text_message = None
         self._file_message = None
-        self._image_message = None
+        self._image_messages = []
         self._image_urls = []
         self._role = None
         self._sender = None
@@ -70,9 +70,10 @@ class AsyncConversationMessage:
                     content_value += '\n' + '\n'.join(citations)
                 self._text_message = TextMessage(content_value, file_citations)
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message = await AsyncImageMessage.create(
+                image_message = await AsyncImageMessage.create(
                     self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"
                 )
+                self._image_messages.append(image_message)
             elif isinstance(content_item, ImageURLContentBlock):
                 self._image_urls.append(content_item.image_url.url)
 
@@ -147,14 +148,14 @@ class AsyncConversationMessage:
         return self._file_message
 
     @property
-    def image_message(self) -> Optional['AsyncImageMessage']:
+    def image_messages(self) -> List['AsyncImageMessage']:
         """
-        Returns the image message content of the conversation message.
+        Returns the list of image message contents of the conversation message.
 
-        :return: The image message content of the conversation message.
-        :rtype: Optional[AsyncImageMessage]
+        :return: The list of image message contents of the conversation message.
+        :rtype: List[AsyncImageMessage]
         """
-        return self._image_message
+        return self._image_messages
 
     @property
     def image_urls(self) -> List[str]:

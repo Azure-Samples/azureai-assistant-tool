@@ -97,14 +97,14 @@ class AsyncConversation:
         return None
     
     @property
-    def image_messages(self) -> List[AsyncImageMessage]:
+    def all_image_messages(self) -> List[List[AsyncImageMessage]]:
         """
         Returns the list of image message contents in the conversation.
 
         :return: The list of image message contents in the conversation.
-        :rtype: List[ImageMessage]
+        :rtype: List[List[AsyncImageMessage]]
         """
-        return [message.image_message for message in self._messages if message.image_message is not None]
+        return [message.image_messages for message in self._messages if len(message.image_messages) > 0]
     
     def contains_image_file_id(self, file_id: str) -> bool:
         """
@@ -115,4 +115,4 @@ class AsyncConversation:
         :return: True if the file ID is found, False otherwise.
         :rtype: bool
         """
-        return any(image_message.file_id == file_id for image_message in self.image_messages)
+        return any(image_message.file_id == file_id for image_messages in self.all_image_messages for image_message in image_messages)
