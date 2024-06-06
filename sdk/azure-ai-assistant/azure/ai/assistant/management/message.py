@@ -134,9 +134,9 @@ class ConversationMessage:
     @property
     def image_messages(self) -> List['ImageMessage']:
         """
-        Returns the list of image messages.
+        Returns the list of image message contents.
 
-        :return: The image message content.
+        :return: The list of image message contents.
         :rtype: List[ImageMessage]
         """
         return self._image_messages

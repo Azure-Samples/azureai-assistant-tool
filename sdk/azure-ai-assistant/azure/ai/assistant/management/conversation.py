@@ -85,9 +85,9 @@ class Conversation:
     @property
     def all_image_messages(self) -> List[List[ImageMessage]]:
         """
-        Returns the list of image message contents in the conversation.
+        Returns the list of all image message contents in the conversation.
 
-        :return: The list of image message contents in the conversation.
+        :return: The list of all image message contents in the conversation.
         :rtype: List[List[ImageMessage]]
         """
         return [message.image_messages for message in self._messages if len(message.image_messages) > 0]
