@@ -82,16 +82,6 @@ class Conversation:
                 return message.text_message
         return None
     
-    @property
-    def all_image_messages(self) -> List[List[ImageMessage]]:
-        """
-        Returns the list of all image message contents in the conversation.
-
-        :return: The list of all image message contents in the conversation.
-        :rtype: List[List[ImageMessage]]
-        """
-        return [message.image_messages for message in self._messages if len(message.image_messages) > 0]
-    
     def contains_image_file_id(self, file_id: str) -> bool:
         """
         Checks if the list of image messages contains a specific file ID.
