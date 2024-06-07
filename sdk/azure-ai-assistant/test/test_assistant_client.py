@@ -17,7 +17,7 @@ from pathlib import Path
 
 RESOURCES_PATH = Path(__file__).parent / 'resources'
 MODEL_ENV_VAR = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4o')
-CLIENT_TYPE = os.environ.get('AI_CLIENT_TYPE', 'AZURE_OPEN_AI')
+CLIENT_TYPE = os.environ.get('AI_CLIENT_TYPE', 'OPEN_AI')
 
 def generate_test_config(updates=None):
     """
@@ -242,4 +242,27 @@ def test_assistant_client_create_thread_and_process_message_with_attachment():
     conversation = thread_client.retrieve_conversation(thread_name)
     last_message = conversation.get_last_text_message(client.assistant_config.name)
     assert last_message is not None
+    client.purge()
+
+def test_assistant_client_create_thread_and_process_message_with_multi_image():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = AssistantClient.from_json(config_json)
+    thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
+    thread_name = thread_client.create_conversation_thread()
+    attachment1 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    attachment2 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment1, attachment2])
+    client.process_messages(thread_name)
+    conversation = thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_message("user")
+    assert last_message is not None
+    assert last_message.image_messages is not None
+    assert len(last_message.image_messages) == 2
+    assert last_message.image_messages[0].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[0].file_id)
+    assert last_message.image_messages[1].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[1].file_id)
+    
     client.purge()
