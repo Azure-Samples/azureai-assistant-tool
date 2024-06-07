@@ -85,26 +85,26 @@ class ConversationInputView(QTextEdit):
             logger.debug("Inserting image from URL...")
             for url in mimeData.urls():
                 if url.isLocalFile():
-                    filePath = url.toLocalFile()
-                    logger.debug(f"Local file path: {filePath}")
-                    if filePath.lower().endswith(IMAGE_FORMATS):
-                        image = QImage(filePath)
+                    file_path = url.toLocalFile()
+                    logger.debug(f"Local file path: {file_path}")
+                    if file_path.lower().endswith(IMAGE_FORMATS):
+                        image = QImage(file_path)
                         if not image.isNull():
-                            self.add_image_thumbnail(image, filePath)
-                            self.main_window.add_image_to_selected_thread(filePath)
+                            self.add_image_thumbnail(image, file_path)
+                            self.main_window.add_image_to_selected_thread(file_path)
                         else:
-                            logger.error(f"Could not load image from file: {filePath}")
+                            logger.error(f"Could not load image from file: {file_path}")
                     else:
-                        logger.warning(f"Unsupported file type: {filePath}")
+                        logger.warning(f"Unsupported file type: {file_path}")
                         QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
                 else:
                     logger.warning(f"Non-local file URLs are not supported: {url.toString()}")
         elif mimeData.hasText():
             text = mimeData.text()
             # Convert URL to local file path
-            fileUrl = QUrl(text)
-            if fileUrl.isLocalFile():
-                file_path = fileUrl.toLocalFile()
+            file_url = QUrl(text)
+            if file_url.isLocalFile():
+                file_path = file_url.toLocalFile()
                 if os.path.isfile(file_path):
                     try:
                         with open(file_path, 'r') as file:
