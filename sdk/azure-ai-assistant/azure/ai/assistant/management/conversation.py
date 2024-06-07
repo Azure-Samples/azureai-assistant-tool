@@ -91,4 +91,4 @@ class Conversation:
         :return: True if the file ID is found, False otherwise.
         :rtype: bool
         """
-        return any(image_message.file_id == file_id for image_messages in self.all_image_messages for image_message in image_messages)
+        return any(image_message.file_id == file_id for message in self.messages for image_message in message.image_messages if image_message is not None)
