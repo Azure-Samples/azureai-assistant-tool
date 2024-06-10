@@ -98,7 +98,7 @@ class ConversationInputView(QTextEdit):
                         logger.warning(f"Unsupported file type: {file_path}")
                         QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
                 else:
-                    logger.warning(f"Non-local file URLs are not supported: {url.toString()}")
+                    super().insertFromMimeData(mimeData)
         elif mimeData.hasText():
             text = mimeData.text()
             # Convert URL to local file path
