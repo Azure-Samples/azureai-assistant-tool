@@ -2,10 +2,11 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.attachment import Attachment
 from azure.ai.assistant.management.logger_module import logger
 
 import json, os
-from typing import Optional
+from typing import Optional, List
 
 
 class ConversationThreadConfig:
@@ -208,13 +209,13 @@ class ConversationThreadConfig:
 
         return self._threads
 
-    def add_attachments_to_thread(self, thread_id, attachments) -> None:
+    def add_attachments_to_thread(self, thread_id: str, attachments: List[Attachment]) -> None:
         """
-        Add attachments to a specific thread. Each attachment is a dictionary with 'file_id' and 'tools'.
+        Add attachments to a specific thread. Each attachment is an instance of Attachment.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
-        :param attachments: A list of attachments to add to the thread.
+        :param attachments: A list of Attachment instances to add to the thread.
         :type attachments: list
         """
         for thread in self._threads:
@@ -225,11 +226,11 @@ class ConversationThreadConfig:
                 # Add new attachments that are not already in the list
                 existing_file_ids = [att['file_id'] for att in thread['attachments']]
                 for new_attachment in attachments:
-                    if new_attachment['file_id'] not in existing_file_ids:
-                        thread['attachments'].append(new_attachment)
+                    if new_attachment.file_id not in existing_file_ids:
+                        thread['attachments'].append(new_attachment.to_dict())
                 break
 
-    def remove_attachment_from_thread(self, thread_id, file_id_to_remove) -> None:
+    def remove_attachment_from_thread(self, thread_id: str, file_id_to_remove: str) -> None:
         """
         Remove a specific attachment from a thread by its file_id.
         
@@ -243,7 +244,7 @@ class ConversationThreadConfig:
                 thread['attachments'] = [att for att in thread.get('attachments', []) if att['file_id'] != file_id_to_remove]
                 break
 
-    def remove_attachments_from_thread(self, thread_id, file_ids_to_remove) -> None:
+    def remove_attachments_from_thread(self, thread_id: str, file_ids_to_remove: List[str]) -> None:
         """
         Remove specific attachments from a thread by their file_id.
         
@@ -257,49 +258,49 @@ class ConversationThreadConfig:
                 thread['attachments'] = [att for att in thread.get('attachments', []) if att['file_id'] not in file_ids_to_remove]
                 break
 
-    def get_attachments_of_thread(self, thread_id) -> list:
+    def get_attachments_of_thread(self, thread_id: str) -> List[Attachment]:
         """
         Get the list of attachments associated with a specific thread.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
 
-        :return: A list of attachments, each containing a file_id and tools.
+        :return: A list of Attachment instances.
         :rtype: list
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                return thread.get('attachments', [])
+                return [Attachment.from_dict(att) for att in thread.get('attachments', [])]
         return []
 
-    def set_attachments_of_thread(self, thread_id, attachments) -> None:
+    def set_attachments_of_thread(self, thread_id: str, attachments: List[Attachment]) -> None:
         """
         Set the attachments for a specific thread.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
-        :param attachments: A list of attachments to set for the thread.
+        :param attachments: A list of Attachment instances to set for the thread.
         :type attachments: list
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                thread['attachments'] = attachments
+                thread['attachments'] = [att.to_dict() for att in attachments]
                 break
 
-    def update_attachment_in_thread(self, thread_id, attachment) -> None:
+    def update_attachment_in_thread(self, thread_id: str, attachment: Attachment) -> None:
         """
         Update an attachment in a specific thread.
         
         :param thread_id: The ID of the thread.
         :type thread_id: str
-        :param attachment: The attachment to update.
-        :type attachment: dict
+        :param attachment: The Attachment instance to update.
+        :type attachment: Attachment
         """
         for thread in self._threads:
             if thread['thread_id'] == thread_id:
-                for att in thread.get('attachments', []):
-                    if att['file_id'] == attachment['file_id']:
-                        att.update(attachment)
+                for i, att in enumerate(thread.get('attachments', [])):
+                    if att['file_id'] == attachment.file_id:
+                        thread['attachments'][i] = attachment.to_dict()
                         break
                 break
 

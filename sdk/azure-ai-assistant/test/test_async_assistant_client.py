@@ -8,7 +8,9 @@ import os
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from test_assistant_client import generate_test_config
+from test_assistant_client import RESOURCES_PATH
 
 
 @pytest.mark.asyncio
@@ -100,5 +102,47 @@ async def test_async_assistant_client_create_thread_and_process_message():
     conversation = await thread_client.retrieve_conversation(thread_name)
     last_message = conversation.get_last_text_message(client.assistant_config.name)
     assert last_message is not None
+    await client.purge()
+    await thread_client.close()
+
+@pytest.mark.asyncio
+async def test_async_assistant_client_create_thread_and_process_message_with_attachment():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = await AsyncAssistantClient.from_json(config_json)
+    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
+    thread_name = await thread_client.create_conversation_thread()
+    attachment = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    await thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment])
+    await client.process_messages(thread_name)
+    conversation = await thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_text_message(client.assistant_config.name)
+    assert last_message is not None
+    await client.purge()
+    await thread_client.close()
+
+@pytest.mark.asyncio
+async def test_assistant_client_create_thread_and_process_message_with_multi_image():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = await AsyncAssistantClient.from_json(config_json)
+    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
+    thread_name = await thread_client.create_conversation_thread()
+    attachment1 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    attachment2 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    await thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment1, attachment2])
+    await client.process_messages(thread_name)
+    conversation = await thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_message("user")
+    assert last_message is not None
+    assert last_message.image_messages is not None
+    assert len(last_message.image_messages) == 2
+    assert last_message.image_messages[0].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[0].file_id)
+    assert last_message.image_messages[1].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[1].file_id)
+    
     await client.purge()
     await thread_client.close()

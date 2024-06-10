@@ -202,11 +202,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             if thread_name:
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
                 conversation = await self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
-                for message in reversed(conversation.messages):
-                    if message.role == "user":
-                        self._messages.append({"role": "user", "content": message.text_message.content})
-                    if message.role == "assistant":
-                        self._messages.append({"role": "assistant", "content": message.text_message.content})
+                self._parse_conversation_messages(conversation.messages)
             elif user_request:
                 self._messages.append({"role": "user", "content": user_request})
 

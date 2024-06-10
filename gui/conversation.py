@@ -4,17 +4,18 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette
-from PySide6.QtCore import Qt, QUrl
-
-import html, os, re, subprocess, sys
-import base64
-from typing import List
-
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QMessageBox
+from PySide6.QtGui import QFont, QTextCursor,QDesktopServices, QMouseEvent, QGuiApplication, QPalette, QImage
+from PySide6.QtCore import Qt, QUrl, QMimeData, QIODevice, QBuffer
+from bs4 import BeautifulSoup
+
+import html, os, re, subprocess, sys, tempfile
+import base64, random, time
+from typing import List
 
 
 class ConversationInputView(QTextEdit):
@@ -24,6 +25,7 @@ class ConversationInputView(QTextEdit):
         super().__init__(parent)
         self.main_window = main_window  # Store a reference to the main window
         self.setInitialPlaceholderText()
+        self.image_file_paths = {}  # Dictionary to track image file paths
 
     def setInitialPlaceholderText(self):
         self.setText(self.PLACEHOLDER_TEXT)
@@ -39,8 +41,23 @@ class ConversationInputView(QTextEdit):
         if self.toPlainText() == self.PLACEHOLDER_TEXT and not event.text().isspace():
             self.clear()
 
+        cursor = self.textCursor()
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            # Check if the cursor is positioned at an image
+            cursor_pos = cursor.position()
+            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+            if cursor.charFormat().isImageFormat():
+                logger.debug("Image found at cursor position, deleting image...")
+                html_before = self.toHtml()
+                cursor.removeSelectedText()
+                html_after = self.toHtml()
+                self.check_for_deleted_images(html_before, html_after)
+            else:
+                # Let the parent class handle other delete/backspace operations
+                cursor.setPosition(cursor_pos)
+                super().keyPressEvent(event)
         # Check if Enter key is pressed
-        if event.key() == Qt.Key_Return and not event.modifiers():
+        elif event.key() == Qt.Key_Return and not event.modifiers():
             # Call on_user_input on the main window reference
             self.main_window.on_user_input_complete(self.toPlainText())
             self.clear()
@@ -52,13 +69,42 @@ class ConversationInputView(QTextEdit):
             # Let the parent class handle all other key events
             super().keyPressEvent(event)
 
-    def insertFromMimeData(self, mimeData):
-        if mimeData.hasText():
+    def insertFromMimeData(self, mimeData: QMimeData):
+        IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+        if mimeData.hasImage():
+            image = QImage(mimeData.imageData())
+            if not image.isNull():
+                logger.debug("Inserting image from clipboard...")
+                temp_dir = tempfile.gettempdir()
+                mime_file_name = self.generate_unique_filename("image.png")
+                temp_file_path = os.path.join(temp_dir, mime_file_name)
+                image.save(temp_file_path)
+                self.add_image_thumbnail(image, temp_file_path)
+                self.main_window.add_image_to_selected_thread(temp_file_path)
+        elif mimeData.hasUrls():
+            logger.debug("Inserting image from URL...")
+            for url in mimeData.urls():
+                if url.isLocalFile():
+                    file_path = url.toLocalFile()
+                    logger.debug(f"Local file path: {file_path}")
+                    if file_path.lower().endswith(IMAGE_FORMATS):
+                        image = QImage(file_path)
+                        if not image.isNull():
+                            self.add_image_thumbnail(image, file_path)
+                            self.main_window.add_image_to_selected_thread(file_path)
+                        else:
+                            logger.error(f"Could not load image from file: {file_path}")
+                    else:
+                        logger.warning(f"Unsupported file type: {file_path}")
+                        QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
+                else:
+                    super().insertFromMimeData(mimeData)
+        elif mimeData.hasText():
             text = mimeData.text()
             # Convert URL to local file path
-            fileUrl = QUrl(text)
-            if fileUrl.isLocalFile():
-                file_path = fileUrl.toLocalFile()
+            file_url = QUrl(text)
+            if file_url.isLocalFile():
+                file_path = file_url.toLocalFile()
                 if os.path.isfile(file_path):
                     try:
                         with open(file_path, 'r') as file:
@@ -71,6 +117,41 @@ class ConversationInputView(QTextEdit):
             else:
                 # If it's not a file URL, proceed with the default paste operation
                 super().insertFromMimeData(mimeData)
+        else:
+            super().insertFromMimeData(mimeData)
+
+    def generate_unique_filename(self, base_name):
+        name, ext = os.path.splitext(base_name)
+        unique_name = f"{name}_{int(time.time())}_{random.randint(1000, 9999)}{ext}"
+        return unique_name
+
+    def add_image_thumbnail(self, image: QImage, file_path: str):
+        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio)  # Resize to 100x100 pixels
+        buffer = QBuffer()
+        buffer.open(QIODevice.WriteOnly)
+        image_thumbnail.save(buffer, "PNG")
+        base64_data = buffer.data().toBase64().data().decode()
+        html = f'<img src="data:image/png;base64,{base64_data}" alt="{file_path}" />'
+        
+        cursor = self.textCursor()
+        cursor.insertHtml(html)
+        self.image_file_paths[file_path] = html
+
+    def check_for_deleted_images(self, html_before: str, html_after: str):
+        soup_before = BeautifulSoup(html_before, 'html.parser')
+        soup_after = BeautifulSoup(html_after, 'html.parser')
+
+        file_paths_before = {img['alt'] for img in soup_before.find_all('img') if 'alt' in img.attrs}
+        file_paths_after = {img['alt'] for img in soup_after.find_all('img') if 'alt' in img.attrs}
+
+        # Identify which images are missing
+        missing_file_paths = file_paths_before - file_paths_after
+
+        # Remove missing images from tracked paths and attachments
+        for file_path in missing_file_paths:
+            if file_path in self.image_file_paths:
+                del self.image_file_paths[file_path]
+                self.main_window.remove_image_from_selected_thread(file_path)
 
     def mouseReleaseEvent(self, event):
         cursor = self.cursorForPosition(event.pos())
@@ -126,9 +207,9 @@ class ClickableTextEdit(QTextEdit):
             subprocess.call(["open", file_path])
 
     def find_urls(self, text):
-        url_pattern = r'https?://\S+'
+        url_pattern = r'\b(https?://[^\s)]+)'
         for match in re.finditer(url_pattern, text):
-            yield (match.group(0), match.start(), match.end())
+            yield (match.group(1), match.start(1), match.end(1))
 
 
 class ConversationView(QWidget):
@@ -238,19 +319,19 @@ class ConversationView(QWidget):
                     self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
-            if message.image_message:
-                image_message = message.image_message
-                # Synchronously retrieve and process the image
-                image_path = image_message.retrieve_image(self.file_path)
-                if image_path:
-                    self.append_image(image_path, message.sender)
+            if len(message.image_messages) > 0:
+                for image_message in message.image_messages:
+                    # Synchronously retrieve and process the image
+                    image_path = image_message.retrieve_image(self.file_path)
+                    if image_path:
+                        self.append_image(image_path)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
         return encoded_string
 
-    def append_image(self, image_path, assistant_name):
+    def append_image(self, image_path):
         base64_image = self.convert_image_to_base64(image_path)
         # Move cursor to the end for each insertion
         cursor = self.conversationView.textCursor()
@@ -317,13 +398,13 @@ class ConversationView(QWidget):
         self.conversationView.update()
 
     def format_urls(self, text):
-        # Regular expression to match URLs
-        url_pattern = r'(https?://\S+)'
+        # Regular expression to match URLs, ensuring parentheses are handled correctly
+        url_pattern = r'((https?://[^\s)]+))'
         url_regex = re.compile(url_pattern)
 
         # Replace URLs with HTML anchor tags
         def replace_with_link(match):
-            url = match.group(0)
+            url = match.group(1)
             return f'<a href="{url}" style="color:blue;">{url}</a>'
 
         return url_regex.sub(replace_with_link, text)

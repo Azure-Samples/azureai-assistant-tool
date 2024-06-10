@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.async_message import AsyncConversationMessage, TextMessage
+from azure.ai.assistant.management.async_message import AsyncConversationMessage, TextMessage, AsyncImageMessage
 
 from openai.types.beta.threads import Message
 from openai import AsyncAzureOpenAI, AsyncOpenAI
@@ -95,3 +95,14 @@ class AsyncConversation:
             if message.sender == sender and message.text_message is not None:
                 return message.text_message
         return None
+    
+    def contains_image_file_id(self, file_id: str) -> bool:
+        """
+        Checks if the list of image messages contains a specific file ID.
+
+        :param file_id: The file ID to check.
+        :type file_id: str
+        :return: True if the file ID is found, False otherwise.
+        :rtype: bool
+        """
+        return any(image_message.file_id == file_id for message in self.messages for image_message in message.image_messages if image_message is not None)

@@ -53,7 +53,8 @@ class CustomListWidget(QListWidget):
         context_menu = QMenu(self)
         attach_file_search_action = context_menu.addAction("Attach File for File Search")
         attach_file_code_action = context_menu.addAction("Attach File for Code Interpreter")
-        
+        attach_image_action = context_menu.addAction("Attach Image File")
+
         current_item = self.currentItem()
         remove_file_menu = None
         if current_item:
@@ -62,7 +63,7 @@ class CustomListWidget(QListWidget):
                 remove_file_menu = context_menu.addMenu("Remove File")
                 for file_info in self.itemToFileMap[row]:
                     actual_file_path = file_info['file_path']
-                    tool_type = file_info['tools'][0]['type']
+                    tool_type = file_info['tools'][0]['type'] if file_info['tools'] else "Image"
 
                     file_label = f"{os.path.basename(actual_file_path)} ({tool_type})"
                     action = remove_file_menu.addAction(file_label)
@@ -74,14 +75,20 @@ class CustomListWidget(QListWidget):
             self.attach_file_to_selected_item("file_search")
         elif selected_action == attach_file_code_action:
             self.attach_file_to_selected_item("code_interpreter")
+        elif selected_action == attach_image_action:
+            self.attach_file_to_selected_item(None, is_image=True)
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
-            self.remove_specific_file_from_selected_item(file_info, row)
+            self.remove_specific_file_from_selected_item(file_info, self.row(current_item))
 
-    def attach_file_to_selected_item(self, mode):
+    def attach_file_to_selected_item(self, mode, is_image=False):
         """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
-        file_path, _ = file_dialog.getOpenFileName(self, "Select File")
+        if is_image:
+            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.jpg *.jpeg *.gif *.webp)")
+        else:
+            file_path, _ = file_dialog.getOpenFileName(self, "Select File")
+
         if file_path:
             current_item = self.currentItem()
             if current_item:
@@ -89,12 +96,13 @@ class CustomListWidget(QListWidget):
                 if row not in self.itemToFileMap:
                     self.itemToFileMap[row] = []
 
-                self.itemToFileMap[row].append({
+                file_info = {
                     "file_id": None,  # This will be updated later
                     "file_path": file_path,
-                    "tools": [{"type": mode}]  # Store the tool type for later use
-                })
-
+                    "attachment_type": "image_file" if is_image else "document_file",
+                    "tools": [] if is_image else [{"type": mode}]  # No tools for image files
+                }
+                self.itemToFileMap[row].append(file_info)
                 self.update_item_icon(current_item, self.itemToFileMap[row])
 
     def remove_specific_file_from_selected_item(self, file_info, row):
@@ -128,17 +136,19 @@ class CustomListWidget(QListWidget):
                 file_name = os.path.basename(file_path)
                 file_id = file_info.get('file_id', None)
                 tools = file_info.get('tools', [])
+                attachment_type = file_info.get('attachment_type', 'document_file')
 
                 # Create a structured entry for the attachments list including file_path
                 attachments.append({
                     "file_name": file_name,
                     "file_id": file_id,
                     "file_path": file_path,  # Include the full file path for upload or further processing
+                    "attachment_type": attachment_type,
                     "tools": tools
                 })
             return attachments
         return []
-    
+
     def set_attachments_for_selected_item(self, attachments):
         """Set the attachments for the currently selected item."""
         current_item = self.currentItem()
@@ -151,10 +161,11 @@ class CustomListWidget(QListWidget):
 
     def load_threads_with_attachments(self, threads):
         """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
+        self.clear_files()  # Clear itemToFileMap before loading new threads
         for thread in threads:
             item = QListWidgetItem(thread['thread_name'])
             self.addItem(item)
-            thread_tooltip_text = "You can add/remove files by right-clicking this item. NOTE: ChatAssistant will not be able to access the files."
+            thread_tooltip_text = "You can add/remove files by right-clicking this item."
             item.setToolTip(thread_tooltip_text)
 
             # Get attachments from the thread data
@@ -181,6 +192,9 @@ class CustomListWidget(QListWidget):
                 row = self.row(current_item)
                 item_text = current_item.text()
                 self.takeItem(row)
+                # delete the attachments for the deleted item
+                if row in self.itemToFileMap:
+                    del self.itemToFileMap[row]
                 self.itemDeleted.emit(item_text)
         else:
             super().keyPressEvent(event)
@@ -474,7 +488,7 @@ class ConversationSidebar(QWidget):
             logger.debug(f"Total time taken to create a new conversation thread: {end_time - start_time} seconds")
             new_item = QListWidgetItem(unique_thread_name)
             self.threadList.addItem(new_item)
-            thread_tooltip_text = f"You can add/remove files by right-clicking this item. NOTE: ChatAssistant will not be able to access the files."
+            thread_tooltip_text = f"You can add/remove files by right-clicking this item."
             new_item.setToolTip(thread_tooltip_text)
 
             if not is_scheduled_task:
@@ -528,11 +542,31 @@ class ConversationSidebar(QWidget):
 
     def on_selected_thread_delete(self, thread_name):
         try:
+            # Get current scroll position and selected row
+            current_scroll_position = self.threadList.verticalScrollBar().value()
+            current_row = self.threadList.currentRow()
+
             # Remove the selected thread from the assistant manager
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
             threads_client.delete_conversation_thread(thread_name)
+            threads_client.save_conversation_threads()
+            
+            # Clear and reload the thread list
+            self.threadList.clear()
+            threads = threads_client.get_conversation_threads()
+            self.threadList.load_threads_with_attachments(threads)
+            
+            # Restore the scroll position
+            self.threadList.verticalScrollBar().setValue(current_scroll_position)
+            
+            # Restore the selected row
+            if current_row >= self.threadList.count():
+                current_row = self.threadList.count() - 1
+            self.threadList.setCurrentRow(current_row)
+            
             # Clear the selection in the sidebar
             self.threadList.clearSelection()
+            
             # Clear the conversation area
             self.main_window.conversation_view.conversationView.clear()
         except Exception as e:

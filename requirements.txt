@@ -6,3 +6,6 @@ PySide6
 
 # Azure Cognitive Services Speech SDK
 azure-cognitiveservices-speech
+
+# Beautiful Soup
+beautifulsoup4

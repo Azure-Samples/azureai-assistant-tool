@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os, time, json
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.attachment import Attachment
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -31,7 +32,22 @@ from gui.assistant_client_manager import AssistantClientManager
 from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
 from gui.conversation import ConversationView
-from gui.signals import ConversationAppendChunkSignal, AppendConversationSignal, ConversationViewClear, StartProcessingSignal, SpeechSynthesisCompleteSignal, StartStatusAnimationSignal, StopProcessingSignal, StopStatusAnimationSignal, UpdateConversationTitleSignal, UserInputSendSignal, UserInputSignal, ErrorSignal, ConversationAppendMessagesSignal
+from gui.signals import (
+    ConversationAppendChunkSignal,
+    AppendConversationSignal,
+    ConversationViewClear,
+    StartProcessingSignal,
+    SpeechSynthesisCompleteSignal,
+    StartStatusAnimationSignal,
+    StopProcessingSignal,
+    StopStatusAnimationSignal,
+    UpdateConversationTitleSignal,
+    UserInputSendSignal,
+    UserInputSignal,
+    ErrorSignal,
+    ConversationAppendMessagesSignal,
+    ConversationAppendImageSignal
+)
 from gui.utils import init_system_assistant
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -158,6 +174,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal = ErrorSignal()
         self.conversation_view_clear_signal = ConversationViewClear()
         self.conversation_append_messages_signal = ConversationAppendMessagesSignal()
+        self.conversation_append_image_signal = ConversationAppendImageSignal()
         self.conversation_append_chunk_signal = ConversationAppendChunkSignal()
 
         # Connect the signals to slots (methods)
@@ -173,6 +190,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
         self.conversation_view_clear_signal.update_signal.connect(self.conversation_view.conversationView.clear)
         self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_messages)
+        self.conversation_append_image_signal.append_signal.connect(self.conversation_view.append_image)
         self.conversation_append_chunk_signal.append_signal.connect(self.conversation_view.append_message_chunk)
 
     def initialize_ui_layout(self):
@@ -344,9 +362,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 thread_name = updated_thread_name
 
             # get files from conversation thread list
-            attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
+            attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
 
-            self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments)
+            self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments_dicts)
             on_user_input_complete_end = time.time()  # End timing after thread starts
             logger.debug(f"Time taken for entering user input: {on_user_input_complete_end - on_user_input_complete_start} seconds")
             self.conversation_view.inputField.clear()
@@ -377,17 +395,22 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             else:
                 return self.conversation_sidebar.threadList.get_current_text()
 
-    def process_input(self, user_input, assistants, thread_name, is_scheduled_task, attachments=None):
+    def process_input(self, user_input, assistants, thread_name, is_scheduled_task, attachments_dicts=None):
         try:
             logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
 
-            # Create message to thread and set attachments
+            # Create message to thread and set attachments list
             thread_client = self.conversation_thread_clients[self.active_ai_client_type]
+            attachments = [Attachment.from_dict(att_dict) for att_dict in attachments_dicts]
             thread_client.create_conversation_thread_message(user_input, thread_name, attachments=attachments, timeout=self.connection_timeout)
             thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
-            attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-            logger.debug(f"process_input: attachments updated: {attachments}")
-            self.conversation_sidebar.set_attachments_for_selected_thread(attachments)
+            updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+            attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
+            logger.debug(f"process_input: attachments updated: {attachments_dicts}")
+            self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
+
+            conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
+            self.update_conversation_messages(conversation)
 
             for assistant_name in assistants:
                 # Signal the start of processing
@@ -421,6 +444,25 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             new_thread_name = "Scheduled_" + new_thread_name
         unique_thread_title = self.conversation_thread_clients[self.active_ai_client_type].set_conversation_thread_name(new_thread_name, thread_name)
         return unique_thread_title
+
+    def update_conversation_messages(self, conversation):
+        self.conversation_view_clear_signal.update_signal.emit()
+        self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+
+    def add_image_to_selected_thread(self, image_path):
+        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
+        attachments_dicts.append({
+            "file_name": os.path.basename(image_path),
+            "file_path": image_path,
+            "attachment_type": "image_file",
+            "tools": []  # No specific tools for images
+        })
+        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
+
+    def remove_image_from_selected_thread(self, image_path):
+        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
+        attachments_dicts = [att for att in attachments_dicts if att["file_path"] != image_path]
+        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
 
     # Callbacks for ConversationSidebarCallbacks
     def on_listening_started(self):
@@ -471,13 +513,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         if run_status == "in_progress" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
-            self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+            self.update_conversation_messages(conversation)
 
         elif run_status == "completed" and conversation.messages:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is completed, conversation updated")
-            self.conversation_view_clear_signal.update_signal.emit()
-            self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+            self.update_conversation_messages(conversation)
 
             if self.conversation_sidebar.is_listening:
                 self.speech_input_handler.start_listening_from_mic()
@@ -489,9 +529,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # failed state is terminal state, so update all messages in conversation view after the run has ended
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
-
-        self.conversation_view_clear_signal.update_signal.emit()
-        self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
+        self.update_conversation_messages(conversation)
 
     def on_run_cancelled(self, assistant_name, run_identifier, run_end_time):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")

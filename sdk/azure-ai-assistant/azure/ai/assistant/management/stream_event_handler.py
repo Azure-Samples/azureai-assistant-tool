@@ -10,6 +10,8 @@ from azure.ai.assistant.management.logger_module import logger
 
 from openai import AssistantEventHandler
 from openai.types.beta.threads import TextDeltaBlock
+from openai.types.beta import AssistantStreamEvent
+from openai.types.beta.assistant_stream_event import ThreadRunFailed, ThreadRunCreated
 from datetime import datetime
 from typing import Optional
 from typing_extensions import override
@@ -56,6 +58,21 @@ class StreamEventHandler(AssistantEventHandler):
         logger.debug(f"on_timeout called")
 
     @override
+    def on_event(self, event : AssistantStreamEvent) -> None:
+        logger.debug(f"on_event called, event: {event}")
+        if isinstance(event, ThreadRunFailed):
+            if event.data.last_error:
+                logger.error(f"last_error: {event.data.last_error.message}")
+                self._parent._callbacks.on_run_failed(self._name, self.current_run.id, str(datetime.now()), event.data.last_error.code, event.data.last_error.message, self._thread_name)
+        if isinstance(event, ThreadRunCreated):
+            logger.info(f"ThreadRunCreated, run_id: {event.data.id}, is_submit_tool_call: {self._is_submit_tool_call}")
+            if self._is_started is False and self._is_submit_tool_call is False:
+                conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
+                user_request = conversation.get_last_text_message("user").content
+                self._parent._callbacks.on_run_start(self._name, event.data.id, str(datetime.now()), user_request)
+                self._is_started = True
+
+    @override
     def on_end(self) -> None:
         logger.info(f"on_end called, run_id: {self.current_run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
         if self._is_submit_tool_call is False:
@@ -86,11 +103,6 @@ class StreamEventHandler(AssistantEventHandler):
     @override
     def on_text_created(self, text) -> None:
         logger.info(f"on_text_created called, text: {text}")
-        if self._is_started is False and self._is_submit_tool_call is False:
-            conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
-            user_request = conversation.get_last_text_message("user").content
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
-            self._is_started = True
 
     @override
     def on_text_delta(self, delta, snapshot):
@@ -103,11 +115,6 @@ class StreamEventHandler(AssistantEventHandler):
     @override
     def on_tool_call_created(self, tool_call):
         logger.info(f"on_tool_call_created called, tool_call: {tool_call}")
-        if self._is_started is False and self._is_submit_tool_call is False:
-            conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
-            user_request = conversation.get_last_text_message("user").content
-            self._parent._callbacks.on_run_start(self._name, self.current_run.id, str(datetime.now()), user_request)
-            self._is_started = True
         if self.current_run.required_action:
             logger.info(f"create, run.required_action.type: {self.current_run.required_action.type}")
 

@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.text_message import TextMessage, FileCitation
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.management.message_utils import _resize_image, _save_image
 
 from openai import AzureOpenAI, OpenAI
 from openai.types.beta.threads import (
@@ -16,8 +17,7 @@ from openai.types.beta.threads import (
 )
 
 from typing import Union, Optional, List, Tuple
-from PIL import Image, UnidentifiedImageError
-import os, io
+import os, base64
 
 
 class ConversationMessage:
@@ -37,7 +37,8 @@ class ConversationMessage:
         self._original_message = original_message
         self._text_message = None
         self._file_message = None
-        self._image_message = None
+        self._image_messages = []
+        self._image_urls = []
         self._role = original_message.role if original_message else "assistant"
         self._sender = None
         self._assistant_config_manager = AssistantConfigManager.get_instance()
@@ -55,7 +56,10 @@ class ConversationMessage:
                 self._text_message = TextMessage(content_value, file_citations)
 
             elif isinstance(content_item, ImageFileContentBlock):
-                self._image_message = ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png")
+                self._image_messages.append(ImageMessage(self._ai_client, content_item.image_file.file_id, f"{content_item.image_file.file_id}.png"))
+
+            elif isinstance(content_item, ImageURLContentBlock):
+                self._image_urls.append(content_item.image_url.url)
 
     def _get_sender_name(self, message: Message) -> str:
         if message.role == "assistant":
@@ -128,14 +132,24 @@ class ConversationMessage:
         return self._file_message
 
     @property
-    def image_message(self) -> Optional['ImageMessage']:
+    def image_messages(self) -> List['ImageMessage']:
         """
-        Returns the image message content.
+        Returns the list of image message contents.
 
-        :return: The image message content.
-        :rtype: Optional[ImageMessage]
+        :return: The list of image message contents.
+        :rtype: List[ImageMessage]
         """
-        return self._image_message
+        return self._image_messages
+
+    @property
+    def image_urls(self) -> List[str]:
+        """
+        Returns the list of image URLs.
+
+        :return: The list of image URLs.
+        :rtype: List[str]
+        """
+        return self._image_urls
 
     @property
     def role(self) -> str:
@@ -277,6 +291,32 @@ class ImageMessage:
         """
         return self._file_name
 
+    def get_image_base64(self, target_width: float = 0.5, target_height: float = 0.5) -> str:
+        """
+        Retrieve the image as a base64 encoded string after resizing it.
+
+        :param target_width: The target width as a fraction of the original width.
+        :type target_width: float
+        :param target_height: The target height as a fraction of the original height.
+        :type target_height: float
+
+        :return: The base64 encoded string of the resized image.
+        :rtype: str
+        """
+        logger.info(f"Retrieving and resizing image with file_id: {self.file_id} as base64 encoded string")
+        try:
+            # Get the image content synchronously
+            response = self._ai_client.files.content(self.file_id)
+            image_data = response.read()
+            
+            resized_image_data = _resize_image(image_data, target_width, target_height)
+            img_base64 = base64.b64encode(resized_image_data).decode('utf-8')
+            
+            return img_base64
+        except Exception as e:
+            logger.error(f"Unexpected error during image base64 encoding {self.file_id}: {e}")
+            return None
+
     def retrieve_image(self, output_folder_name: str) -> str:
         """
         Retrieve the image synchronously.
@@ -301,21 +341,10 @@ class ImageMessage:
             # Get the image content synchronously
             response = self._ai_client.files.content(self.file_id)
             image_data = response.read()
-            file_path = self._save_and_resize_image(image_data, file_path)
+            resized_image_data = _resize_image(image_data, 0.5, 0.5)
+            _save_image(resized_image_data, file_path)
             logger.info(f"Resized image saved to {file_path}")
             return file_path
         except Exception as e:
             logger.error(f"Unexpected error during image processing {self.file_id}: {e}")
-            return None
-
-    def _save_and_resize_image(self, image_data: bytes, file_path: str, target_width: float = 0.5, target_height: float = 0.5) -> str:
-        try:
-            with Image.open(io.BytesIO(image_data)) as img:
-                new_width = int(img.width * target_width)
-                new_height = int(img.height * target_height)
-                resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                resized_img.save(file_path)
-            return file_path
-        except Exception as e:
-            logger.error(f"Error processing image: {e}")
             return None
