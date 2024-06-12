@@ -11,16 +11,21 @@ class ChatClient {
 
     async sendMessage(url) {
         const message = this.messageInput.value.trim();
+        const files = this.fileInput.files;
+
         if (!message) return false;
 
         this.ui.appendUserMessage(message);
 
-        console.log(JSON.stringify({ message }));
-
+        const formData = new FormData();
+        formData.append("message", message);
+        for (const [i, file] of Array.from(files).entries()) {
+            formData.append(`image_${i}`, file);
+        }
+        
         const response = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message })
+            body: formData,
         });
 
         const data = await response.json();

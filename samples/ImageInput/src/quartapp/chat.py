@@ -9,7 +9,7 @@ from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 import azure.identity.aio
 
-from quart import Blueprint, jsonify, request, Response, render_template, current_app
+from quart import Blueprint, jsonify, request, Response, render_template, current_app, formparser
 
 import asyncio
 import json, os
@@ -148,7 +148,11 @@ async def index():
 
 @bp.post("/chat")
 async def start_chat():
-    user_message = await request.get_json()
+    user_message = await request.form
+    current_app.logger.info(f"User message: {user_message}")
+    user_files = await request.files
+    current_app.logger.info(f"User files: {user_files}")
+
     if not hasattr(bp, 'assistant_client'):
         return jsonify({"error": "Assistant client is not initialized"}), 500
 
