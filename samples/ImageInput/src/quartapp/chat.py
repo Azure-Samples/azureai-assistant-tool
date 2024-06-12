@@ -7,12 +7,13 @@ from azure.ai.assistant.management.async_assistant_client_callbacks import Async
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 import azure.identity.aio
 
 from quart import Blueprint, jsonify, request, Response, render_template, current_app, formparser
 
 import asyncio
-import json, os
+import json, os, tempfile, time, random
 
 
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
@@ -65,6 +66,12 @@ async def read_config(assistant_name):
     except Exception as e:
         current_app.logger.error(f"An error occurred: {e}")
         return None
+
+async def generate_unique_filename(base_name):
+        name, ext = os.path.splitext(base_name)
+        unique_name = f"{name}_{int(time.time())}_{random.randint(1000, 9999)}{ext}"
+        current_app.logger.info(f"Generated unique filename: {unique_name}")
+        return unique_name
 
 @bp.before_app_serving
 async def configure_assistant_client():
@@ -149,9 +156,22 @@ async def index():
 @bp.post("/chat")
 async def start_chat():
     user_message = await request.form
-    current_app.logger.info(f"User message: {user_message}")
     user_files = await request.files
+    current_app.logger.info(f"User message: {user_message}")
     current_app.logger.info(f"User files: {user_files}")
+
+    attachments = []
+    temp_dir = tempfile.gettempdir()
+    for key in user_files.keys():
+        file_name = await generate_unique_filename(key)
+        temp_file_path = os.path.join(temp_dir, file_name)
+        await user_files[key].save(temp_file_path)
+        attachments.append(Attachment.from_dict({
+            "file_name": os.path.basename(temp_file_path),
+            "file_path": temp_file_path,
+            "attachment_type": AttachmentType.IMAGE_FILE,
+            "tools": [],
+        }))
 
     if not hasattr(bp, 'assistant_client'):
         return jsonify({"error": "Assistant client is not initialized"}), 500
@@ -160,7 +180,7 @@ async def start_chat():
         return jsonify({"error": "Conversation thread is not initialized"}), 500
 
     # Send user message to the conversation thread
-    await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name)
+    await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name, attachments=attachments)
     # Process messages in the background, do not await here
     asyncio.create_task(
         bp.assistant_client.process_messages(thread_name=bp.thread_name, stream=True)

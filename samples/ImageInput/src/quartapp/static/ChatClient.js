@@ -20,9 +20,9 @@ class ChatClient {
         const formData = new FormData();
         formData.append("message", message);
         for (const [i, file] of Array.from(files).entries()) {
-            formData.append(`image_${i}`, file);
+            formData.append(`${i}_${file.name}`, file);
         }
-        
+
         const response = await fetch(url, {
             method: "POST",
             body: formData,
@@ -30,15 +30,6 @@ class ChatClient {
 
         const data = await response.json();
         return data.thread_name;
-    }
-
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
     }
 
     listenToServer(url, threadName) {
