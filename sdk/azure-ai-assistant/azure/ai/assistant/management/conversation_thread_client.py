@@ -296,6 +296,14 @@ class ConversationThreadClient:
             existing_attachments = self._thread_config.get_attachments_of_thread(thread_id)
             existing_attachments_by_id = {att.file_id: att for att in existing_attachments if att.file_id}
 
+            #Note: removed due to openai issue with file deletion on thread; may be added back once issue is resolved
+            # new_file_ids = {att.file_id for att in new_attachments if att.file_id}	
+            # attachments_to_remove = [att for att in existing_attachments if att.file_id not in new_file_ids]	
+
+            # for attachment in attachments_to_remove:	
+            #     self._thread_config.remove_attachment_from_thread(thread_id, attachment.file_id)	
+            #     self._ai_client.files.delete(file_id=attachment.file_id)
+
             all_updated_attachments = []
             image_attachments = []
             for attachment in new_attachments:
