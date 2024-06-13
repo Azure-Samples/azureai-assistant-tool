@@ -172,6 +172,8 @@ async def start_chat():
             "attachment_type": AttachmentType.IMAGE_FILE,
             "tools": [],
         }))
+    current_app.logger.info(f"Attachments: {attachments}")
+    timeout = 90.0
 
     if not hasattr(bp, 'assistant_client'):
         return jsonify({"error": "Assistant client is not initialized"}), 500
@@ -180,7 +182,15 @@ async def start_chat():
         return jsonify({"error": "Conversation thread is not initialized"}), 500
 
     # Send user message to the conversation thread
-    await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name, attachments=attachments)
+    if len(attachments) > 0:
+        await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name, attachments=attachments, timeout=timeout)
+    else:
+        await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name, timeout=timeout)
+    conversation = await bp.conversation_thread_client.retrieve_conversation(bp.thread_name)
+    convmessages = conversation.messages
+    for message in convmessages:
+        current_app.logger.info(f"Conversation messages: {message.original_message}")
+        current_app.logger.info(f"Conversation messages: {message.image_messages}")
     # Process messages in the background, do not await here
     asyncio.create_task(
         bp.assistant_client.process_messages(thread_name=bp.thread_name, stream=True)
