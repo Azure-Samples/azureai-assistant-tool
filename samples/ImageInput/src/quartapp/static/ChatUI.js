@@ -108,6 +108,17 @@ class ChatUI {
         this.targetContainer.appendChild(userTemplateClone);
         this.scrollToBottom();
     }
+    
+    appendUserImageMessage(message, imageFiles) {
+        const userTemplateClone = this.userTemplate.content.cloneNode(true);
+        userTemplateClone.querySelector(".message-content").textContent = message;
+        userTemplateClone.querySelector(".message-content").innerHTML += "<br><br>";
+        for (const imageFile of imageFiles){
+            userTemplateClone.querySelector(".message-content").innerHTML += `<img src="${URL.createObjectURL(imageFile)}"${imageFile.name}" style="max-width: min(300px, 100%);"/>`;
+        }
+        this.targetContainer.appendChild(userTemplateClone);
+        this.scrollToBottom();
+    }
 
     appendAssistantMessage(messageDiv, accumulatedContent, isStreaming) {
         //console.log("Accumulated Content before conversion:", accumulatedContent);    

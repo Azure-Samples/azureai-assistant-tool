@@ -15,11 +15,16 @@ class ChatClient {
 
         if (!message) return false;
 
-        this.ui.appendUserMessage(message);
+        if (files.length > 0) {
+            this.ui.appendUserImageMessage(message, files)
+        } else {
+            this.ui.appendUserMessage(message);
+        }
 
         const formData = new FormData();
         formData.append("message", message);
         for (const [i, file] of Array.from(files).entries()) {
+            //add type check for file
             formData.append(`${i}_${file.name}`, file);
         }
 
