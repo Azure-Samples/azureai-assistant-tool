@@ -114,7 +114,11 @@ class ChatUI {
         userTemplateClone.querySelector(".message-content").textContent = message;
         userTemplateClone.querySelector(".message-content").innerHTML += "<br><br>";
         for (const imageFile of imageFiles){
-            userTemplateClone.querySelector(".message-content").innerHTML += `<img src="${URL.createObjectURL(imageFile)}"${imageFile.name}" style="max-width: min(300px, 100%);"/>`;
+            if (imageFile.type == "image/jpeg" || imageFile.type == "image/png" || imageFile.type == "image/gif" || imageFile.type == "image/webp") {
+                userTemplateClone.querySelector(".message-content").innerHTML += `<img src="${URL.createObjectURL(imageFile)}"${imageFile.name}" style="max-width: min(300px, 100%);"/>`;
+            } else {
+                console.error("Unsupported file type")
+            }
         }
         this.targetContainer.appendChild(userTemplateClone);
         this.scrollToBottom();

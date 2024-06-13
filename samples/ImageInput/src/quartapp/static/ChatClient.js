@@ -16,7 +16,7 @@ class ChatClient {
         if (!message) return false;
 
         if (files.length > 0) {
-            this.ui.appendUserImageMessage(message, files)
+            this.ui.appendUserImageMessage(message, files);
         } else {
             this.ui.appendUserMessage(message);
         }
@@ -24,8 +24,11 @@ class ChatClient {
         const formData = new FormData();
         formData.append("message", message);
         for (const [i, file] of Array.from(files).entries()) {
-            //add type check for file
-            formData.append(`${i}_${file.name}`, file);
+            if (file.type == "image/jpeg" || file.type == "image/png" || file.type == "image/gif" || file.type == "image/webp") {
+                formData.append(`${i}_${file.name}`, file);
+            } else {
+                console.error("Unsupported file type")
+            }
         }
 
         const response = await fetch(url, {
