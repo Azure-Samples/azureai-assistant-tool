@@ -1,6 +1,6 @@
-# Sample Application using Azure OpenAI Assistants and File Search tool (Python)
+# Sample Application using Azure OpenAI Assistants with Image Input Support (Python)
 
-This sample includes a simple Python [Quart](https://quart.palletsprojects.com/en/latest/) app that streams responses from OpenAI Assistant to an HTML/JS frontend using Server-Sent Events (SSEs). The application is configured to upload two documents under the `files` folder for use with the OpenAI Assistant's File Search tool.
+This sample includes a simple Python [Quart](https://quart.palletsprojects.com/en/latest/) app that streams responses from OpenAI Assistant to an HTML/JS frontend using Server-Sent Events (SSEs). The application supports both image (.jpg/jpeg, .webp, .gif, .png) and text inputs.
 
 The sample is designed for use with [Docker containers](https://www.docker.com/), both for local development and Azure deployment. For Azure deployment to [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/overview), please use this [template](https://github.com/Azure-Samples/openai-chat-app-quickstart) and replace the `src` folder content with this application.
 
@@ -12,7 +12,7 @@ This sample includes a `docker-compose.yaml` for local development which creates
 
 2. Make sure that the `.env` file exists.
 
-3. Store a keys and endpoint information (Azure) for the OpenAI resource in the `.env` file. The key should be stored in the `.env` file as `AZURE_OPENAI_API_KEY or OPENAI_API_KEY`. This is necessary because Docker containers don't have access to your user Azure credentials.
+3. Store keys and endpoint information (Azure) for the OpenAI resource in the `.env` file. The key should be stored in the `.env` file as `AZURE_OPENAI_API_KEY or OPENAI_API_KEY`. This is necessary because Docker containers don't have access to your user Azure credentials.
 
 4. Start the services with this command:
 
@@ -24,7 +24,7 @@ This sample includes a `docker-compose.yaml` for local development which creates
 
 ## Example run
 
-![File-Search-screenshot](../../assets/FileSearchAssistant.png)
+![image-input-screenshot](../../assets/ImageInputAssistant.png)
 
 ## Deployment to Azure
 
