@@ -256,18 +256,15 @@ class AsyncConversationThreadClient:
                 })
 
             if image_attachments:
-                # Retrieve the conversation to check if the image file is already included
-                conversation = await self.retrieve_conversation(thread_name)
                 for image_attachment in image_attachments:
-                    # if image attachment is not already in the conversation, add it
-                    if not conversation.contains_image_file_id(image_attachment.file_id):
-                        content.append({
-                            "type": "image_file",
-                            "image_file": {
-                                "file_id": image_attachment.file_id,
-                                "detail": "high"
-                            }
-                        })
+                    # add image attachment to message
+                    content.append({
+                        "type": "image_file",
+                        "image_file": {
+                            "file_id": image_attachment.file_id,
+                            "detail": "high"
+                        }
+                    })
 
             if attachments:
                 # Create the message with the attachments
