@@ -146,3 +146,31 @@ async def test_assistant_client_create_thread_and_process_message_with_multi_ima
     
     await client.purge()
     await thread_client.close()
+
+@pytest.mark.asyncio
+async def test_assistant_client_create_thread_and_process_multi_messages_with_image():
+    config = generate_test_config()
+    config_json = json.dumps(config)
+
+    client = await AsyncAssistantClient.from_json(config_json)
+    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
+    thread_name = await thread_client.create_conversation_thread()
+    attachment1 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    attachment2 = Attachment(file_path=str(RESOURCES_PATH / "scenery.png"), attachment_type=AttachmentType.IMAGE_FILE)
+    await thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment1])
+    await client.process_messages(thread_name)
+    await thread_client.create_conversation_thread_message(message="What is in the picture?", thread_name=thread_name, attachments=[attachment1, attachment2])
+    await client.process_messages(thread_name)
+    conversation = await thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_message("user")
+    assert len(conversation.messages) == 4
+    assert last_message is not None
+    assert last_message.image_messages is not None
+    assert len(last_message.image_messages) == 2
+    assert last_message.image_messages[0].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[0].file_id)
+    assert last_message.image_messages[1].file_id is not None
+    assert conversation.contains_image_file_id(last_message.image_messages[1].file_id)
+    
+    await client.purge()
+    await thread_client.close()
