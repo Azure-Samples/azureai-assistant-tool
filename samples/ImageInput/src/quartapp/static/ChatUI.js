@@ -11,24 +11,21 @@ class ChatUI {
         }
     }
 
-    appendUserMessage(message) {
+    appendUserMessage(message, imageFiles = null) {
         const userTemplateClone = this.userTemplate.content.cloneNode(true);
         userTemplateClone.querySelector(".message-content").textContent = message;
-        this.targetContainer.appendChild(userTemplateClone);
-        this.scrollToBottom();
-    }
-    
-    appendUserImageMessage(message, imageFiles) {
-        const userTemplateClone = this.userTemplate.content.cloneNode(true);
-        userTemplateClone.querySelector(".message-content").textContent = message;
-        userTemplateClone.querySelector(".message-content").innerHTML += "<br><br>";
-        for (const imageFile of imageFiles){
-            if (imageFile.type == "image/jpeg" || imageFile.type == "image/png" || imageFile.type == "image/gif" || imageFile.type == "image/webp") {
-                userTemplateClone.querySelector(".message-content").innerHTML += `<img src="${URL.createObjectURL(imageFile)}"${imageFile.name}" style="max-width: min(300px, 100%);"/>`;
-            } else {
-                console.error("Unsupported file type")
+
+        if (imageFiles) {
+            userTemplateClone.querySelector(".message-content").innerHTML += "<br><br>";
+            for (const imageFile of imageFiles){
+                if (imageFile.type == "image/jpeg" || imageFile.type == "image/png" || imageFile.type == "image/gif" || imageFile.type == "image/webp") {
+                    userTemplateClone.querySelector(".message-content").innerHTML += `<img src="${URL.createObjectURL(imageFile)}"${imageFile.name}" style="max-width: min(300px, 100%);"/>`;
+                } else {
+                    console.error("Unsupported file type")
+                }
             }
         }
+        
         this.targetContainer.appendChild(userTemplateClone);
         this.scrollToBottom();
     }

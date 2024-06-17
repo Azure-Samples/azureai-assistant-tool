@@ -16,7 +16,7 @@ class ChatClient {
         if (!message) return false;
 
         if (files.length > 0) {
-            this.ui.appendUserImageMessage(message, files);
+            this.ui.appendUserMessage(message, files);
         } else {
             this.ui.appendUserMessage(message);
         }
