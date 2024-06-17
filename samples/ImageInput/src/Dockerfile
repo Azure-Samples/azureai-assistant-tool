@@ -28,9 +28,6 @@ COPY --from=build --chown=app:app /usr/local/lib/python3.11 /usr/local/lib/pytho
 COPY --from=build --chown=app:app /usr/local/bin /usr/local/bin
 COPY --from=build --chown=app:app /code /code
 
-# Copy the files directory
-COPY --chown=app:app files /code/files
-
 USER app
 
 EXPOSE 50505

@@ -10,19 +10,13 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 import azure.identity.aio
 
-from quart import Blueprint, jsonify, request, Response, render_template, current_app, formparser
+from quart import Blueprint, jsonify, request, Response, render_template, current_app
 
 import asyncio
 import json, os, tempfile, time, random
 
 
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
-
-# Assuming your files are stored in the 'files' directory at the project root
-file_id_map = {
-    "product_info_1.md": "product_info_1.md",
-    "product_info_2.md": "product_info_2.md",
-}
 
 user_queues = {}
 
@@ -40,9 +34,6 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
             current_app.logger.info("run status completed")
             text_message = message.text_message
             current_app.logger.info(f"message.text_message.content: {text_message.content}")
-            if text_message.file_citations:
-                for file_citation in text_message.file_citations:
-                    current_app.logger.info(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
             await self.message_queue.put(("completed_message", text_message.content))
 
     async def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
@@ -67,15 +58,9 @@ async def read_config(assistant_name):
         current_app.logger.error(f"An error occurred: {e}")
         return None
 
-async def generate_unique_filename(base_name):
-        name, ext = os.path.splitext(base_name)
-        unique_name = f"{name}_{int(time.time())}_{random.randint(1000, 9999)}{ext}"
-        current_app.logger.info(f"Generated unique filename: {unique_name}")
-        return unique_name
-
 @bp.before_app_serving
 async def configure_assistant_client():
-    config = await read_config("file_search")
+    config = await read_config("image_input")
     client_args = {}
     if config:
         if os.getenv("OPENAI_API_KEY"):
@@ -153,12 +138,16 @@ async def shutdown_assistant_client():
 async def index():
     return await render_template("index.html")
 
+async def generate_unique_filename(base_name):
+        name, ext = os.path.splitext(base_name)
+        unique_name = f"{name}_{int(time.time())}_{random.randint(1000, 9999)}{ext}"
+        current_app.logger.info(f"Generated unique filename: {unique_name}")
+        return unique_name
+
 @bp.post("/chat")
 async def start_chat():
     user_message = await request.form
     user_files = await request.files
-    current_app.logger.info(f"User message: {user_message}")
-    current_app.logger.info(f"User files: {user_files}")
 
     attachments = []
     temp_dir = tempfile.gettempdir()
@@ -192,32 +181,6 @@ async def start_chat():
     )
 
     return jsonify({"thread_name": bp.thread_name, "message": "Processing started"}), 200
-
-@bp.route('/fetch-document', methods=['GET'])
-async def fetch_document():
-    filename = request.args.get('filename')
-    current_app.logger.info(f"Fetching document: {filename}")
-    if not filename:
-        return jsonify({"error": "Filename is required"}), 400
-
-    # Get the file path from the mapping
-    file_path = file_id_map.get(filename)
-    if not file_path:
-        return jsonify({"error": f"No file found for filename: {filename}"}), 404
-
-    # Construct the full path to the file
-    full_path = os.path.join('files', file_path)
-
-    if not os.path.exists(full_path):
-        return jsonify({"error": f"File not found: {filename}"}), 404
-
-    try:
-        # Read the file content asynchronously using asyncio.to_thread
-        data = await asyncio.to_thread(read_file, full_path)
-        return Response(data, content_type='text/plain')
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 def read_file(path):
     with open(path, 'r') as file:

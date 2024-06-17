@@ -9,97 +9,6 @@ class ChatUI {
         if (!this.assistantTemplate) {
             console.error("Assistant template not found!");
         }
-        this.addCitationClickListener();
-        this.attachCloseButtonListener();
-    }
-
-    preprocessContent(content) {
-        // Regular expression to find citations like [n] filename.md
-        const citationRegex = /\[(\d+)\] ([^\s]+\.md)/g;
-        return content.replace(citationRegex, (match, p1, p2) => {
-            return `<a href="#" class="file-citation" data-file-name="${p2}">[${p1}] ${p2}</a>`;
-        });
-    }
-
-    addCitationClickListener() {
-        document.addEventListener('click', (event) => {
-            if (event.target.classList.contains('file-citation')) {
-                event.preventDefault();
-                const filename = event.target.getAttribute('data-file-name');
-                this.loadDocument(filename);
-            }
-        });
-    }
-
-    async loadDocument(filename) {
-        try {
-            const response = await fetch(`/fetch-document?filename=${filename}`);
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            const markdownContent = await response.text();
-            // Use markdown-it to convert Markdown to HTML
-            const md = window.markdownit({
-                html: true,
-                linkify: true,
-                typographer: true,
-                breaks: true
-            });
-            const htmlContent = md.render(markdownContent);
-            this.showDocument(htmlContent);
-        } catch (error) {
-            console.error('Error fetching document:', error);
-        }
-    }
-
-    showDocument(content) {
-        console.log("showDocument:", content);
-        const docViewerSection = document.getElementById("document-viewer-section");
-        const chatColumn = document.getElementById("chat-container");
-
-        // Load the document content into the iframe
-        const iframe = document.getElementById("document-viewer");
-        iframe.srcdoc = content;
-
-        // Check if the iframe content is loaded correctly
-        iframe.onload = function() {
-            console.log("Iframe loaded successfully.");
-        };
-        iframe.onerror = function() {
-            console.error("Error loading iframe content.");
-        };
-
-        // Update Bootstrap grid classes for splitting the screen
-        chatColumn.classList.remove("col-full");
-        chatColumn.classList.add("col-half");
-        docViewerSection.classList.add("visible");
-        docViewerSection.classList.remove("hidden");
-
-        // Make the document viewer and the close button visible
-        docViewerSection.style.display = 'block';
-        document.getElementById("close-button").style.display = 'block';
-    }
-
-    closeDocumentViewer() {
-        const docViewerSection = document.getElementById("document-viewer-section");
-        const chatColumn = document.getElementById("chat-container");
-
-        // Hide the document viewer and the close button
-        docViewerSection.style.display = 'none';
-        docViewerSection.classList.add("hidden");
-        docViewerSection.classList.remove("visible");
-        document.getElementById("close-button").style.display = 'none';
-
-        // Restore the chat column to full width
-        chatColumn.classList.remove("col-half");
-        chatColumn.classList.add("col-full");
-    }
-
-    attachCloseButtonListener() {
-        const closeButton = document.getElementById("close-button");
-        if (closeButton) {
-            closeButton.addEventListener("click", () => this.closeDocumentViewer());
-        }
     }
 
     appendUserMessage(message) {
@@ -134,10 +43,8 @@ class ChatUI {
         });
     
         try {
-            // Preprocess content to convert citations to links
-            const preprocessedContent = this.preprocessContent(accumulatedContent);
             // Convert the accumulated content to HTML using markdown-it
-            let htmlContent = md.render(preprocessedContent);
+            let htmlContent = md.render(accumulatedContent);
             const messageTextDiv = messageDiv.querySelector(".message-text");
             if (!messageTextDiv) {
                 throw new Error("Message content div not found in the template.");
