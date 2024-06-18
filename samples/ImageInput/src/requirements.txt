@@ -171,5 +171,5 @@ wsproto==1.2.0
     # via hypercorn
 yarl==1.9.4
     # via aiohttp
-https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.4.1-alpha/azure_ai_assistant-0.4.1a1-py3-none-any.whl
+https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.4.2-alpha/azure_ai_assistant-0.4.2a1-py3-none-any.whl
     # via quartapp (pyproject.toml)
