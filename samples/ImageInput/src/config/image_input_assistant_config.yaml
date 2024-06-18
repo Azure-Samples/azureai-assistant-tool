@@ -1,0 +1,19 @@
+name: image_input
+instructions: You are a helpful assistant capable of answering questions.
+model: gpt-4-turbo-2024-04-09
+assistant_id: 
+file_references: []
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores: []
+functions: []
+file_search: false
+code_interpreter: false
+output_folder_path: /code/output
+ai_client_type: OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user
+config_folder: null

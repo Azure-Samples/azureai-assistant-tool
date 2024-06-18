@@ -256,18 +256,15 @@ class AsyncConversationThreadClient:
                 })
 
             if image_attachments:
-                # Retrieve the conversation to check if the image file is already included
-                conversation = await self.retrieve_conversation(thread_name)
                 for image_attachment in image_attachments:
-                    # if image attachment is not already in the conversation, add it
-                    if not conversation.contains_image_file_id(image_attachment.file_id):
-                        content.append({
-                            "type": "image_file",
-                            "image_file": {
-                                "file_id": image_attachment.file_id,
-                                "detail": "high"
-                            }
-                        })
+                    # add image attachment to message
+                    content.append({
+                        "type": "image_file",
+                        "image_file": {
+                            "file_id": image_attachment.file_id,
+                            "detail": "high"
+                        }
+                    })
 
             if attachments:
                 # Create the message with the attachments
@@ -298,12 +295,14 @@ class AsyncConversationThreadClient:
         try:
             existing_attachments = self._thread_config.get_attachments_of_thread(thread_id)
             existing_attachments_by_id = {att.file_id: att for att in existing_attachments if att.file_id}
-            new_file_ids = {att.file_id for att in new_attachments if att.file_id}
-            attachments_to_remove = [att for att in existing_attachments if att.file_id not in new_file_ids]
 
-            for attachment in attachments_to_remove:
-                self._thread_config.remove_attachment_from_thread(thread_id, attachment.file_id)
-                await self._ai_client.files.delete(file_id=attachment.file_id)
+            #Note: removed due to openai issue with file deletion on thread; may be added back once issue is resolved
+            # new_file_ids = {att.file_id for att in new_attachments if att.file_id}	
+            # attachments_to_remove = [att for att in existing_attachments if att.file_id not in new_file_ids]	
+
+            # for attachment in attachments_to_remove:	
+            #     self._thread_config.remove_attachment_from_thread(thread_id, attachment.file_id)	
+            #     await self._ai_client.files.delete(file_id=attachment.file_id)
 
             all_updated_attachments = []
             image_attachments = []
