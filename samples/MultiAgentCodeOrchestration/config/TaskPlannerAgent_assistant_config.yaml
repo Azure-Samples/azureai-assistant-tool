@@ -45,46 +45,13 @@ instructions: |-
     - Example response: "It seems your request isn't related to software development. I'm here to help with a wide range of questions and tasks, any specific area you'd like assistance with?"
     - Always include question in your answer in this case.
   - User Confirmation: Before proceeding with any plan, always seek confirmation from the user with question mark. You can say something like, "Here's the plan based on your request. Would you like me to go ahead with this?"
-  - Executing the Plan: Once the user has confirmed, clearly present the plan in json format (including the json code block) to the user for execution. This ensures the user is fully informed and agrees with the proposed actions.
-model: gpt-3.5-turbo-0125
+model: gpt-4o
 assistant_id:
 file_references:
 - C:/Git/azureai-assistant-tool/samples/MultiAgentCodeOrchestration/config/CodeProgrammerAgent_assistant_config.yaml
 - C:/Git/azureai-assistant-tool/samples/MultiAgentCodeOrchestration/config/CodeInspectionAgent_assistant_config.yaml
 tool_resources: null
-functions:
-- type: function
-  function:
-    name: find_files_by_name_in_directory
-    module: azure.ai.assistant.functions.file_functions
-    description: Searches for files matching specific criteria by name in a directory
-      and its sub-directories (case-insensitive).
-    parameters:
-      type: object
-      properties:
-        directory:
-          type: string
-          description: The directory to search in.
-        file_name_contains:
-          type: string
-          description: A partial or full file name to search for.
-      required:
-      - directory
-      - file_name_contains
-- type: function
-  function:
-    name: find_all_folders_by_name_from_current_directory
-    module: azure.ai.assistant.functions.file_functions
-    description: Searches for matching folders with a given name in the current directory
-      and its subdirectories. The search is case-sensitive and uses fuzzy matching.
-    parameters:
-      type: object
-      properties:
-        folder_name:
-          type: string
-          description: The name of the folder to search for.
-      required:
-      - folder_name
+functions: []
 file_search: false
 code_interpreter: false
 output_folder_path: output
@@ -100,3 +67,4 @@ completion_settings:
   seed: null
   max_text_messages: null
 assistant_role: user_interaction
+config_folder: null

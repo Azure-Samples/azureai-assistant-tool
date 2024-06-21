@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+import asyncio
+import json
+import re
+from typing import Dict, List
+
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
@@ -9,10 +14,6 @@ from azure.ai.assistant.management.async_conversation_thread_client import Async
 from azure.ai.assistant.management.async_task_manager import AsyncTaskManager, AsyncMultiTask
 from azure.ai.assistant.management.async_task_manager_callbacks import AsyncTaskManagerCallbacks
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-
-from typing import Dict, List
-import json, re
-import asyncio
 
 
 class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCallbacks):
@@ -80,7 +81,7 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
                 # Extract the JSON code block from the response by using the FileCreatorAgent
                 await self._assistants["FileCreatorAgent"].process_messages(user_request=message.content)
 
-    async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response = None):
+    async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response=None):
         if "error" in response:
             print(f"\n{assistant_name}: Function call {function_name} with arguments {arguments}, result failed with: {response}")
         else:
@@ -122,10 +123,12 @@ async def initialize_assistants(assistant_names: List[str], orchestrator: MultiA
     for assistant_name in assistant_names:
         config = load_assistant_config(assistant_name)
         if config:
-            if assistant_name == "TaskPlannerAgent" or assistant_name == "FileCreatorAgent":
+            if assistant_name in {"TaskPlannerAgent", "TaskExecutionAgent", "FileCreatorAgent", "UserAgent"}:
                 assistants[assistant_name] = await AsyncChatAssistantClient.from_yaml(config, callbacks=orchestrator)
             else:
                 assistants[assistant_name] = await AsyncAssistantClient.from_yaml(config, callbacks=orchestrator)
+        else:
+            print(f"Configuration for {assistant_name} not found.")
     orchestrator.assistants = assistants
     return assistants
 
@@ -140,23 +143,10 @@ def extract_json_code_block(text):
     return match.group(1) if match else text
 
 
-def requires_user_confirmation(assistant_response: str):
-    """
-    Checks if the response requires user confirmation.
-
-    NOTE: This is a very simple implementation and may not cover all cases.
-    Could be improved e.g. by using a ML model to detect the intent from the response and context.
-    """
-    # Remove text under json code block
-    assistant_response = re.sub(r"```json\n([\s\S]*?)\n```", "", assistant_response)
-    # if text contains question mark, return True
-    return "?" in assistant_response
-
-
 async def main():
     # Use the AssistantConfigManager to save the assistant configurations at the end of the session
     assistant_config_manager = AssistantConfigManager.get_instance('config')
-    assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent", "FileCreatorAgent"]
+    assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent", "TaskExecutionAgent", "FileCreatorAgent", "UserAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = await initialize_assistants(assistant_names, orchestrator)
     task_manager = AsyncTaskManager(orchestrator)
@@ -171,23 +161,34 @@ async def main():
             break
         if not user_request:
             continue
+
         await conversation_thread_client.create_conversation_thread_message(user_request, planner_thread)
-        await assistants["TaskPlannerAgent"].process_messages(thread_name=planner_thread)
+        await assistants["UserAgent"].process_messages(thread_name=planner_thread)
+        conversation = await conversation_thread_client.retrieve_conversation(planner_thread)
+        response = conversation.get_last_text_message("UserAgent")
+
         try:
-            # Extract the JSON code block from the response for task scheduling
-            conversation = await conversation_thread_client.retrieve_conversation(planner_thread)
-            response = conversation.get_last_text_message("TaskPlannerAgent")
-            if requires_user_confirmation(response.content):
-                continue
-            tasks = json.loads(extract_json_code_block(response.content))
+            decision = json.loads(response.content)
+
+            if decision["action"] in {"create_plan", "improve_plan"}:
+                await assistants["TaskPlannerAgent"].process_messages(thread_name=planner_thread)
+
+            elif decision["action"] == "execute_plan":
+                await assistants["TaskExecutionAgent"].process_messages(thread_name=planner_thread)
+                conversation = await conversation_thread_client.retrieve_conversation(planner_thread)
+                response = conversation.get_last_text_message("TaskExecutionAgent")
+                tasks = json.loads(extract_json_code_block(response.content))
+                multi_task = AsyncMultiTask(tasks)
+                await task_manager.schedule_task(multi_task)
+                await orchestrator.wait_for_all_tasks()
+            elif decision["action"] == "not_relevant":
+                print(decision["details"])
+                continue  # Continuously prompt the user for relevant tasks
         except json.JSONDecodeError:
+            print("Invalid JSON response. Please try again.")
             continue
-        multi_task = AsyncMultiTask(tasks)
-        await task_manager.schedule_task(multi_task)
-        await orchestrator.wait_for_all_tasks()
 
     assistant_config_manager.save_configs()
-
     await conversation_thread_client.close()
 
 if __name__ == "__main__":
