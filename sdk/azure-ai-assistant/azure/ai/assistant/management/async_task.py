@@ -80,18 +80,41 @@ class AsyncMultiTask(AsyncTask):
     This class represents a multi task.
 
     :param requests: A list of requests, each request is a dict with 'assistant' and 'task' keys.
-    :type requests: list
+                     A single dict is also accepted and will be converted to a list.
+    :type requests: list or dict
     """
     def __init__(self, requests):
         super().__init__()
-        self.requests = requests
+        self.requests = self._validate_and_convert_requests(requests)
+
+    def _validate_and_convert_requests(self, requests):
+        """
+        Validates and converts the requests to a list of dictionaries if necessary.
+
+        :param requests: A list of requests or a single request dictionary.
+        :type requests: list or dict
+        :return: A list of request dictionaries.
+        :rtype: list
+        """
+        if isinstance(requests, dict):
+            return [requests]
+        elif isinstance(requests, list):
+            # Check if all items in the list are dictionaries
+            if not all(isinstance(request, dict) for request in requests):
+                raise ValueError("All items in the requests list must be dictionaries.")
+            return requests
+        else:
+            raise TypeError("Requests should be a dictionary or a list of dictionaries.")
 
     async def execute(self, callback=None):
         """
         Executes the multi task.
 
         :param callback: The callback function to call when the task is complete.
-        :type
+        :type callback: callable or None
         """
-        if callback:
-            await callback()
+        try:
+            if callback:
+                await callback()
+        except Exception as e:
+            print(f"Error during task execution: {e}")
