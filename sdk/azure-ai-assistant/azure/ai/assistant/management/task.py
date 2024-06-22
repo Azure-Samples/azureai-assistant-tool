@@ -50,10 +50,8 @@ class BasicTask(Task):
     :param user_request: The user request to process.
     :type user_request: str
     """
-    def __init__(
-            self, 
-            user_request : str
-    ) -> None:
+    def __init__(self,
+                 user_request: str) -> None:
         super().__init__()
         self.user_request = user_request
 
@@ -75,17 +73,12 @@ class BatchTask(Task):
     :param requests: A list of user requests to process.
     :type requests: list
     """
-    def __init__(
-            self, 
-            requests : list
-    ) -> None:
+    def __init__(self,
+                 requests: list) -> None:
         super().__init__()
         self.requests = requests
 
-    def execute(
-            self, 
-            callback=None
-    ) -> None:
+    def execute(self, callback=None) -> None:
         """
         Executes the batch task.
 
@@ -103,18 +96,32 @@ class MultiTask(Task):
     :param requests: A list of requests, each request is a dict with 'assistant' and 'task' keys.
     :type requests: list
     """
-    def __init__(
-            self, 
-            requests : list
-    ) -> None:
+    def __init__(self,
+                 requests: list) -> None:
         super().__init__()
         # List of requests, each request is a dict with 'assistant' and 'task' keys
-        self.requests = requests
+        self.requests = self._validate_and_convert_requests(requests)
 
-    def execute(
-            self, 
-            callback=None
-    ) -> None:
+    def _validate_and_convert_requests(self, requests):
+        """
+        Validates and converts the requests to a list of dictionaries if necessary.
+
+        :param requests: A list of requests or a single request dictionary.
+        :type requests: list or dict
+        :return: A list of request dictionaries.
+        :rtype: list
+        """
+        if isinstance(requests, dict):
+            return [requests]
+        elif isinstance(requests, list):
+            # Check if all items in the list are dictionaries
+            if not all(isinstance(request, dict) for request in requests):
+                raise ValueError("All items in the requests list must be dictionaries.")
+            return requests
+        else:
+            raise TypeError("Requests should be a dictionary or a list of dictionaries.")
+
+    def execute(self, callback=None) -> None:
         """
         Executes the multi task.
 
