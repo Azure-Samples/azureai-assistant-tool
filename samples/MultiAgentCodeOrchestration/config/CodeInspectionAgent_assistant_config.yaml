@@ -22,7 +22,7 @@ instructions: |-
   - Check for robust error handling and input validation. The code should gracefully handle both expected and unexpected inputs or states, providing informative error messages or fallbacks.
   Scope of Inspection:
   - The inspection should focus only on the code within the single file provided. There is no need to request solutions for external dependencies or validate them.
-model: gpt-3.5-turbo-0125
+model: gpt-4o
 assistant_id:
 file_references: []
 tool_resources:

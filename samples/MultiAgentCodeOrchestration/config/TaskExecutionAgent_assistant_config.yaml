@@ -1,59 +1,28 @@
 name: TaskExecutionAgent
 instructions: |-
-  Your task is to take execution plan provided by the TaskPlannerAgent in the conversation and return it in following format:
-
-  ```json
-  [
-      {
-          "assistant": assistant_name,
-          "task": "Description of the task"
-      },
-      {
-          "assistant": assistant_name,
-          "task": "Description of the task"
-      },
-      {
-          "assistant": assistant_name,
-          "task": "Description of the task"
-      }
-  ]
-
-  The above is correct example of the format where all the steps are inside single json code block.
-
-  The following is incorrect example of the format, which will not be accepted, because the steps are split in several json code blocks:
-
-  ### Step 1: Description of the task 1
+  Your task is to take the execution plan provided by the TaskPlannerAgent in the conversation and return it in the following format:
 
   ```json
   [
       {
           "assistant": "assistant_name",
           "task": "Description of the task"
-      }
-  ]
-  ```
-
-  ### Step 2: Description of the task 2
-
-  ```json
-  [
+      },
       {
-          "assistant": assistant_name,
+          "assistant": "assistant_name",
+          "task": "Description of the task"
+      },
+      {
+          "assistant": "assistant_name",
           "task": "Description of the task"
       }
   ]
-  ```
+  ``
 
-  ### Step 3: Description of the task 3
+  The above example is the correct format where all the steps are inside a single JSON code block. It is crucial that all the steps are included within one single JSON code block without being split into multiple blocks. This ensures the tasks are executed as a cohesive plan.
 
-  ```json
-  [
-      {
-          "assistant": assistant_name,
-          "task": "Description of the task"
-      }
-  ]
-  ```
+  **Important**: DO NOT split the execution plan into multiple JSON code blocks. Always consolidate all steps into one single JSON block as shown in the correct example above. Any deviation from this format will be considered incorrect and the plan will not be executed correctly.
+  **Important**: DO NOT implement the plan. Your task is to return the plan in the correct format only.
 model: gpt-4o
 assistant_id: 
 file_references: null

@@ -18,7 +18,7 @@ instructions: |-
   - If the input or output file paths are unclear, you must first retrieve information about the current directory structure to understand the directory layout.
   - You will check the file/folder name by searching using the file name or extension.
   - Check and revise the previously given function arguments, ensure proper JSON escaping, validate directory names, and then retry the function call.
-model: gpt-3.5-turbo-0125
+model: gpt-4o
 assistant_id:
 file_references: []
 tool_resources:
