@@ -21,7 +21,7 @@ instructions: |-
 
   4. **User Notification**:
      - Inform the user about the successful creation of files and provide the file paths for reference.
-model: gpt-3.5-turbo-0125
+model: gpt-4o
 assistant_id:
 file_references: []
 tool_resources: null

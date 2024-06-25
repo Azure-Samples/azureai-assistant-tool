@@ -14,6 +14,7 @@ from azure.ai.assistant.management.async_conversation_thread_client import Async
 from azure.ai.assistant.management.async_task_manager import AsyncTaskManager, AsyncMultiTask
 from azure.ai.assistant.management.async_task_manager_callbacks import AsyncTaskManagerCallbacks
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.text_message import TextMessage
 
 
 class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCallbacks):
@@ -26,7 +27,13 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
         self.conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
         self.condition = asyncio.Condition()
         self.task_started = False
+        self.task_manager = AsyncTaskManager(callbacks=self)
         super().__init__()
+
+        self.agent_functions = {
+            "CodeProgrammerAgent": self.post_run_code_programmer_agent,
+            "TaskExecutionAgent": self.post_run_task_execution_agent,
+        }
 
     async def on_task_started(self, task: AsyncMultiTask, schedule_id):
         print(f"\nTask {task.id} started with schedule ID: {schedule_id}")
@@ -77,9 +84,20 @@ class MultiAgentOrchestrator(AsyncTaskManagerCallbacks, AsyncAssistantClientCall
             conversation = await self.conversation_thread_client.retrieve_conversation(thread_name)
             message = conversation.get_last_text_message(assistant_name)
             print(f"\n{message.content}")
-            if assistant_name == "CodeProgrammerAgent":
-                # Extract the JSON code block from the response by using the FileCreatorAgent
-                await self._assistants["FileCreatorAgent"].process_messages(user_request=message.content)
+            handler = self.agent_functions.get(assistant_name)
+            if handler:
+                await handler(message)
+
+    async def post_run_code_programmer_agent(self, message: TextMessage):
+        # Extract the JSON code block from the response by using the FileCreatorAgent
+        await self._assistants["FileCreatorAgent"].process_messages(user_request=message.content)
+
+    async def post_run_task_execution_agent(self, message: TextMessage):
+        # Extract the JSON code block from the response and execute the tasks
+        tasks = json.loads(extract_json_code_block(message.content))
+        multi_task = AsyncMultiTask(tasks)
+        await self.task_manager.schedule_task(multi_task)
+        await self.wait_for_all_tasks()
 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response=None):
         if "error" in response:
@@ -149,7 +167,6 @@ async def main():
     assistant_names = ["CodeProgrammerAgent", "CodeInspectionAgent", "TaskPlannerAgent", "TaskExecutionAgent", "FileCreatorAgent", "UserAgent"]
     orchestrator = MultiAgentOrchestrator()
     assistants = await initialize_assistants(assistant_names, orchestrator)
-    task_manager = AsyncTaskManager(orchestrator)
 
     conversation_thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
     planner_thread = await conversation_thread_client.create_conversation_thread()
@@ -167,26 +184,25 @@ async def main():
         conversation = await conversation_thread_client.retrieve_conversation(planner_thread)
         response = conversation.get_last_text_message("UserAgent")
 
+        if response is None or response.content.strip() == "":
+            print("No valid response received from UserAgent.")
+            continue
+        
         try:
             decision = json.loads(response.content)
-
-            if decision["action"] in {"create_plan", "improve_plan"}:
-                await assistants["TaskPlannerAgent"].process_messages(thread_name=planner_thread)
-
-            elif decision["action"] == "execute_plan":
-                await assistants["TaskExecutionAgent"].process_messages(thread_name=planner_thread)
-                conversation = await conversation_thread_client.retrieve_conversation(planner_thread)
-                response = conversation.get_last_text_message("TaskExecutionAgent")
-                tasks = json.loads(extract_json_code_block(response.content))
-                multi_task = AsyncMultiTask(tasks)
-                await task_manager.schedule_task(multi_task)
-                await orchestrator.wait_for_all_tasks()
-            elif decision["action"] == "not_relevant":
-                print(decision["details"])
-                continue  # Continuously prompt the user for relevant tasks
-        except json.JSONDecodeError:
-            print("Invalid JSON response. Please try again.")
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode JSON response: {e}")
             continue
+
+        if decision["action"] in {"create_plan", "improve_plan"}:
+            await assistants["TaskPlannerAgent"].process_messages(thread_name=planner_thread)
+
+        elif decision["action"] == "execute_plan":
+            await assistants["TaskExecutionAgent"].process_messages(thread_name=planner_thread)
+        
+        elif decision["action"] == "not_relevant":
+            print(decision["details"])
+            continue  # Continuously prompt the user for relevant tasks
 
     assistant_config_manager.save_configs()
     await conversation_thread_client.close()
