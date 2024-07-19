@@ -398,19 +398,29 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def process_input(self, user_input, assistants, thread_name, is_scheduled_task, attachments_dicts=None):
         try:
             logger.debug(f"Processing user input: {user_input} with assistants {assistants} for thread {thread_name}")
-
-            # Create message to thread and set attachments list
             thread_client = self.conversation_thread_clients[self.active_ai_client_type]
-            attachments = [Attachment.from_dict(att_dict) for att_dict in attachments_dicts]
-            thread_client.create_conversation_thread_message(user_input, thread_name, attachments=attachments, timeout=self.connection_timeout)
             thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
+
+            # Remove deleted attachments from thread
+            existing_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+            all_attachment_ids = [att["file_id"] for att in attachments_dicts]
+            attachments_to_remove = [att for att in existing_attachments if att.file_id not in all_attachment_ids]
+            for attachment in attachments_to_remove:
+                thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)
+            
+            # Create message to thread
+            conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
+            attachments = [Attachment.from_dict(att_dict) for att_dict in attachments_dicts if not conversation.contains_image_file_id(att_dict["file_id"])]
+            thread_client.create_conversation_thread_message(user_input, thread_name, attachments=attachments, timeout=self.connection_timeout)
+
+            # Set attachments list
             updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
             attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
             logger.debug(f"process_input: attachments updated: {attachments_dicts}")
             self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
 
-            conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
-            self.update_conversation_messages(conversation)
+            updated_conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
+            self.update_conversation_messages(updated_conversation)
 
             for assistant_name in assistants:
                 # Signal the start of processing

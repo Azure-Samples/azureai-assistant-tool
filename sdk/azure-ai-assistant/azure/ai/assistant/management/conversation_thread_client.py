@@ -329,7 +329,6 @@ class ConversationThreadClient:
                     else:  # Tool file
                         all_updated_attachments.append(current_attachment)
 
-            self._thread_config.set_attachments_of_thread(thread_id, all_updated_attachments + image_attachments)
             updated_attachments = [{'file_id': att.file_id, 'tools': [att.tool.to_dict()] if att.tool else []} for att in all_updated_attachments]
             return updated_attachments, image_attachments
         except Exception as e:
