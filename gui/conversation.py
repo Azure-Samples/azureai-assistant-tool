@@ -89,9 +89,13 @@ class ConversationInputView(QTextEdit):
                     logger.debug(f"Local file path: {file_path}")
                     if file_path.lower().endswith(IMAGE_FORMATS):
                         image = QImage(file_path)
+                        temp_dir = tempfile.gettempdir()
+                        file_name = self.generate_unique_filename(os.path.basename(file_path))
+                        temp_file_path = os.path.join(temp_dir, file_name)
+                        image.save(temp_file_path)
                         if not image.isNull():
-                            self.add_image_thumbnail(image, file_path)
-                            self.main_window.add_image_to_selected_thread(file_path)
+                            self.add_image_thumbnail(image, temp_file_path)
+                            self.main_window.add_image_to_selected_thread(temp_file_path)
                         else:
                             logger.error(f"Could not load image from file: {file_path}")
                     else:
