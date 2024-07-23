@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os, time, json
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
-from azure.ai.assistant.management.attachment import Attachment
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -401,46 +401,72 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             thread_client = self.conversation_thread_clients[self.active_ai_client_type]
             thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
 
-            # Remove deleted attachments from thread
-            existing_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-            all_attachment_ids = [att["file_id"] for att in attachments_dicts]
-            attachments_to_remove = [att for att in existing_attachments if att.file_id not in all_attachment_ids]
-            for attachment in attachments_to_remove:
-                thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)
-            
-            # Create message to thread
-            conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
-            attachments = [Attachment.from_dict(att_dict) for att_dict in attachments_dicts if not conversation.contains_image_file_id(att_dict["file_id"])]
-            thread_client.create_conversation_thread_message(user_input, thread_name, attachments=attachments, timeout=self.connection_timeout)
+            self._update_attachments_from_ui_to_thread(thread_client, thread_id, attachments_dicts)
 
-            # Set attachments list
-            updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-            attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
-            logger.debug(f"process_input: attachments updated: {attachments_dicts}")
-            self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
+            self._create_thread_message(thread_client, user_input, thread_name, attachments_dicts)
+
+            self._update_attachments_in_ui_from_thread(thread_client, thread_id)
 
             updated_conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
             self.update_conversation_messages(updated_conversation)
 
             for assistant_name in assistants:
-                # Signal the start of processing
-                self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
-
-                # Send the user input to the assistant client
-                assistant_client = self.assistant_client_manager.get_client(assistant_name)
-                if assistant_client is not None:
-                    start_time = time.time()
-                    assistant_client.process_messages(thread_name=thread_name, timeout=self.connection_timeout, stream=self.use_streaming_for_assistant)
-                    end_time = time.time()
-                    logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
-
-                self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
+                self._process_assistant_input(assistant_name, thread_name, is_scheduled_task)
 
         except Exception as e:
             error_message = f"An error occurred while processing the input: {e}"
             self.error_signal.error_signal.emit(error_message)
             self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
             logger.error(error_message)
+
+    def _update_attachments_from_ui_to_thread(self, thread_client : ConversationThreadClient, thread_id, attachments_dicts):
+        # Synchronize the thread configuration and cloud client for deleted attachments
+        existing_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        all_attachment_ids = [att["file_id"] for att in attachments_dicts]
+        attachments_to_remove = [att for att in existing_attachments if att.file_id not in all_attachment_ids]
+        
+        for attachment in attachments_to_remove:
+            thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)
+            if attachment.attachment_type != AttachmentType.IMAGE_FILE:
+                thread_client._ai_client.files.delete(file_id=attachment.file_id)
+
+        logger.debug("Attachments synchronized from UI to thread")
+
+    def _create_thread_message(self, thread_client : ConversationThreadClient, user_input, thread_name, attachments_dicts):
+        conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
+        attachments = [
+            Attachment.from_dict(att_dict) 
+            for att_dict in attachments_dicts 
+            if not conversation.contains_image_file_id(att_dict["file_id"])
+        ]
+        thread_client.create_conversation_thread_message(
+            user_input, thread_name, 
+            attachments=attachments, 
+            timeout=self.connection_timeout
+        )
+
+    def _update_attachments_in_ui_from_thread(self, thread_client : ConversationThreadClient, thread_id):
+        # Refresh the attachments list in the UI after message creation
+        updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
+        logger.debug(f"process_input: attachments updated: {attachments_dicts}")
+        self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
+
+    def _process_assistant_input(self, assistant_name, thread_name, is_scheduled_task):
+        self.start_processing_signal.start_signal.emit(assistant_name, is_scheduled_task)
+
+        assistant_client = self.assistant_client_manager.get_client(assistant_name)
+        if assistant_client is not None:
+            start_time = time.time()
+            assistant_client.process_messages(
+                thread_name=thread_name, 
+                timeout=self.connection_timeout, 
+                stream=self.use_streaming_for_assistant
+            )
+            end_time = time.time()
+            logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
+
+        self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
 
     def update_conversation_title(self, text, thread_name, is_scheduled_task):
         if not hasattr(self, 'conversation_title_creator'):
