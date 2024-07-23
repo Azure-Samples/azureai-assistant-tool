@@ -592,9 +592,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:
-            if message.file_message:
-                file_path = message.file_message.retrieve_file(assistant_config.output_folder_path)
-                logger.debug(f"File downloaded to {file_path} on run end")
+            if len(message.file_messages) > 0:
+                for file_message in message.file_messages:
+                    file_path = message.file_message.retrieve_file(assistant_config.output_folder_path)
+                    logger.debug(f"File downloaded to {file_path} on run end")
 
     # Callbacks for TaskManagerCallbacks
     def on_task_started(self, task: Task, schedule_id):

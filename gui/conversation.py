@@ -315,12 +315,12 @@ class ConversationView(QWidget):
                 self.append_message(message.sender, text_message.content, color=color)
 
             # Handle file message content
-            if message.file_message:
-                file_message = message.file_message
+            if len(message.file_messages) > 0:
+                for file_message in message.file_messages:
                 # Synchronously retrieve and process the file
-                file_path = file_message.retrieve_file(self.file_path)
-                if file_path:
-                    self.append_message(message.sender, f"File saved: {file_path}", color='green')
+                    file_path = file_message.retrieve_file(self.file_path)
+                    if file_path:
+                        self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
             if len(message.image_messages) > 0:
