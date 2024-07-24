@@ -437,7 +437,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         attachments = [
             Attachment.from_dict(att_dict) 
             for att_dict in attachments_dicts 
-            if not conversation.contains_image_file_id(att_dict["file_id"])
+            if not conversation.contains_file_id(att_dict["file_id"])
         ]
         thread_client.create_conversation_thread_message(
             user_input, thread_name, 
