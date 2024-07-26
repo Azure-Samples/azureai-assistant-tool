@@ -28,7 +28,7 @@ class AsyncConversationMessage:
         self._ai_client : Union[AsyncOpenAI, AsyncAzureOpenAI] = None
         self._original_message = None
         self._text_message = None
-        self._file_message = None
+        self._file_messages = []
         self._image_messages = []
         self._image_urls = []
         self._role = None
@@ -100,7 +100,8 @@ class AsyncConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
-                    self._file_message = await AsyncFileMessage.create(self._ai_client, file_id, file_name)
+                    file_message = await AsyncFileMessage.create(self._ai_client, file_id, file_name)
+                    self._file_messages.append(file_message)
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
@@ -138,14 +139,14 @@ class AsyncConversationMessage:
         self._text_message = value
 
     @property
-    def file_message(self) -> Optional['AsyncFileMessage']:
+    def file_messages(self) -> Optional['AsyncFileMessage']:
         """
         Returns the file message content of the conversation message.
 
         :return: The file message content of the conversation message.
         :rtype: Optional[AsyncFileMessage]
         """
-        return self._file_message
+        return self._file_messages
 
     @property
     def image_messages(self) -> List['AsyncImageMessage']:

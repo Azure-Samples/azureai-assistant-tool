@@ -140,9 +140,9 @@ async def test_assistant_client_create_thread_and_process_message_with_multi_ima
     assert last_message.image_messages is not None
     assert len(last_message.image_messages) == 2
     assert last_message.image_messages[0].file_id is not None
-    assert conversation.contains_image_file_id(last_message.image_messages[0].file_id)
+    assert conversation.contains_file_id(last_message.image_messages[0].file_id)
     assert last_message.image_messages[1].file_id is not None
-    assert conversation.contains_image_file_id(last_message.image_messages[1].file_id)
+    assert conversation.contains_file_id(last_message.image_messages[1].file_id)
     
     await client.purge()
     await thread_client.close()
@@ -168,9 +168,9 @@ async def test_assistant_client_create_thread_and_process_multi_messages_with_im
     assert last_message.image_messages is not None
     assert len(last_message.image_messages) == 2
     assert last_message.image_messages[0].file_id is not None
-    assert conversation.contains_image_file_id(last_message.image_messages[0].file_id)
+    assert conversation.contains_file_id(last_message.image_messages[0].file_id)
     assert last_message.image_messages[1].file_id is not None
-    assert conversation.contains_image_file_id(last_message.image_messages[1].file_id)
+    assert conversation.contains_file_id(last_message.image_messages[1].file_id)
     
     await client.purge()
     await thread_client.close()
