@@ -231,7 +231,7 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                 temperature = None if text_completion_config is None else text_completion_config.temperature
                 seed = None if text_completion_config is None else text_completion_config.seed
                 frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
-                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
+                max_tokens = 1000 if text_completion_config is None else text_completion_config.max_tokens
                 presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
                 top_p = None if text_completion_config is None else text_completion_config.top_p
                 response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
