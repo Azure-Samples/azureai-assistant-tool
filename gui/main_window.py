@@ -594,7 +594,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         for message in conversation.messages:
             if len(message.file_messages) > 0:
                 for file_message in message.file_messages:
-                    file_path = message.file_message.retrieve_file(assistant_config.output_folder_path)
+                    file_path = file_message.retrieve_file(assistant_config.output_folder_path)
                     logger.debug(f"File downloaded to {file_path} on run end")
 
     # Callbacks for TaskManagerCallbacks
