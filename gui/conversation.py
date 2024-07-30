@@ -89,9 +89,13 @@ class ConversationInputView(QTextEdit):
                     logger.debug(f"Local file path: {file_path}")
                     if file_path.lower().endswith(IMAGE_FORMATS):
                         image = QImage(file_path)
+                        temp_dir = tempfile.gettempdir()
+                        file_name = self.generate_unique_filename(os.path.basename(file_path))
+                        temp_file_path = os.path.join(temp_dir, file_name)
+                        image.save(temp_file_path)
                         if not image.isNull():
-                            self.add_image_thumbnail(image, file_path)
-                            self.main_window.add_image_to_selected_thread(file_path)
+                            self.add_image_thumbnail(image, temp_file_path)
+                            self.main_window.add_image_to_selected_thread(temp_file_path)
                         else:
                             logger.error(f"Could not load image from file: {file_path}")
                     else:
@@ -311,12 +315,12 @@ class ConversationView(QWidget):
                 self.append_message(message.sender, text_message.content, color=color)
 
             # Handle file message content
-            if message.file_message:
-                file_message = message.file_message
+            if len(message.file_messages) > 0:
+                for file_message in message.file_messages:
                 # Synchronously retrieve and process the file
-                file_path = file_message.retrieve_file(self.file_path)
-                if file_path:
-                    self.append_message(message.sender, f"File saved: {file_path}", color='green')
+                    file_path = file_message.retrieve_file(self.file_path)
+                    if file_path:
+                        self.append_message(message.sender, f"File saved: {file_path}", color='green')
 
             # Handle image message content
             if len(message.image_messages) > 0:

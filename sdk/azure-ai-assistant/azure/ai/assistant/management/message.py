@@ -36,7 +36,7 @@ class ConversationMessage:
         self._ai_client = ai_client
         self._original_message = original_message
         self._text_message = None
-        self._file_message = None
+        self._file_messages = []
         self._image_messages = []
         self._image_urls = []
         self._role = original_message.role if original_message else "assistant"
@@ -85,7 +85,7 @@ class ConversationMessage:
                 if isinstance(annotation, FilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = annotation.text.split("/")[-1]
-                    self._file_message = FileMessage(self._ai_client, file_id, file_name)
+                    self._file_messages.append(FileMessage(self._ai_client, file_id, file_name))
                     citations.append(f'[{index}] {file_name}')
                     file_citations.append(FileCitation(file_id, file_name))
 
@@ -122,14 +122,14 @@ class ConversationMessage:
         self._text_message = value
 
     @property
-    def file_message(self) -> Optional['FileMessage']:
+    def file_messages(self) -> List['FileMessage']:
         """
         Returns the file message content.
 
         :return: The file message content.
-        :rtype: Optional[FileMessage]
+        :rtype: List[FileMessage]
         """
-        return self._file_message
+        return self._file_messages
 
     @property
     def image_messages(self) -> List['ImageMessage']:
