@@ -8,7 +8,7 @@ import os
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
-from azure.ai.assistant.management.attachment import Attachment, AttachmentType
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType, AttachmentTool, AttachmentToolType
 from test_assistant_client import generate_test_config
 from test_assistant_client import RESOURCES_PATH
 
@@ -174,3 +174,27 @@ async def test_assistant_client_create_thread_and_process_multi_messages_with_im
     
     await client.purge()
     await thread_client.close()
+
+@pytest.mark.asyncio
+async def test_assistant_client_create_thread_and_process_message_with_file():
+    updates = {
+        "code_interpreter": True
+    }
+    config = generate_test_config(updates)
+    config_json = json.dumps(config)
+
+    client = await AsyncAssistantClient.from_json(config_json)
+    thread_client = AsyncConversationThreadClient.get_instance(AsyncAIClientType.OPEN_AI)
+    thread_name = await thread_client.create_conversation_thread()
+    attachment_tool = AttachmentTool(AttachmentToolType.CODE_INTERPRETER)
+    attachment = Attachment(file_path=str(RESOURCES_PATH / "product_info_1.md"), attachment_type=AttachmentType.DOCUMENT_FILE, tool=attachment_tool)
+    await thread_client.create_conversation_thread_message(message="Can you write and return to me a table in a csv file with information from product_info_1.md", thread_name=thread_name, attachments=[attachment])
+    await client.process_messages(thread_name)
+    conversation = await thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_message(client.assistant_config.name)
+    assert last_message is not None
+    assert len(last_message.file_messages) == 1
+    assert last_message.file_messages[0].file_id is not None
+    assert conversation.contains_file_id(last_message.file_messages[0].file_id)
+
+    client.purge()

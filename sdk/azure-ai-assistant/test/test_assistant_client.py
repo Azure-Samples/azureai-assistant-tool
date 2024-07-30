@@ -7,7 +7,7 @@ import os
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantConfig, VectorStoreConfig
-from azure.ai.assistant.management.attachment import Attachment, AttachmentType
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType, AttachmentToolType, AttachmentTool
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 
@@ -291,4 +291,27 @@ def test_assistant_client_create_thread_and_process_multi_messages_with_image():
     assert last_message.image_messages[1].file_id is not None
     assert conversation.contains_file_id(last_message.image_messages[1].file_id)
     
+    client.purge()
+
+def test_assistant_client_create_thread_and_process_message_with_file():
+    updates = {
+        "code_interpreter": True
+    }
+    config = generate_test_config(updates)
+    config_json = json.dumps(config)
+
+    client = AssistantClient.from_json(config_json)
+    thread_client = ConversationThreadClient.get_instance(client._get_ai_client_type(config.get('ai_client_type')))
+    thread_name = thread_client.create_conversation_thread()
+    attachment_tool = AttachmentTool(AttachmentToolType.CODE_INTERPRETER)
+    attachment = Attachment(file_path=str(RESOURCES_PATH / "product_info_1.md"), attachment_type=AttachmentType.DOCUMENT_FILE, tool=attachment_tool)
+    thread_client.create_conversation_thread_message(message="Can you write and return to me a table in a csv file with information from product_info_1.md", thread_name=thread_name, attachments=[attachment])
+    client.process_messages(thread_name)
+    conversation = thread_client.retrieve_conversation(thread_name)
+    last_message = conversation.get_last_message(client.assistant_config.name)
+    assert last_message is not None
+    assert len(last_message.file_messages) == 1
+    assert last_message.file_messages[0].file_id is not None
+    assert conversation.contains_file_id(last_message.file_messages[0].file_id)
+
     client.purge()
