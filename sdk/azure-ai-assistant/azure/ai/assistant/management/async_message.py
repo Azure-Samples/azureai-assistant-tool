@@ -139,12 +139,12 @@ class AsyncConversationMessage:
         self._text_message = value
 
     @property
-    def file_messages(self) -> Optional['AsyncFileMessage']:
+    def file_messages(self) -> List['AsyncFileMessage']:
         """
         Returns the file message content of the conversation message.
 
         :return: The file message content of the conversation message.
-        :rtype: Optional[AsyncFileMessage]
+        :rtype: List[AsyncFileMessage]
         """
         return self._file_messages
 

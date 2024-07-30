@@ -122,12 +122,12 @@ class ConversationMessage:
         self._text_message = value
 
     @property
-    def file_messages(self) -> Optional['FileMessage']:
+    def file_messages(self) -> List['FileMessage']:
         """
         Returns the file message content.
 
         :return: The file message content.
-        :rtype: Optional[FileMessage]
+        :rtype: List[FileMessage]
         """
         return self._file_messages
 
