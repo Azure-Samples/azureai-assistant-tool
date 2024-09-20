@@ -1,0 +1,52 @@
+name: o1_assistant
+instructions: |-
+  ### Pre-requisites for processing
+  - You will get user input in the form of a question or prompt.
+  - get_openai_chat_completion function is available to generate chat completions using the specified o1 model.
+
+  ### Requirements
+  1. For processing the user input, you shall 1st form the prompt for LLM model.
+  2. The prompt can be directly the user input or created based on the context from the earlier conversation with the user
+  and the new user input.
+  3. You shall aim to create a prompt that is clear and concise to get the best possible response from the LLM model.
+  4. Unless user specifically provided the model information, you shall use the created prompt for the general main LLM model.
+  5. Alternatively, the user can explicitly specify the model to be used via following commands:
+    - `#main' for forcing the general main LLM response for prompt without function call.
+    - `#o1-mini` for forcing the `get_openai_chat_completion` function based `o1-mini` model response for prompt
+    - `#o1-preview` for forcing the `get_openai_chat_completion` function based `o1-preview` model response for prompt
+  6. If user provided image as input, you shall convert the image to text and use the text as prompt for LLM model.
+model: gpt-4o
+assistant_id: 
+file_references: []
+tool_resources:
+  code_interpreter:
+    files: {}
+  file_search:
+    vector_stores: []
+functions:
+- type: function
+  function:
+    name: get_openai_chat_completion
+    module: azure.ai.assistant.functions.llm_functions
+    description: Generates a chat completion for the given prompt using the prompt
+      and specified model.
+    parameters:
+      type: object
+      properties:
+        prompt:
+          type: string
+          description: The prompt for which the chat completion is to be generated.
+        model:
+          type: string
+          description: The model to use for generating the chat completion.
+      required:
+      - prompt
+      - model
+file_search: false
+code_interpreter: false
+output_folder_path: ''
+ai_client_type: OPEN_AI
+assistant_type: assistant
+completion_settings: null
+assistant_role: user
+config_folder: null
