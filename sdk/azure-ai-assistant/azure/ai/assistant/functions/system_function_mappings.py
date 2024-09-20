@@ -18,7 +18,8 @@ from azure.ai.assistant.functions.file_functions import (
 )
 
 from azure.ai.assistant.functions.llm_functions import (
-    get_openai_chat_completion
+    get_openai_chat_completion,
+    get_azure_openai_chat_completion,
 )
 
 # Statically defined system functions for fast reference
@@ -36,4 +37,5 @@ system_functions = {
     "find_files_by_name_in_directory": find_files_by_name_in_directory,
     "find_files_by_extension_in_directory": find_files_by_extension_in_directory,
     "get_openai_chat_completion": get_openai_chat_completion,
+    "get_azure_openai_chat_completion": get_azure_openai_chat_completion,
 }
