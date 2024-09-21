@@ -234,5 +234,55 @@
                 ]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_openai_chat_completion",
+            "module": "azure.ai.assistant.functions.llm_functions",
+            "description": "Generates a chat completion for the given prompt using the prompt and specified model.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "The prompt for which the chat completion is to be generated."
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "The model to use for generating the chat completion."
+                    }
+                },
+                "required": [
+                    "prompt",
+                    "model"
+                ]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_azure_openai_chat_completion",
+            "module": "azure.ai.assistant.functions.llm_functions",
+            "description": "Generates a chat completion for the given prompt using the prompt and specified model.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "The prompt for which the chat completion is to be generated."
+                    },
+                    "model": {
+                        "type": "string",
+                        "description": "The model to use for generating the chat completion."
+                    }
+                },
+                "required": [
+                    "prompt",
+                    "model"
+                ]
+            }
+        }
     }
 ]

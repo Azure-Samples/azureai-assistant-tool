@@ -17,6 +17,11 @@ from azure.ai.assistant.functions.file_functions import (
     find_files_by_extension_in_directory,
 )
 
+from azure.ai.assistant.functions.llm_functions import (
+    get_openai_chat_completion,
+    get_azure_openai_chat_completion,
+)
+
 # Statically defined system functions for fast reference
 system_functions = {
     "fetch_current_datetime": fetch_current_datetime,
@@ -30,5 +35,7 @@ system_functions = {
     "find_all_folders_by_name_from_current_directory": find_all_folders_by_name_from_current_directory,
     "retrieve_current_directory_structure_subfolders": retrieve_current_directory_structure_subfolders,
     "find_files_by_name_in_directory": find_files_by_name_in_directory,
-    "find_files_by_extension_in_directory": find_files_by_extension_in_directory
+    "find_files_by_extension_in_directory": find_files_by_extension_in_directory,
+    "get_openai_chat_completion": get_openai_chat_completion,
+    "get_azure_openai_chat_completion": get_azure_openai_chat_completion,
 }
