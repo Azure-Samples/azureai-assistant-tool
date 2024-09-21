@@ -7,7 +7,7 @@ from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
 
 from typing import Dict, Any, List
-import json
+import json, copy
 
 
 def _initialize_clients(client_type):
@@ -64,14 +64,27 @@ def _generate_chat_completion(ai_client, model, messages):
         return json.dumps({"function_error": error_message})
 
 
-def _update_messages_with_prompt(messages, prompt):
-    # Replace the last user message with the new prompt
-    if messages:
-        messages[-1] = {"role": "user", "content": [{"type": "text", "text": prompt}]}
-    else:
-        # If there are no messages, start a new conversation
-        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-    return messages
+def _update_messages_with_prompt(messages : List[ConversationMessage], prompt):
+    updated_messages = copy.deepcopy(messages)
+    
+    new_message = {
+        "role": "user",
+        "content": [{"type": "text", "text": prompt}]
+    }
+    
+    if not updated_messages:
+        updated_messages.append(new_message)
+        return updated_messages
+    
+    for message in reversed(updated_messages):
+        if message.get("role") == "user":
+            message["content"] = new_message["content"]
+            return updated_messages
+    
+    # If no user message is found, append the new user message
+    updated_messages.append(new_message)
+    
+    return updated_messages
 
 
 def _parse_text_messages(messages: List['ConversationMessage']) -> List[Dict[str, Any]]:
