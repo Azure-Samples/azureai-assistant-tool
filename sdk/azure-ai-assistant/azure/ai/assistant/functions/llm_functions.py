@@ -28,6 +28,7 @@ def _retrieve_and_parse_conversation(thread_client):
         logger.info(f"retrieve_and_parse_conversation, thread_id: {thread_id}")
 
         thread_name = thread_config.get_thread_name_by_id(thread_id)
+        # Retrieve max 10 last text messages from the conversation
         conversation = thread_client.retrieve_conversation(
             thread_name=thread_name, max_text_messages=10
         )
