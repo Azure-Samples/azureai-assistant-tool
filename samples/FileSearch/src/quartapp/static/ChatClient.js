@@ -21,12 +21,12 @@ class ChatClient {
         });
 
         const data = await response.json();
-        return data.thread_name;
+        return data.thread_id;
     }
 
-    listenToServer(url, threadName) {
+    listenToServer(url, threadID) {
         if (!this.eventSource || this.eventSource.readyState === EventSource.CLOSED) {
-            this.eventSource = new EventSource(`${url}/${threadName}`);
+            this.eventSource = new EventSource(`${url}/${threadID}`);
             this.handleMessages();
         }
     }

@@ -12,9 +12,9 @@ function initChat() {
 
     form.addEventListener("submit", async function(e) {
         e.preventDefault();
-        const threadName = await chatClient.sendMessage("/chat");
-        if (threadName) {
-            chatClient.listenToServer("/stream", threadName);
+        const thread_id = await chatClient.sendMessage("/chat");
+        if (thread_id) {
+            chatClient.listenToServer("/stream", thread_id);
         }
         chatClient.messageInput.value = "";
     });

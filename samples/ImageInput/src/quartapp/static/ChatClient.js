@@ -37,7 +37,7 @@ class ChatClient {
         });
 
         const data = await response.json();
-        return data.thread_name;
+        return data.thread_id;
     }
 
     listenToServer(url, threadName) {
