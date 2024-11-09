@@ -315,14 +315,14 @@ class AssistantConfigDialog(QDialog):
         # Input Audio Format
         self.inputAudioFormatLabel = QLabel('Input Audio Format:')
         self.inputAudioFormatComboBox = QComboBox()
-        self.inputAudioFormatComboBox.addItems(['PCM (24kHz, 16-bit, mono)'])
+        self.inputAudioFormatComboBox.addItems(['pcm_24khz_mono'])
         self.audioLayout.addWidget(self.inputAudioFormatLabel)
         self.audioLayout.addWidget(self.inputAudioFormatComboBox)
 
         # Output Audio Format
         self.outputAudioFormatLabel = QLabel('Output Audio Format:')
         self.outputAudioFormatComboBox = QComboBox()
-        self.outputAudioFormatComboBox.addItems(['PCM (24kHz, 16-bit, mono)'])
+        self.outputAudioFormatComboBox.addItems(['pcm_24khz_mono'])
         self.audioLayout.addWidget(self.outputAudioFormatLabel)
         self.audioLayout.addWidget(self.outputAudioFormatComboBox)
 
@@ -429,7 +429,7 @@ class AssistantConfigDialog(QDialog):
 
         # Chunk Size
         self.chunkSizeLayout = QHBoxLayout()
-        self.chunkSizeLabel = QLabel('Chunk Size:')
+        self.chunkSizeLabel = QLabel('Chunk Size (bytes):')
         self.chunkSizeSpinBox = QSpinBox()
         self.chunkSizeSpinBox.setRange(0, 10000)
         self.chunkSizeSpinBox.setValue(1024)
@@ -438,7 +438,7 @@ class AssistantConfigDialog(QDialog):
 
         # Window Duration
         self.windowDurationLayout = QHBoxLayout()
-        self.windowDurationLabel = QLabel('Window Duration:')
+        self.windowDurationLabel = QLabel('Window Duration (ms):')
         self.windowDurationSpinBox = QSpinBox()
         self.windowDurationSpinBox.setRange(0, 10000)
         self.windowDurationSpinBox.setValue(1500)
@@ -447,7 +447,7 @@ class AssistantConfigDialog(QDialog):
 
         # Silence Ratio
         self.silenceRatioLayout = QHBoxLayout()
-        self.silenceRatioLabel = QLabel('Silence Ratio:')
+        self.silenceRatioLabel = QLabel('Silence Ratio (0.0 to 10.0):')
         self.silenceRatioSpinBox = QSpinBox()
         self.silenceRatioSpinBox.setRange(0, 10000)
         self.silenceRatioSpinBox.setValue(1500)
@@ -456,7 +456,7 @@ class AssistantConfigDialog(QDialog):
 
         # Minimum Speech Duration
         self.minSpeechDurationLayout = QHBoxLayout()
-        self.minSpeechDurationLabel = QLabel('Minimum Speech Duration:')
+        self.minSpeechDurationLabel = QLabel('Minimum Speech Duration (ms):')
         self.minSpeechDurationSpinBox = QSpinBox()
         self.minSpeechDurationSpinBox.setRange(0, 10000)
         self.minSpeechDurationSpinBox.setValue(300)
@@ -465,7 +465,7 @@ class AssistantConfigDialog(QDialog):
 
         # Minimum Silence Duration
         self.minSilenceDurationLayout = QHBoxLayout()
-        self.minSilenceDurationLabel = QLabel('Minimum Silence Duration:')
+        self.minSilenceDurationLabel = QLabel('Minimum Silence Duration (ms):')
         self.minSilenceDurationSpinBox = QSpinBox()
         self.minSilenceDurationSpinBox.setRange(0, 10000)
         self.minSilenceDurationSpinBox.setValue(1000)
@@ -893,6 +893,9 @@ class AssistantConfigDialog(QDialog):
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
 
+            if self.assistant_type == "realtime_assistant":
+                self.load_audio_settings(self.assistant_config.audio_config)
+
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
             if output_folder_path:
@@ -948,6 +951,27 @@ class AssistantConfigDialog(QDialog):
             elif self.assistant_type == "realtime_assistant":
                 self.temperatureSlider.setValue(100)
                 self.maxResponseOutputTokensEdit.setText("inf")
+
+    def load_audio_settings(self, audio_config):
+        if audio_config:
+            self.voiceComboBox.setCurrentText(audio_config.voice)
+            self.inputAudioFormatComboBox.setCurrentText(audio_config.input_audio_format)
+            self.outputAudioFormatComboBox.setCurrentText(audio_config.output_audio_format)
+            self.inputAudioTranscriptionComboBox.setCurrentText(audio_config.input_audio_transcription)
+            self.keywordDetectionLineEdit.setText(audio_config.keyword_detection)
+
+            turn_detection_type = audio_config.turn_detection.get('type', 'local_vad')
+            self.turnDetectionComboBox.setCurrentText(turn_detection_type)
+            if turn_detection_type == "server_vad":
+                self.serverVadThresholdSlider.setValue(audio_config.turn_detection.get('server_vad_threshold', 0.5) * 100)
+                self.prefixPaddingMsSpinBox.setValue(audio_config.turn_detection.get('prefix_padding_ms', 300))
+                self.silenceDurationMsSpinBox.setValue(audio_config.turn_detection.get('silence_duration_ms', 500))
+            elif turn_detection_type == "local_vad":
+                self.chunkSizeSpinBox.setValue(audio_config.turn_detection.get('chunk_size', 1024))
+                self.windowDurationSpinBox.setValue(audio_config.turn_detection.get('window_duration', 1500))
+                self.silenceRatioSpinBox.setValue(audio_config.turn_detection.get('silence_ratio', 1500))
+                self.minSpeechDurationSpinBox.setValue(audio_config.turn_detection.get('min_speech_duration', 300))
+                self.minSilenceDurationSpinBox.setValue(audio_config.turn_detection.get('min_silence_duration', 1000))
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -1021,6 +1045,35 @@ class AssistantConfigDialog(QDialog):
         for item in selected_items:
             del file_dict[item.text()]
             list_widget.takeItem(list_widget.row(item))
+
+    def get_audio_settings(self):
+        turn_detection = {}
+        if self.turnDetectionComboBox.currentText() == "server_vad":
+            turn_detection = {
+                'type': 'server_vad',
+                'server_vad_threshold': self.serverVadThresholdSlider.value() / 100,
+                'prefix_padding_ms': self.prefixPaddingMsSpinBox.value(),
+                'silence_duration_ms': self.silenceDurationMsSpinBox.value()
+            }
+        elif self.turnDetectionComboBox.currentText() == "local_vad":
+            turn_detection = {
+                'type': 'local_vad',
+                'chunk_size': self.chunkSizeSpinBox.value(),
+                'window_duration': self.windowDurationSpinBox.value(),
+                'silence_ratio': self.silenceRatioSpinBox.value(),
+                'min_speech_duration': self.minSpeechDurationSpinBox.value(),
+                'min_silence_duration': self.minSilenceDurationSpinBox.value()
+            }
+        audio_config = {
+            'voice': self.voiceComboBox.currentText(),
+            'input_audio_format': self.inputAudioFormatComboBox.currentText(),
+            'output_audio_format': self.outputAudioFormatComboBox.currentText(),
+            'input_audio_transcription': self.inputAudioTranscriptionComboBox.currentText(),
+            'keyword_detection': self.keywordDetectionLineEdit.text(),
+            'turn_detection': turn_detection
+        }
+
+        return audio_config
 
     def save_configuration(self):
         if self.tabWidget.currentIndex() == 3:
@@ -1102,7 +1155,8 @@ class AssistantConfigDialog(QDialog):
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
-            'completion_settings': completion_settings
+            'completion_settings': completion_settings,
+            'audio_settings': self.get_audio_settings() if self.assistant_type == "realtime_assistant" else None
         }
 
         # Validation and emission of the configuration

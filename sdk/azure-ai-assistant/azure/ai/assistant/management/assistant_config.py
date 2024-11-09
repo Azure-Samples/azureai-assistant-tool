@@ -8,6 +8,175 @@ import json, os
 from typing import Optional, Union
 
 
+class AudioConfig:
+    """
+    A class representing the configuration for audio.
+
+    :param voice: The voice.
+    :type voice: str
+    :param input_audio_format: The input audio format.
+    :type input_audio_format: str
+    :param output_audio_format: The output audio format.
+    :type output_audio_format: str
+    :param input_audio_transcription: The input audio transcription.
+    :type input_audio_transcription: str
+    :param keyword_detection: The keyword detection.
+    :type keyword_detection: str
+    :param turn_detection: The turn detection.
+    :type turn_detection: dict
+    """
+    def __init__(self,
+                 voice: str,
+                 input_audio_format: str,
+                 output_audio_format: str,
+                 input_audio_transcription: str,
+                 keyword_detection: str,
+                 turn_detection: dict
+    ) -> None:
+        self._voice = voice
+        self._input_audio_format = input_audio_format
+        self._output_audio_format = output_audio_format
+        self._input_audio_transcription = input_audio_transcription
+        self._keyword_detection = keyword_detection
+        self._turn_detection = turn_detection
+
+    @property
+    def voice(self) -> str:
+        """
+        Get the voice.
+
+        :return: The voice.
+        :rtype: str
+        """
+        return self._voice
+    
+    @voice.setter
+    def voice(self, value) -> None:
+        """
+        Set the voice.
+
+        :param value: The voice.
+        :type value: str
+        """
+        self._voice = value
+
+    @property
+    def input_audio_format(self) -> str:
+        """
+        Get the input audio format.
+
+        :return: The input audio format.
+        :rtype: str
+        """
+        return self._input_audio_format
+    
+    @input_audio_format.setter
+    def input_audio_format(self, value) -> None:
+        """
+        Set the input audio format.
+
+        :param value: The input audio format.
+        :type value: str
+        """
+        self._input_audio_format = value
+
+    @property
+    def output_audio_format(self) -> str:
+        """
+        Get the output audio format.
+
+        :return: The output audio format.
+        :rtype: str
+        """
+        return self._output_audio_format
+    
+    @output_audio_format.setter
+    def output_audio_format(self, value) -> None:
+        """
+        Set the output audio format.
+
+        :param value: The output audio format.
+        :type value: str
+        """
+        self._output_audio_format = value
+
+    @property
+    def input_audio_transcription(self) -> str:
+        """
+        Get the input audio transcription.
+
+        :return: The input audio transcription.
+        :rtype: str
+        """
+        return self._input_audio_transcription
+    
+    @input_audio_transcription.setter
+    def input_audio_transcription(self, value) -> None:
+        """
+        Set the input audio transcription.
+
+        :param value: The input audio transcription.
+        :type value: str
+        """
+        self._input_audio_transcription = value
+
+    @property
+    def keyword_detection(self) -> str:
+        """
+        Get the keyword detection.
+
+        :return: The keyword detection.
+        :rtype: str
+        """
+        return self._keyword_detection
+    
+    @keyword_detection.setter
+    def keyword_detection(self, value) -> None:
+        """
+        Set the keyword detection.
+
+        :param value: The keyword detection.
+        :type value: str
+        """
+        self._keyword_detection = value
+
+    @property
+    def turn_detection(self) -> dict:
+        """
+        Get the turn detection.
+
+        :return: The turn detection.
+        :rtype: dict
+        """
+        return self._turn_detection
+    
+    @turn_detection.setter
+    def turn_detection(self, value) -> None:
+        """
+        Set the turn detection.
+
+        :param value: The turn detection.
+        :type value: dict
+        """
+        self._turn_detection = value
+
+    def to_dict(self) -> dict:
+        """
+        Convert the audio configuration to a dictionary.
+
+        :return: The audio configuration as a dictionary.
+        :rtype: dict
+        """
+        return {
+            'voice': self.voice,
+            'input_audio_format': self.input_audio_format,
+            'output_audio_format': self.output_audio_format,
+            'input_audio_transcription': self.input_audio_transcription,
+            'keyword_detection': self.keyword_detection,
+            'turn_detection': self.turn_detection
+        }
+
+
 class TextCompletionConfig:
     """
     A class representing the configuration for text completion.
@@ -655,6 +824,7 @@ class AssistantConfig:
 
         # Completion settings based on assistant type
         self._text_completion_config = self._setup_completion_settings(config_data)
+        self._audio_config = self._setup_audio_config(config_data)
 
         # Config folder for local assistant and threads configuration
         self._config_folder = None
@@ -704,6 +874,34 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     truncation_strategy=completion_data['truncation_strategy']
                 )
+
+    def _setup_audio_config(self, config_data):
+        if config_data.get('audio', None) is not None:
+            audio_data = config_data.get('audio', {
+                'voice': 'alloy',
+                'input_audio_format': 'pcm_24khz_mono',
+                'output_audio_format': 'pcm_24khz_mono',
+                'input_audio_transcription': 'whisper-1',
+                'keyword_detection': 'none',
+                'turn_detection': {
+                    'type': 'local_vad',
+                    'chunk_size': 1024,
+                    'window_duration': 1500,
+                    'silence_ratio': 1500,
+                    'min_speech_duration': 300,
+                    'min_silence_duration': 1000
+                }
+            })
+            return AudioConfig(
+                voice=audio_data['voice'],
+                input_audio_format=audio_data['input_audio_format'],
+                output_audio_format=audio_data['output_audio_format'],
+                input_audio_transcription=audio_data['input_audio_transcription'],
+                keyword_detection=audio_data['keyword_detection'],
+                turn_detection=audio_data['turn_detection']
+            )
+        else:
+            return None
 
     def _initialize_tool_resources(self, tool_resources_data):
         if tool_resources_data:
@@ -790,6 +988,7 @@ class AssistantConfig:
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
+        self._config_data['audio'] = self._audio_config.to_dict() if self._audio_config is not None else None
         self._config_data['config_folder'] = self._config_folder
         return self._config_data
 
@@ -1030,6 +1229,15 @@ class AssistantConfig:
         """
         return self._text_completion_config
     
+    @property
+    def audio_config(self) -> AudioConfig:
+        """Get the audio config.
+        
+        :return: The audio config.
+        :rtype: AudioConfig
+        """
+        return self._audio_config
+
     @property
     def config_folder(self) -> str:
         """Get the config folder.
