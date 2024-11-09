@@ -54,7 +54,6 @@ class AssistantConfigDialog(QDialog):
         self.function_config_manager = function_config_manager
 
         self.init_variables()
-        self.init_speech_input()
         self.init_ui()
 
     def init_variables(self):
@@ -71,23 +70,7 @@ class AssistantConfigDialog(QDialog):
         if not os.path.exists(self.default_output_folder_path):
             os.makedirs(self.default_output_folder_path)
 
-    def init_speech_input(self):
-        self.is_mic_on = False
-        self.currentHypothesis = ""
-        self.user_input_signal = UserInputSignal()
-        self.user_input_send_signal = UserInputSendSignal()
-        self.user_input_signal.update_signal.connect(self.on_user_input)
-        self.user_input_send_signal.send_signal.connect(self.on_user_input_complete)
-        try:
-            self.speech_input_handler = SpeechInputHandler(self, self.user_input_signal.update_signal, self.user_input_send_signal.send_signal)
-        except ValueError as e:
-            logger.error(f"Error initializing speech input handler: {e}")
-
     def on_tab_changed(self, index):
-        # Check if the microphone is on when changing tabs
-        if self.is_mic_on:
-            self.toggle_mic()
-
         # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
         if index == 3:
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
@@ -96,9 +79,6 @@ class AssistantConfigDialog(QDialog):
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
     def closeEvent(self, event):
-        # Check if the microphone is on when closing the window
-        if self.is_mic_on:
-            self.toggle_mic()
         super(AssistantConfigDialog, self).closeEvent(event)
 
     def init_ui(self):
@@ -114,8 +94,14 @@ class AssistantConfigDialog(QDialog):
         toolsTab = self.create_tools_tab()
         self.tabWidget.addTab(toolsTab, "Tools")
 
+        # Create Completion tab
         completionTab = self.create_completion_tab()
         self.tabWidget.addTab(completionTab, "Completion")
+
+        # Create Audio tab for real-time assistant
+        if self.assistant_type == "realtime_assistant":
+            self.create_audio_tab()
+            self.tabWidget.addTab(self.create_audio_tab(), "Audio")
 
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
@@ -130,7 +116,7 @@ class AssistantConfigDialog(QDialog):
         self.saveButton.clicked.connect(self.save_configuration)
         mainLayout.addWidget(self.saveButton)
 
-        # setup status bar
+        # Setup status bar
         self.status_bar = StatusBar(self)
         mainLayout.addWidget(self.status_bar.get_widget())
 
@@ -315,6 +301,187 @@ class AssistantConfigDialog(QDialog):
 
         return toolsTab
 
+    def create_audio_tab(self):
+        audioTab = QWidget()
+        self.audioLayout = QVBoxLayout(audioTab)
+
+        # Voice selection
+        self.voiceLabel = QLabel('Voice:')
+        self.voiceComboBox = QComboBox()
+        self.voiceComboBox.addItems(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'])
+        self.audioLayout.addWidget(self.voiceLabel)
+        self.audioLayout.addWidget(self.voiceComboBox)
+
+        # Input Audio Format
+        self.inputAudioFormatLabel = QLabel('Input Audio Format:')
+        self.inputAudioFormatComboBox = QComboBox()
+        self.inputAudioFormatComboBox.addItems(['PCM (24kHz, 16-bit, mono)'])
+        self.audioLayout.addWidget(self.inputAudioFormatLabel)
+        self.audioLayout.addWidget(self.inputAudioFormatComboBox)
+
+        # Output Audio Format
+        self.outputAudioFormatLabel = QLabel('Output Audio Format:')
+        self.outputAudioFormatComboBox = QComboBox()
+        self.outputAudioFormatComboBox.addItems(['PCM (24kHz, 16-bit, mono)'])
+        self.audioLayout.addWidget(self.outputAudioFormatLabel)
+        self.audioLayout.addWidget(self.outputAudioFormatComboBox)
+
+        # Input Audio Transcription
+        self.inputAudioTranscriptionLabel = QLabel('Input Audio Transcription:')
+        self.inputAudioTranscriptionComboBox = QComboBox()
+        self.inputAudioTranscriptionComboBox.addItems(['whisper-1'])
+        self.audioLayout.addWidget(self.inputAudioTranscriptionLabel)
+        self.audioLayout.addWidget(self.inputAudioTranscriptionComboBox)
+
+        # Keyword Detection
+        self.keywordDetectionLabel = QLabel('Keyword Detection:')
+        # Line edit for keyword detection model file path
+        self.keywordDetectionLineEdit = QLineEdit()
+        self.keywordDetectionLineEdit.setPlaceholderText("resources/kws.table")
+        self.audioLayout.addWidget(self.keywordDetectionLabel)
+        self.audioLayout.addWidget(self.keywordDetectionLineEdit)
+
+        # Turn Detection
+        self.turnDetectionLabel = QLabel('Turn Detection:')
+        self.turnDetectionComboBox = QComboBox()
+        self.turnDetectionComboBox.addItems(['server_vad', 'local_vad'])
+        self.turnDetectionComboBox.currentIndexChanged.connect(self.update_vad_settings)
+        self.audioLayout.addWidget(self.turnDetectionLabel)
+        self.audioLayout.addWidget(self.turnDetectionComboBox)
+
+        # Initialize with default VAD settings
+        self.currentVadSettings = None
+        self.update_vad_settings()
+
+        return audioTab
+
+    def update_vad_settings(self):
+        """ Updates the UI based on the selected VAD option (server or local). """
+        # Remove existing VAD settings
+        if self.currentVadSettings:
+            self.clear_vad_layout(self.currentVadSettings)
+        
+        # Apply new settings based on the selected option
+        vad_selection = self.turnDetectionComboBox.currentText()
+        if vad_selection == 'server_vad':
+            self.setup_server_vad(self.audioLayout)
+            self.currentVadSettings = self.serverVadSettings
+        else:
+            self.setup_local_vad(self.audioLayout)
+            self.currentVadSettings = self.localVadSettings
+
+    def clear_vad_layout(self, layout):
+        """ Clears all widgets and sub-layouts from the specified layout. """
+        # Recursively remove widgets from the layout
+        for i in reversed(range(layout.count())):
+            item = layout.itemAt(i)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            elif item.layout() is not None:
+                self.clear_vad_layout(item.layout())
+        # Reset the layout after clearing
+        layout.update()
+
+    def setup_server_vad(self, layout):
+        self.serverVadSettings = QVBoxLayout()
+
+        # Activation Threshold
+        self.serverVadThresholdLabel = QLabel('Activation Threshold for VAD (0.0 to 1.0):')
+        self.serverVadThresholdSlider = QSlider(Qt.Horizontal)
+        self.serverVadThresholdSlider.setMinimum(0)
+        self.serverVadThresholdSlider.setMaximum(100)
+        self.serverVadThresholdSlider.setValue(50)
+        self.serverVadThresholdValueLabel = QLabel('0.5')
+        self.serverVadThresholdSlider.valueChanged.connect(
+            lambda: self.serverVadThresholdValueLabel.setText(f"{self.serverVadThresholdSlider.value() / 100:.1f}"))
+        self.serverVadSettings.addWidget(self.serverVadThresholdLabel)
+        self.serverVadSettings.addWidget(self.serverVadThresholdSlider)
+        self.serverVadSettings.addWidget(self.serverVadThresholdValueLabel)
+
+        # Prefix Padding
+        self.prefixPaddingMsLayout = QHBoxLayout()
+        self.prefixPaddingMsLabel = QLabel('Prefix Padding (ms):')
+        self.prefixPaddingMsSpinBox = QSpinBox()
+        self.prefixPaddingMsSpinBox.setRange(0, 1000)
+        self.prefixPaddingMsSpinBox.setValue(300)
+        self.prefixPaddingMsLayout.addWidget(self.prefixPaddingMsLabel)
+        self.prefixPaddingMsLayout.addWidget(self.prefixPaddingMsSpinBox)
+
+        # Silence Duration
+        self.silenceDurationMsLayout = QHBoxLayout()
+        self.silenceDurationMsLabel = QLabel('Silence Duration (ms):')
+        self.silenceDurationMsSpinBox = QSpinBox()
+        self.silenceDurationMsSpinBox.setRange(0, 1000)
+        self.silenceDurationMsSpinBox.setValue(500)
+        self.silenceDurationMsLayout.addWidget(self.silenceDurationMsLabel)
+        self.silenceDurationMsLayout.addWidget(self.silenceDurationMsSpinBox)
+
+        # Add layouts to settings
+        self.serverVadSettings.addLayout(self.prefixPaddingMsLayout)
+        self.serverVadSettings.addLayout(self.silenceDurationMsLayout)
+
+        # Add server VAD settings to main layout
+        layout.addLayout(self.serverVadSettings)
+
+    def setup_local_vad(self, layout):
+        self.localVadSettings = QVBoxLayout()
+
+        # Chunk Size
+        self.chunkSizeLayout = QHBoxLayout()
+        self.chunkSizeLabel = QLabel('Chunk Size:')
+        self.chunkSizeSpinBox = QSpinBox()
+        self.chunkSizeSpinBox.setRange(0, 10000)
+        self.chunkSizeSpinBox.setValue(1024)
+        self.chunkSizeLayout.addWidget(self.chunkSizeLabel)
+        self.chunkSizeLayout.addWidget(self.chunkSizeSpinBox)
+
+        # Window Duration
+        self.windowDurationLayout = QHBoxLayout()
+        self.windowDurationLabel = QLabel('Window Duration:')
+        self.windowDurationSpinBox = QSpinBox()
+        self.windowDurationSpinBox.setRange(0, 10000)
+        self.windowDurationSpinBox.setValue(1500)
+        self.windowDurationLayout.addWidget(self.windowDurationLabel)
+        self.windowDurationLayout.addWidget(self.windowDurationSpinBox)
+
+        # Silence Ratio
+        self.silenceRatioLayout = QHBoxLayout()
+        self.silenceRatioLabel = QLabel('Silence Ratio:')
+        self.silenceRatioSpinBox = QSpinBox()
+        self.silenceRatioSpinBox.setRange(0, 10000)
+        self.silenceRatioSpinBox.setValue(1500)
+        self.silenceRatioLayout.addWidget(self.silenceRatioLabel)
+        self.silenceRatioLayout.addWidget(self.silenceRatioSpinBox)
+
+        # Minimum Speech Duration
+        self.minSpeechDurationLayout = QHBoxLayout()
+        self.minSpeechDurationLabel = QLabel('Minimum Speech Duration:')
+        self.minSpeechDurationSpinBox = QSpinBox()
+        self.minSpeechDurationSpinBox.setRange(0, 10000)
+        self.minSpeechDurationSpinBox.setValue(300)
+        self.minSpeechDurationLayout.addWidget(self.minSpeechDurationLabel)
+        self.minSpeechDurationLayout.addWidget(self.minSpeechDurationSpinBox)
+
+        # Minimum Silence Duration
+        self.minSilenceDurationLayout = QHBoxLayout()
+        self.minSilenceDurationLabel = QLabel('Minimum Silence Duration:')
+        self.minSilenceDurationSpinBox = QSpinBox()
+        self.minSilenceDurationSpinBox.setRange(0, 10000)
+        self.minSilenceDurationSpinBox.setValue(1000)
+        self.minSilenceDurationLayout.addWidget(self.minSilenceDurationLabel)
+        self.minSilenceDurationLayout.addWidget(self.minSilenceDurationSpinBox)
+
+        # Add layouts to settings
+        self.localVadSettings.addLayout(self.chunkSizeLayout)
+        self.localVadSettings.addLayout(self.windowDurationLayout)
+        self.localVadSettings.addLayout(self.silenceRatioLayout)
+        self.localVadSettings.addLayout(self.minSpeechDurationLayout)
+        self.localVadSettings.addLayout(self.minSilenceDurationLayout)
+
+        # Add local VAD settings to main layout
+        layout.addLayout(self.localVadSettings)
+
     def setup_code_interpreter_files(self, layout):
         codeFilesLabel = QLabel('Files for Code Interpreter:')
         self.codeFileList = QListWidget()
@@ -375,6 +542,8 @@ class AssistantConfigDialog(QDialog):
             self.init_assistant_completion_settings(completionLayout)
         elif self.assistant_type == "chat_assistant":
             self.init_chat_assistant_completion_settings(completionLayout)
+        elif self.assistant_type == "realtime_assistant":
+            self.init_realtime_assistant_completion_settings(completionLayout)
 
         self.toggleCompletionSettings()
 
@@ -478,7 +647,19 @@ class AssistantConfigDialog(QDialog):
 
         completionLayout.addLayout(self.maxMessagesLayout)
 
-    def init_common_completion_settings(self, completionLayout):
+    def init_realtime_assistant_completion_settings(self, completionLayout):
+        self.init_temperature_slider(completionLayout)
+        self.maxResponseOutputTokensLayout = QHBoxLayout()
+        # if not set, it will be set to None (default) in the completion request
+        self.maxResponseOutputTokensLabel = QLabel('Max Response Output Tokens (1-4096 or "inf"):')
+        self.maxResponseOutputTokensEdit = QLineEdit()
+        self.maxResponseOutputTokensEdit.setPlaceholderText("inf")
+        self.maxResponseOutputTokensEdit.setToolTip("Maximum number of output tokens for a single assistant response, inclusive of tool calls. Provide an integer between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model.")
+        self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensLabel)
+        self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensEdit)
+        completionLayout.addLayout(self.maxResponseOutputTokensLayout)
+
+    def init_temperature_slider(self, completionLayout):
         self.temperatureLabel = QLabel('Temperature:')
         self.temperatureSlider = QSlider(Qt.Horizontal)
         self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
@@ -491,6 +672,8 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.temperatureSlider)
         completionLayout.addWidget(self.temperatureValueLabel)
 
+    def init_common_completion_settings(self, completionLayout):
+        self.init_temperature_slider(completionLayout)
         self.topPLabel = QLabel('Top P:')
         self.topPSlider = QSlider(Qt.Horizontal)
         self.topPSlider.setToolTip("Controls the diversity of the generated text. Lower values make the text more deterministic, while higher values make it more diverse.")
@@ -529,6 +712,9 @@ class AssistantConfigDialog(QDialog):
             self.topPSlider.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
             self.temperatureSlider.setEnabled(isEnabled)
+        elif self.assistant_type == "realtime_assistant":
+            self.temperatureSlider.setEnabled(isEnabled)
+            self.maxResponseOutputTokensEdit.setEnabled(isEnabled)
 
     def ai_client_selection_changed(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
@@ -620,25 +806,6 @@ class AssistantConfigDialog(QDialog):
         instructionsEditorTab = QWidget()
         instructionsEditorLayout = QVBoxLayout(instructionsEditorTab)
 
-        # Load icons
-        self.mic_on_icon = QIcon(resource_path("gui/images/mic_on.png"))
-        self.mic_off_icon = QIcon(resource_path("gui/images/mic_off.png"))
-
-        # Microphone button
-        self.micButton = QPushButton()
-        self.micButton.setIcon(self.mic_off_icon)  # Set initial icon
-        self.micButton.setIconSize(QSize(24, 24))  # Set icon size
-        self.micButton.setFixedSize(30, 30)  # Set button size
-        self.micButton.clicked.connect(self.toggle_mic)
-        self.micButton.setStyleSheet("QPushButton { border: none; }")  # Optional: remove border
-        self.micButton.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        # Add microphone button to the top left corner
-        topLayout = QHBoxLayout()
-        topLayout.addWidget(self.micButton)
-        topLayout.addStretch()  # This will push the button to the right
-        instructionsEditorLayout.addLayout(topLayout)
-
         # QTextEdit for entering instructions
         self.newInstructionsEdit = QTextEdit()
         self.newInstructionsEdit.setText("")
@@ -656,41 +823,6 @@ class AssistantConfigDialog(QDialog):
         folderPath = QFileDialog.getExistingDirectory(self, "Select Output Folder", "", options=options)
         if folderPath:
             self.outputFolderPathEdit.setText(folderPath)
-
-    def toggle_mic(self):
-        if self.is_mic_on:
-            self.micButton.setIcon(self.mic_off_icon)
-            self.speech_input_handler.stop_listening_from_mic()
-        else:
-            self.micButton.setIcon(self.mic_on_icon)
-            self.speech_input_handler.start_listening_from_mic()
-        self.is_mic_on = not self.is_mic_on
-
-    def on_user_input(self, text):
-        # Update the instructions editor with the hypothesis result
-        if self.currentHypothesis:
-            # Remove the last hypothesis before adding the new one
-            currentText = self.newInstructionsEdit.toPlainText()
-            updatedText = currentText.rsplit(self.currentHypothesis, 1)[0] + text
-            self.newInstructionsEdit.setPlainText(updatedText)
-        else:
-            # If no previous hypothesis, just update the text
-            self.newInstructionsEdit.insertPlainText(text)
-        self.currentHypothesis = text
-
-    def on_user_input_complete(self, text):
-        # Replace the hypothesis with the complete result
-        if self.currentHypothesis:
-            # Remove the last hypothesis before adding the complete text
-            currentText = self.newInstructionsEdit.toPlainText()
-            updatedText = currentText.rsplit(self.currentHypothesis, 1)[0] + text + "\n"
-            self.newInstructionsEdit.setPlainText(updatedText)
-        else:
-            # If no previous hypothesis, just append the text
-            self.newInstructionsEdit.append(text)
-        self.currentHypothesis = ""
-        # Move the cursor to the end
-        self.newInstructionsEdit.moveCursor(QtGui.QTextCursor.End)
 
     def check_instructions(self):
         threading.Thread(target=self._check_instructions, args=()).start()
@@ -792,6 +924,9 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
+            elif self.assistant_type == "realtime_assistant":
+                self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
+                self.maxResponseOutputTokensEdit.setText(str(completion_settings.get('max_response_output_tokens', 'inf')))
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
@@ -810,6 +945,9 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
                 self.maxMessagesEdit.setValue(10)
+            elif self.assistant_type == "realtime_assistant":
+                self.temperatureSlider.setValue(100)
+                self.maxResponseOutputTokensEdit.setText("inf")
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -944,6 +1082,12 @@ class AssistantConfigDialog(QDialog):
                 code_interpreter_files=code_interpreter_files,
                 file_search_vector_stores=vector_stores
             )
+        elif self.assistant_type == "realtime_assistant":
+            if not self.useDefaultSettingsCheckBox.isChecked():
+                completion_settings = {
+                    'temperature': self.temperatureSlider.value() / 100,
+                    'max_response_output_tokens': self.maxResponseOutputTokensEdit.text()
+                }
 
         config = {
             'name': self.assistant_name,

@@ -40,6 +40,10 @@ class AssistantsMenu:
         createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
         self.assistants_menu.addAction(createChatAssistantAction)
 
+        createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
+        createRealtimeAssistantAction.triggered.connect(lambda: self.create_new_edit_realtime_assistant())
+        self.assistants_menu.addAction(createRealtimeAssistantAction)
+
         # Add an action for exporting an assistant
         exportAction = QAction('Export', self.main_window)
         exportAction.triggered.connect(self.export_assistant)
@@ -60,6 +64,15 @@ class AssistantsMenu:
         # Connect the custom signal to a method to process the submitted data
         self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
         
+        # Show the dialog non-modally
+        self.dialog.show()
+
+    def create_new_edit_realtime_assistant(self):
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="realtime_assistant", function_config_manager=self.function_config_manager)
+        
+        # Connect the custom signal to a method to process the submitted data
+        self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
+
         # Show the dialog non-modally
         self.dialog.show()
 
