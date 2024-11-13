@@ -143,10 +143,19 @@ class AssistantConfigDialog(QDialog):
         # AI client selection
         self.aiClientLabel = QLabel('AI Client:')
         self.aiClientComboBox = QComboBox()
-        ai_client_type_names = [client_type.name for client_type in AIClientType]
-        self.aiClientComboBox.addItems(ai_client_type_names)
+        if self.assistant_type == "realtime_assistant":
+            # Only add OPEN_AI_REALTIME for Realtime Assistants
+            self.aiClientComboBox.addItem(AIClientType.OPEN_AI_REALTIME.name)
+            self.aiClientComboBox.setEnabled(False)  # Optional: Disabling to prevent user change
+        else:
+            # Add all AIClientType options for other assistant types
+            for client_type in AIClientType:
+                if client_type != AIClientType.OPEN_AI_REALTIME:
+                    self.aiClientComboBox.addItem(client_type.name)
+            self.aiClientComboBox.setEnabled(True)  # Allow user selection for non-realtime
+
         active_ai_client_type = self.main_window.active_ai_client_type
-        self.aiClientComboBox.setCurrentIndex(ai_client_type_names.index(active_ai_client_type.name))
+        self.aiClientComboBox.setCurrentIndex(self.aiClientComboBox.findText(active_ai_client_type.name))
         self.aiClientComboBox.currentIndexChanged.connect(self.ai_client_selection_changed)
         configLayout.addWidget(self.aiClientLabel)
         configLayout.addWidget(self.aiClientComboBox)
@@ -751,10 +760,16 @@ class AssistantConfigDialog(QDialog):
                     models = ai_client.models.list().data
                     for model in models:
                         self.modelComboBox.addItem(model.id)
+            elif self.ai_client_type == AIClientType.OPEN_AI_REALTIME:
+                if ai_client:
+                    models = ai_client.models.list().data
+                    for model in models:
+                        if "realtime" in model.id:
+                            self.modelComboBox.addItem(model.id)
         except Exception as e:
             logger.error(f"Error getting models from AI client: {e}")
         finally:
-            if self.ai_client_type == AIClientType.OPEN_AI:
+            if self.ai_client_type == AIClientType.OPEN_AI or self.ai_client_type == AIClientType.OPEN_AI_REALTIME:
                 self.modelComboBox.setToolTip("Select a model ID supported for assistant from the list")
             elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
                 self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")

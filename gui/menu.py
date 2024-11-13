@@ -22,32 +22,41 @@ from gui.log_broadcaster import LogBroadcaster
 
 
 class AssistantsMenu:
-    def __init__(self, main_window):
+    def __init__(self, main_window, client_type):
         self.main_window = main_window
+        self.client_type = client_type
         self.assistants_menu = self.main_window.menuBar().addMenu("&Assistants")
         self.function_config_manager = FunctionConfigManager.get_instance()
         self.assistant_client_manager = AssistantClientManager.get_instance()
         self.create_assistants_menu()
 
     def create_assistants_menu(self):
-        self.assistantActions = {}
-
-        createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
-        createAssistantAction.triggered.connect(self.create_new_edit_assistant)
-        self.assistants_menu.addAction(createAssistantAction)
-
-        createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
-        createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
-        self.assistants_menu.addAction(createChatAssistantAction)
-
-        createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
-        createRealtimeAssistantAction.triggered.connect(lambda: self.create_new_edit_realtime_assistant())
-        self.assistants_menu.addAction(createRealtimeAssistantAction)
-
-        # Add an action for exporting an assistant
+        self.assistants_menu.clear()  # Clear existing menu actions
+        if self.client_type == AIClientType.OPEN_AI_REALTIME:
+            # Only add Realtime Assistant action
+            createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
+            createRealtimeAssistantAction.triggered.connect(self.create_new_edit_realtime_assistant)
+            self.assistants_menu.addAction(createRealtimeAssistantAction)
+        else:
+            # Add OpenAI Assistant action
+            createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
+            createAssistantAction.triggered.connect(self.create_new_edit_assistant)
+            self.assistants_menu.addAction(createAssistantAction)
+            
+            # Add Chat Assistant action
+            createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
+            createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
+            self.assistants_menu.addAction(createChatAssistantAction)
+        
+        # Common export action
         exportAction = QAction('Export', self.main_window)
         exportAction.triggered.connect(self.export_assistant)
         self.assistants_menu.addAction(exportAction)
+
+    def update_client_type(self, new_client_type):
+        if self.client_type != new_client_type:
+            self.client_type = new_client_type
+            self.create_assistants_menu()  # Update menu based on the new client type
 
     def create_new_edit_assistant(self):
         self.dialog = AssistantConfigDialog(parent=self.main_window, function_config_manager=self.function_config_manager)

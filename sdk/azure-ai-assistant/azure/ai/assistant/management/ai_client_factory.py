@@ -18,6 +18,8 @@ class AIClientType(Enum):
     """Azure OpenAI client"""
     OPEN_AI = auto()
     """OpenAI client"""
+    OPEN_AI_REALTIME = auto()
+    """OpenAI client used with Realtime API"""
 
 
 class AsyncAIClientType(Enum):
@@ -28,6 +30,8 @@ class AsyncAIClientType(Enum):
     """Azure OpenAI async client"""
     OPEN_AI = auto()
     """OpenAI async client"""
+    OPEN_AI_REALTIME = auto()
+    """OpenAI async client used with Realtime API"""
 
 
 class AIClientFactory:
@@ -87,13 +91,13 @@ class AIClientFactory:
         if isinstance(client_type, AIClientType):
             if client_type == AIClientType.AZURE_OPEN_AI:
                 self._clients[client_key] = AzureOpenAI(api_version=api_version, azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), **client_args)
-            elif client_type == AIClientType.OPEN_AI:
+            elif client_type == AIClientType.OPEN_AI or client_type == AIClientType.OPEN_AI_REALTIME:
                 self._clients[client_key] = OpenAI(**client_args)
                 
         elif isinstance(client_type, AsyncAIClientType):
             if client_type == AsyncAIClientType.AZURE_OPEN_AI:
                 self._clients[client_key] = AsyncAzureOpenAI(api_version=api_version, azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), **client_args)
-            elif client_type == AsyncAIClientType.OPEN_AI:
+            elif client_type == AsyncAIClientType.OPEN_AI or client_type == AsyncAIClientType.OPEN_AI_REALTIME:
                 self._clients[client_key] = AsyncOpenAI(**client_args)
         else:
             raise ValueError(f"Invalid client type: {client_type}")

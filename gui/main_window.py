@@ -131,6 +131,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.OPEN_AI
             )
+        elif self.system_client_type == AIClientType.OPEN_AI_REALTIME.name:
+            self.system_client = AIClientFactory.get_instance().get_client(
+                AIClientType.OPEN_AI_REALTIME
+            )
 
     def initialize_ui(self):
         self.initialize_ui_components()
@@ -149,7 +153,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.diagnostics_sidebar = DiagnosticsSidebar(self)
 
         # setup menus
-        self.assistants_menu = AssistantsMenu(self)
+        self.assistants_menu = AssistantsMenu(self, self.active_ai_client_type)
         self.functions_menu = FunctionsMenu(self)
         self.tasks_menu = TasksMenu(self)
         self.diagnostics_menu = DiagnosticsMenu(self)
@@ -239,9 +243,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech input handler: {e}")
             logger.error(f"Error initializing speech input handler: {e}")
 
-    def set_active_ai_client_type(self, ai_client_type : AIClientType):
+    def set_active_ai_client_type(self, new_client_type : AIClientType):
         # If the active AI client type is not yet initialized, return and set the active AI client type in deferred_init
         if not hasattr(self, 'conversation_thread_clients'):
+            return
+        
+        # If the new client type is the same as the current active client type, return
+        if self.active_ai_client_type == new_client_type:
             return
 
         # Save the conversation threads for the current active assistant
@@ -252,7 +260,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.assistant_config_manager.save_configs()
 
         self.conversation_view.conversationView.clear()
-        self.active_ai_client_type = ai_client_type
+
+        self.active_ai_client_type = new_client_type
+        if self.assistants_menu is not None:
+            self.assistants_menu.update_client_type(new_client_type)  # Update the menu for the new client type
+
         client = None
         try:
             if self.active_ai_client_type == AIClientType.AZURE_OPEN_AI:
@@ -262,6 +274,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             elif self.active_ai_client_type == AIClientType.OPEN_AI:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI
+                )
+            elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
+                client = AIClientFactory.get_instance().get_client(
+                    AIClientType.OPEN_AI_REALTIME
                 )
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
