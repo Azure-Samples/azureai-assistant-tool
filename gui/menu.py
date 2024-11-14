@@ -10,6 +10,7 @@ from PySide6.QtGui import QAction
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 from gui.debug_dialog import DebugViewDialog
@@ -89,8 +90,10 @@ class AssistantsMenu:
         try:
             if assistant_type == "chat_assistant":
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            else:
+            elif assistant_type == "assistant":
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            elif assistant_type == "realtime_assistant":
+                assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)

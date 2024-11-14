@@ -9,3 +9,6 @@ azure-cognitiveservices-speech
 
 # Beautiful Soup
 beautifulsoup4
+
+# Realtime Python Library
+https://github.com/jhakulin/realtime-ai/releases/download/v0.1.0/realtime_ai-0.1.0-py3-none-any.whl

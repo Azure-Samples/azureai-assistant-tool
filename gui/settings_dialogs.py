@@ -100,8 +100,8 @@ class ClientSettingsDialog(QDialog):
 
         # Create combo box for client selection
         self.clientSelection = QComboBox()
-        ai_client_type_names = [client_type.name for client_type in AIClientType]
-        self.clientSelection.addItems(ai_client_type_names)
+        self.clientSelection.addItem(AIClientType.OPEN_AI.name)
+        self.clientSelection.addItem(AIClientType.AZURE_OPEN_AI.name)
         self.layout.addWidget(self.clientSelection)
         # Connect the client selection change signal to the slot
         self.clientSelection.currentIndexChanged.connect(self.update_model_selection)
