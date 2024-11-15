@@ -100,8 +100,8 @@ class AssistantConfigDialog(QDialog):
 
         # Create Audio tab for real-time assistant
         if self.assistant_type == "realtime_assistant":
-            self.create_audio_tab()
-            self.tabWidget.addTab(self.create_audio_tab(), "Audio")
+            self.create_realtime_tab()
+            self.tabWidget.addTab(self.create_realtime_tab(), "Realtime")
 
         # Create Instructions Editor tab
         instructionsEditorTab = self.create_instructions_tab()
@@ -310,7 +310,7 @@ class AssistantConfigDialog(QDialog):
 
         return toolsTab
 
-    def create_audio_tab(self):
+    def create_realtime_tab(self):
         audioTab = QWidget()
         self.audioLayout = QVBoxLayout(audioTab)
 
@@ -320,6 +320,13 @@ class AssistantConfigDialog(QDialog):
         self.voiceComboBox.addItems(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'])
         self.audioLayout.addWidget(self.voiceLabel)
         self.audioLayout.addWidget(self.voiceComboBox)
+
+        # Modality selection
+        self.modalityLabel = QLabel('Modalities:')
+        self.modalityComboBox = QComboBox()
+        self.modalityComboBox.addItems(['text_and_audio', 'text'])
+        self.audioLayout.addWidget(self.modalityLabel)
+        self.audioLayout.addWidget(self.modalityComboBox)
 
         # Input Audio Format
         self.inputAudioFormatLabel = QLabel('Input Audio Format:')
@@ -335,20 +342,20 @@ class AssistantConfigDialog(QDialog):
         self.audioLayout.addWidget(self.outputAudioFormatLabel)
         self.audioLayout.addWidget(self.outputAudioFormatComboBox)
 
-        # Input Audio Transcription
-        self.inputAudioTranscriptionLabel = QLabel('Input Audio Transcription:')
-        self.inputAudioTranscriptionComboBox = QComboBox()
-        self.inputAudioTranscriptionComboBox.addItems(['whisper-1'])
-        self.audioLayout.addWidget(self.inputAudioTranscriptionLabel)
-        self.audioLayout.addWidget(self.inputAudioTranscriptionComboBox)
+        # Input Audio Transcription Model
+        self.inputAudioTranscriptionModelLabel = QLabel('Input Audio Transcription Model:')
+        self.inputAudioTranscriptionModelComboBox = QComboBox()
+        self.inputAudioTranscriptionModelComboBox.addItems(['whisper-1'])
+        self.audioLayout.addWidget(self.inputAudioTranscriptionModelLabel)
+        self.audioLayout.addWidget(self.inputAudioTranscriptionModelComboBox)
 
-        # Keyword Detection
-        self.keywordDetectionLabel = QLabel('Keyword Detection:')
+        # Keyword Detection Model
+        self.keywordDetectionModelLabel = QLabel('Keyword Detection Model:')
         # Line edit for keyword detection model file path
-        self.keywordDetectionLineEdit = QLineEdit()
-        self.keywordDetectionLineEdit.setPlaceholderText("resources/kws.table")
-        self.audioLayout.addWidget(self.keywordDetectionLabel)
-        self.audioLayout.addWidget(self.keywordDetectionLineEdit)
+        self.keywordDetectionModelLineEdit = QLineEdit()
+        self.keywordDetectionModelLineEdit.setPlaceholderText("resources/kws.table")
+        self.audioLayout.addWidget(self.keywordDetectionModelLabel)
+        self.audioLayout.addWidget(self.keywordDetectionModelLineEdit)
 
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
@@ -663,7 +670,7 @@ class AssistantConfigDialog(QDialog):
         self.maxResponseOutputTokensLabel = QLabel('Max Response Output Tokens (1-4096 or "inf"):')
         self.maxResponseOutputTokensEdit = QLineEdit()
         self.maxResponseOutputTokensEdit.setPlaceholderText("inf")
-        self.maxResponseOutputTokensEdit.setToolTip("Maximum number of output tokens for a single assistant response, inclusive of tool calls. Provide an integer between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model.")
+        self.maxResponseOutputTokensEdit.setToolTip("Maximum number of output tokens for a single assistant response, inclusive of tool calls. Provide a number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model.")
         self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensLabel)
         self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensEdit)
         completionLayout.addLayout(self.maxResponseOutputTokensLayout)
@@ -909,7 +916,7 @@ class AssistantConfigDialog(QDialog):
             self.load_completion_settings(self.assistant_config.text_completion_config)
 
             if self.assistant_type == "realtime_assistant":
-                self.load_audio_settings(self.assistant_config.audio_config)
+                self.load_realtime_settings(self.assistant_config.audio_config)
 
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
@@ -944,7 +951,7 @@ class AssistantConfigDialog(QDialog):
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
             elif self.assistant_type == "realtime_assistant":
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
-                self.maxResponseOutputTokensEdit.setText(str(completion_settings.get('max_response_output_tokens', 'inf')))
+                self.maxResponseOutputTokensEdit.setText(str(completion_settings.get('max_output_tokens', 'inf')))
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
@@ -967,26 +974,27 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(100)
                 self.maxResponseOutputTokensEdit.setText("inf")
 
-    def load_audio_settings(self, audio_config):
-        if audio_config:
-            self.voiceComboBox.setCurrentText(audio_config.voice)
-            self.inputAudioFormatComboBox.setCurrentText(audio_config.input_audio_format)
-            self.outputAudioFormatComboBox.setCurrentText(audio_config.output_audio_format)
-            self.inputAudioTranscriptionComboBox.setCurrentText(audio_config.input_audio_transcription)
-            self.keywordDetectionLineEdit.setText(audio_config.keyword_detection)
+    def load_realtime_settings(self, realtime_config):
+        if realtime_config:
+            self.voiceComboBox.setCurrentText(realtime_config.voice)
+            self.modalityComboBox.setCurrentText(realtime_config.modalities)
+            self.inputAudioFormatComboBox.setCurrentText(realtime_config.input_audio_format)
+            self.outputAudioFormatComboBox.setCurrentText(realtime_config.output_audio_format)
+            self.inputAudioTranscriptionModelComboBox.setCurrentText(realtime_config.input_audio_transcription_model)
+            self.keywordDetectionModelLineEdit.setText(realtime_config.keyword_detection_model)
 
-            turn_detection_type = audio_config.turn_detection.get('type', 'local_vad')
+            turn_detection_type = realtime_config.turn_detection.get('type', 'local_vad')
             self.turnDetectionComboBox.setCurrentText(turn_detection_type)
             if turn_detection_type == "server_vad":
-                self.serverVadThresholdSlider.setValue(audio_config.turn_detection.get('server_vad_threshold', 0.5) * 100)
-                self.prefixPaddingMsSpinBox.setValue(audio_config.turn_detection.get('prefix_padding_ms', 300))
-                self.silenceDurationMsSpinBox.setValue(audio_config.turn_detection.get('silence_duration_ms', 500))
+                self.serverVadThresholdSlider.setValue(realtime_config.turn_detection.get('server_vad_threshold', 0.5) * 100)
+                self.prefixPaddingMsSpinBox.setValue(realtime_config.turn_detection.get('prefix_padding_ms', 300))
+                self.silenceDurationMsSpinBox.setValue(realtime_config.turn_detection.get('silence_duration_ms', 500))
             elif turn_detection_type == "local_vad":
-                self.chunkSizeSpinBox.setValue(audio_config.turn_detection.get('chunk_size', 1024))
-                self.windowDurationSpinBox.setValue(audio_config.turn_detection.get('window_duration', 1500))
-                self.silenceRatioSpinBox.setValue(audio_config.turn_detection.get('silence_ratio', 1500))
-                self.minSpeechDurationSpinBox.setValue(audio_config.turn_detection.get('min_speech_duration', 300))
-                self.minSilenceDurationSpinBox.setValue(audio_config.turn_detection.get('min_silence_duration', 1000))
+                self.chunkSizeSpinBox.setValue(realtime_config.turn_detection.get('chunk_size', 1024))
+                self.windowDurationSpinBox.setValue(realtime_config.turn_detection.get('window_duration', 1500))
+                self.silenceRatioSpinBox.setValue(realtime_config.turn_detection.get('silence_ratio', 1500))
+                self.minSpeechDurationSpinBox.setValue(realtime_config.turn_detection.get('min_speech_duration', 300))
+                self.minSilenceDurationSpinBox.setValue(realtime_config.turn_detection.get('min_silence_duration', 1000))
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -1061,7 +1069,7 @@ class AssistantConfigDialog(QDialog):
             del file_dict[item.text()]
             list_widget.takeItem(list_widget.row(item))
 
-    def get_audio_settings(self):
+    def get_realtime_settings(self):
         turn_detection = {}
         if self.turnDetectionComboBox.currentText() == "server_vad":
             turn_detection = {
@@ -1081,10 +1089,11 @@ class AssistantConfigDialog(QDialog):
             }
         audio_config = {
             'voice': self.voiceComboBox.currentText(),
+            'modalities': self.modalityComboBox.currentText(),
             'input_audio_format': self.inputAudioFormatComboBox.currentText(),
             'output_audio_format': self.outputAudioFormatComboBox.currentText(),
-            'input_audio_transcription': self.inputAudioTranscriptionComboBox.currentText(),
-            'keyword_detection': self.keywordDetectionLineEdit.text(),
+            'input_audio_transcription_model': self.inputAudioTranscriptionModelComboBox.currentText(),
+            'keyword_detection_model': self.keywordDetectionModelLineEdit.text(),
             'turn_detection': turn_detection
         }
 
@@ -1154,7 +1163,7 @@ class AssistantConfigDialog(QDialog):
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
-                    'max_response_output_tokens': self.maxResponseOutputTokensEdit.text()
+                    'max_output_tokens': self.maxResponseOutputTokensEdit.text()
                 }
 
         config = {
@@ -1171,7 +1180,7 @@ class AssistantConfigDialog(QDialog):
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
             'completion_settings': completion_settings,
-            'audio_settings': self.get_audio_settings() if self.assistant_type == "realtime_assistant" else None
+            'realtime_settings': self.get_realtime_settings() if self.assistant_type == "realtime_assistant" else None
         }
 
         # Validation and emission of the configuration

@@ -8,36 +8,40 @@ import json, os
 from typing import Optional, Union
 
 
-class AudioConfig:
+class RealtimeConfig:
     """
-    A class representing the configuration for audio.
+    A class representing the configuration for realtime.
 
     :param voice: The voice.
     :type voice: str
+    :param modalities: The modalities.
+    :type modalities: str
     :param input_audio_format: The input audio format.
     :type input_audio_format: str
     :param output_audio_format: The output audio format.
     :type output_audio_format: str
-    :param input_audio_transcription: The input audio transcription.
-    :type input_audio_transcription: str
-    :param keyword_detection: The keyword detection.
-    :type keyword_detection: str
+    :param input_audio_transcription_model: The input audio transcription model.
+    :type input_audio_transcription_model: str
+    :param keyword_detection_model: The keyword detection model.
+    :type keyword_detection_model: str
     :param turn_detection: The turn detection.
     :type turn_detection: dict
     """
     def __init__(self,
                  voice: str,
+                 modalities: str,
                  input_audio_format: str,
                  output_audio_format: str,
-                 input_audio_transcription: str,
-                 keyword_detection: str,
+                 input_audio_transcription_model: str,
+                 keyword_detection_model: str,
                  turn_detection: dict
     ) -> None:
         self._voice = voice
+        self._modalities = modalities
         self._input_audio_format = input_audio_format
         self._output_audio_format = output_audio_format
-        self._input_audio_transcription = input_audio_transcription
-        self._keyword_detection = keyword_detection
+        self._input_audio_transcription_model = input_audio_transcription_model
+        self._keyword_detection_model = keyword_detection_model
         self._turn_detection = turn_detection
 
     @property
@@ -59,6 +63,19 @@ class AudioConfig:
         :type value: str
         """
         self._voice = value
+
+    @property
+    def modalities(self) -> list:
+        """
+        Get the modalities.
+
+        :return: The modalities.
+        :rtype: list
+        """
+        if self._modalities == "text_and_audio":
+            return ['text', 'audio']
+        elif self._modalities == "text":
+            return ['text']
 
     @property
     def input_audio_format(self) -> str:
@@ -101,44 +118,44 @@ class AudioConfig:
         self._output_audio_format = value
 
     @property
-    def input_audio_transcription(self) -> str:
+    def input_audio_transcription_model(self) -> str:
         """
-        Get the input audio transcription.
+        Get the input audio transcription model.
 
-        :return: The input audio transcription.
+        :return: The input audio transcription model.
         :rtype: str
         """
-        return self._input_audio_transcription
+        return self._input_audio_transcription_model
     
-    @input_audio_transcription.setter
-    def input_audio_transcription(self, value) -> None:
+    @input_audio_transcription_model.setter
+    def input_audio_transcription_model(self, value) -> None:
         """
-        Set the input audio transcription.
+        Set the input audio transcription model.
 
-        :param value: The input audio transcription.
+        :param value: The input audio transcription model.
         :type value: str
         """
-        self._input_audio_transcription = value
+        self._input_audio_transcription_model = value
 
     @property
-    def keyword_detection(self) -> str:
+    def keyword_detection_model(self) -> str:
         """
-        Get the keyword detection.
+        Get the keyword detection model.
 
-        :return: The keyword detection.
+        :return: The keyword detection model.
         :rtype: str
         """
-        return self._keyword_detection
+        return self._keyword_detection_model
     
-    @keyword_detection.setter
-    def keyword_detection(self, value) -> None:
+    @keyword_detection_model.setter
+    def keyword_detection_model(self, value) -> None:
         """
-        Set the keyword detection.
+        Set the keyword detection model.
 
-        :param value: The keyword detection.
+        :param value: The keyword detection model.
         :type value: str
         """
-        self._keyword_detection = value
+        self._keyword_detection_model = value
 
     @property
     def turn_detection(self) -> dict:
@@ -169,10 +186,11 @@ class AudioConfig:
         """
         return {
             'voice': self.voice,
+            'modalities': self._modalities,
             'input_audio_format': self.input_audio_format,
             'output_audio_format': self.output_audio_format,
-            'input_audio_transcription': self.input_audio_transcription,
-            'keyword_detection': self.keyword_detection,
+            'input_audio_transcription_model': self.input_audio_transcription_model,
+            'keyword_detection': self.keyword_detection_model,
             'turn_detection': self.turn_detection
         }
 
@@ -552,6 +570,68 @@ class AssistantTextCompletionConfig:
         self._truncation_strategy = value
 
 
+class RealtimeCompletionConfig:
+    """
+    A class representing the configuration for realtime completion.
+
+    :param temperature: The temperature.
+    :type temperature: float
+    :param max_output_tokens: The maximum number of output tokens. A number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model
+    :type max_output_tokens: str
+    """
+    def __init__(self, 
+                 temperature: float, 
+                 max_output_tokens: int,
+    ) -> None:
+        self._temperature = temperature
+        self._max_output_tokens = max_output_tokens
+
+    def to_dict(self):
+        return {'temperature': self.temperature,
+                'max_output_tokens': self.max_output_tokens,
+                }
+
+    @property
+    def temperature(self) -> float:
+        """
+        Get the temperature.
+
+        :return: The temperature.
+        :rtype: float
+        """
+        return self._temperature
+    
+    @temperature.setter
+    def temperature(self, value) -> None:
+        """
+        Set the temperature.
+
+        :param value: The temperature.
+        :type value: float
+        """
+        self._temperature = value
+
+    @property
+    def max_output_tokens(self) -> str:
+        """
+        Get the maximum number of output tokens.
+
+        :return: The maximum number of output tokens.
+        :rtype: str
+        """
+        return self._max_output_tokens
+    
+    @max_output_tokens.setter
+    def max_output_tokens(self, value) -> None:
+        """
+        Set the maximum number of output tokens.
+
+        :param value: The maximum number of output tokens.
+        :type value: str
+        """
+        self._max_output_tokens = value
+
+
 class VectorStoreConfig:
     """
     A class representing the configuration for a vector store.
@@ -824,7 +904,7 @@ class AssistantConfig:
 
         # Completion settings based on assistant type
         self._text_completion_config = self._setup_completion_settings(config_data)
-        self._audio_config = self._setup_audio_config(config_data)
+        self._realtime_config = self._setup_realtime_config(config_data)
 
         # Config folder for local assistant and threads configuration
         self._config_folder = None
@@ -874,15 +954,26 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     truncation_strategy=completion_data['truncation_strategy']
                 )
+            elif self._assistant_type == 'realtime_assistant':
+                completion_data = config_data.get('completion_settings', {
+                    'temperature': 1.0,
+                    'max_output_tokens': 'inf'
+                })
+                # Constructing RealtimeCompletionConfig from the dictionary
+                return RealtimeCompletionConfig(
+                    temperature=completion_data['temperature'],
+                    max_output_tokens=completion_data['max_output_tokens']
+                )
 
-    def _setup_audio_config(self, config_data):
-        if config_data.get('audio', None) is not None:
-            audio_data = config_data.get('audio', {
+
+    def _setup_realtime_config(self, config_data):
+        if config_data.get('realtime_settings', None) is not None:
+            realtime_data = config_data.get('realtime_settings', {
                 'voice': 'alloy',
                 'input_audio_format': 'pcm_24khz_mono',
                 'output_audio_format': 'pcm_24khz_mono',
                 'input_audio_transcription': 'whisper-1',
-                'keyword_detection': 'none',
+                'keyword_detection_model': 'none',
                 'turn_detection': {
                     'type': 'local_vad',
                     'chunk_size': 1024,
@@ -892,13 +983,14 @@ class AssistantConfig:
                     'min_silence_duration': 1000
                 }
             })
-            return AudioConfig(
-                voice=audio_data['voice'],
-                input_audio_format=audio_data['input_audio_format'],
-                output_audio_format=audio_data['output_audio_format'],
-                input_audio_transcription=audio_data['input_audio_transcription'],
-                keyword_detection=audio_data['keyword_detection'],
-                turn_detection=audio_data['turn_detection']
+            return RealtimeConfig(
+                voice=realtime_data['voice'],
+                modalities=realtime_data['modalities'],
+                input_audio_format=realtime_data['input_audio_format'],
+                output_audio_format=realtime_data['output_audio_format'],
+                input_audio_transcription_model=realtime_data['input_audio_transcription_model'],
+                keyword_detection_model=realtime_data['keyword_detection_model'],
+                turn_detection=realtime_data['turn_detection']
             )
         else:
             return None
@@ -988,7 +1080,7 @@ class AssistantConfig:
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
-        self._config_data['audio'] = self._audio_config.to_dict() if self._audio_config is not None else None
+        self._config_data['realtime_settings'] = self._realtime_config.to_dict() if self._realtime_config is not None else None
         self._config_data['config_folder'] = self._config_folder
         return self._config_data
 
@@ -1221,22 +1313,22 @@ class AssistantConfig:
         return self._assistant_role
 
     @property
-    def text_completion_config(self) -> Union[TextCompletionConfig, AssistantTextCompletionConfig, None]:
+    def text_completion_config(self) -> Union[TextCompletionConfig, AssistantTextCompletionConfig, RealtimeCompletionConfig, None]:
         """Get the text completion config.
         
         :return: The completion config.
-        :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, None]
+        :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, RealtimeCompletionConfig, None]
         """
         return self._text_completion_config
     
     @property
-    def audio_config(self) -> AudioConfig:
+    def realtime_config(self) -> RealtimeConfig:
         """Get the audio config.
         
         :return: The audio config.
         :rtype: AudioConfig
         """
-        return self._audio_config
+        return self._realtime_config
 
     @property
     def config_folder(self) -> str:

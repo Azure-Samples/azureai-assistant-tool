@@ -109,7 +109,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
 
 
 class MyRealtimeEventHandler(RealtimeAIEventHandler):
-    def __init__(self, audio_player: AudioPlayer, assistant_client: BaseAssistantClient):
+    def __init__(self, audio_player: AudioPlayer, assistant_client: "RealtimeAssistantClient"):
         super().__init__()
         self._audio_player = audio_player
         self._current_item_id = None
@@ -399,14 +399,14 @@ class RealtimeAssistantClient(BaseAssistantClient):
             options = RealtimeAIOptions(
                 api_key=self.ai_client.api_key,
                 model=assistant_config.model,
-                modalities=assistant_config.modalities,
+                modalities=assistant_config.realtime_config.modalities,
                 instructions=assistant_config.instructions,
-                voice=assistant_config.audio_config.voice,
-                input_audio_format=assistant_config.audio_config.input_audio_format,
-                output_audio_format=assistant_config.audio_config.output_audio_format,
-                input_audio_transcription_enabled=bool(assistant_config.audio_config.input_audio_transcription),
-                input_audio_transcription_model=assistant_config.audio_config.input_audio_transcription,
-                turn_detection=assistant_config.audio_config.turn_detection,
+                voice=assistant_config.realtime_config.voice,
+                input_audio_format=assistant_config.realtime_config.input_audio_format,
+                output_audio_format=assistant_config.realtime_config.output_audio_format,
+                input_audio_transcription_enabled=True,
+                input_audio_transcription_model=assistant_config.realtime_config.input_audio_transcription_model,
+                turn_detection=assistant_config.realtime_config.turn_detection,
                 tools=tools,
                 tool_choice="auto",
                 temperature=assistant_config.text_completion_config.temperature,
@@ -439,7 +439,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                     "min_silence_duration": 1.0
                 },
                 enable_wave_capture=False,
-                keyword_model_file="resources/kws.table")
+                keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
             
             # Update the local configuration using AssistantConfigManager
             # TODO make optional to save the assistant_config in the config manager
