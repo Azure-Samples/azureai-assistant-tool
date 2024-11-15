@@ -479,8 +479,8 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :return: None
         :rtype: None
         """
-        self._audio_player.stop()
         self._audio_capture.stop()
+        self._audio_player.stop()
 
     def generate_response(
             self, 

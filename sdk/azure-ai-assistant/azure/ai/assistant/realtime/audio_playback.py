@@ -5,6 +5,7 @@ import queue
 import threading
 import time
 import wave
+from typing import Optional
 
 # Constants for PyAudio Configuration
 FORMAT = pyaudio.paInt16
@@ -16,14 +17,24 @@ logger = logging.getLogger(__name__)
 
 
 class AudioPlayer:
-    """Handles audio playback for decoded audio data using PyAudio."""
+    """
+    Handles audio playback for decoded audio data using PyAudio.
+    """
 
-    def __init__(self, min_buffer_fill=3, max_buffer_size=0, enable_wave_capture=False):
+    def __init__(
+        self,
+        min_buffer_fill=3,
+        max_buffer_size=0,
+        enable_wave_capture=False,
+        output_filename: Optional[str] = None
+    ):
         """
         Initializes the AudioPlayer with a pre-fetch buffer threshold.
 
         :param min_buffer_fill: Minimum number of buffers that should be filled before starting playback initially.
         :param max_buffer_size: Maximum size of the buffer queue.
+        :param enable_wave_capture: Flag to enable capturing played audio to a wave file.
+        :param output_filename: Filename for the wave capture, defaults to 'playback_output.wav'.
         """
         self.initial_min_buffer_fill = min_buffer_fill
         self.min_buffer_fill = min_buffer_fill
@@ -35,8 +46,11 @@ class AudioPlayer:
         self.playback_complete_event = threading.Event()
         self.buffer_lock = threading.Lock()
         self.enable_wave_capture = enable_wave_capture
+        self.output_filename = output_filename or "playback_output.wav"
         self.wave_file = None
         self.buffers_played = 0
+        self.is_running = False  # Tracks whether the player is running
+        self.thread = None
 
         # Fade-out related attributes
         self.fade_out_event = threading.Event()
@@ -45,18 +59,17 @@ class AudioPlayer:
         self.fade_step = 0.0
         self.total_fade_steps = 0
 
-        self._initialize_wave_file()
-        self._initialize_stream()
-        self._start_thread()
+        # Lock for thread-safe operations
+        self.lock = threading.Lock()
 
     def _initialize_wave_file(self):
         if self.enable_wave_capture:
             try:
-                self.wave_file = wave.open("playback_output.wav", "wb")
+                self.wave_file = wave.open(self.output_filename, "wb")
                 self.wave_file.setnchannels(CHANNELS)
                 self.wave_file.setsampwidth(self.pyaudio_instance.get_sample_size(FORMAT))
                 self.wave_file.setframerate(RATE)
-                logger.info("Wave file for playback capture initialized.")
+                logger.info(f"Wave file '{self.output_filename}' initialized for capture.")
             except Exception as e:
                 logger.error(f"Error opening wave file for playback capture: {e}")
 
@@ -80,14 +93,55 @@ class AudioPlayer:
         self.thread.start()
         logger.info("Playback thread started.")
 
-    def is_audio_playing(self):
-        """Checks if audio is currently playing."""
-        with self.buffer_lock:
-            buffer_not_empty = not self.buffer.empty()
-        is_playing = buffer_not_empty
-        logger.debug(f"Checking if audio is playing: Buffer not empty = {buffer_not_empty}, "
-                     f"Is playing = {is_playing}")
-        return is_playing
+    def start(self):
+        """
+        Starts the audio playback stream and initializes necessary components.
+        """
+        with self.lock:
+            if self.is_running:
+                logger.warning("AudioPlayer is already running.")
+                return
+
+            self._initialize_wave_file()
+            self._initialize_stream()
+
+            # Start the playback thread
+            self._start_thread()
+
+            self.is_running = True
+            logger.info("AudioPlayer started.")
+
+    def stop(self):
+        """
+        Stops the audio playback stream and releases all resources.
+        """
+        with self.lock:
+            if not self.is_running:
+                logger.warning("AudioPlayer is not running.")
+                return
+
+            self.stop_event.set()
+            self.playback_complete_event.wait(timeout=5)
+            self.thread.join(timeout=5)
+            
+            if self.stream and self.stream.is_active():
+                self.stream.stop_stream()
+                logger.debug("PyAudio stream stopped.")
+            if self.stream:
+                self.stream.close()
+                logger.debug("PyAudio stream closed.")
+            self.pyaudio_instance.terminate()
+            logger.debug("PyAudio terminated.")
+
+            if self.enable_wave_capture and self.wave_file:
+                try:
+                    self.wave_file.close()
+                    logger.info(f"Wave file '{self.output_filename}' saved successfully.")
+                except Exception as e:
+                    logger.error(f"Error closing wave file for playback: {e}")
+
+            self.is_running = False
+            logger.info("AudioPlayer stopped and resources released.")
 
     def playback_loop(self):
         """Main playback loop that handles audio streaming."""
@@ -142,6 +196,15 @@ class AudioPlayer:
 
         logger.info("Playback thread terminated.")
         self.playback_complete_event.set()
+
+    def is_audio_playing(self):
+        """Checks if audio is currently playing."""
+        with self.buffer_lock:
+            buffer_not_empty = not self.buffer.empty()
+        is_playing = buffer_not_empty
+        logger.debug(f"Checking if audio is playing: Buffer not empty = {buffer_not_empty}, "
+                     f"Is playing = {is_playing}")
+        return is_playing
 
     def _initiate_fade_out(self):
         """Initiates the fade-out process."""
@@ -223,22 +286,8 @@ class AudioPlayer:
     def close(self):
         """Closes the AudioPlayer, stopping playback and releasing resources."""
         logger.info("Closing AudioPlayer.")
-        self.stop_event.set()
-        self.buffer.put(None)
-        self.playback_complete_event.wait(timeout=5)
-        self.thread.join(timeout=5)
-        if self.stream and self.stream.is_active():
-            self.stream.stop_stream()
-            logger.debug("PyAudio stream stopped.")
-        if self.stream:
-            self.stream.close()
-            logger.debug("PyAudio stream closed.")
-        self.pyaudio_instance.terminate()
-        logger.debug("PyAudio terminated.")
-        if self.enable_wave_capture and self.wave_file:
-            try:
-                self.wave_file.close()
-                logger.info("Playback wave file saved successfully.")
-            except Exception as e:
-                logger.error(f"Error closing wave file for playback: {e}")
-        logger.info("AudioPlayer stopped and resources released.")
+        self.stop()
+
+    def __del__(self):
+        """Ensures that resources are released upon deletion."""
+        self.close()
