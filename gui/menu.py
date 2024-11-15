@@ -10,7 +10,7 @@ from PySide6.QtGui import QAction
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
-from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
+from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 from gui.debug_dialog import DebugViewDialog
