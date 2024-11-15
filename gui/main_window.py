@@ -592,6 +592,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         last_assistant_message = conversation.get_last_text_message(assistant_name)
+        if last_assistant_message is None:
+            logger.error(
+                f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'. Aborting run end process."
+            )
+            raise ValueError("No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
+                             "Please check Diagnostics for more detailed information and troubleshooting steps.")
+
         if self.conversation_sidebar.is_listening:
             # microphone needs to be stopped before speech synthesis otherwise synthesis output will be heard by the microphone
             self.speech_input_handler.stop_listening_from_mic()

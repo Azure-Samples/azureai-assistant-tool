@@ -12,13 +12,14 @@ from realtime_ai.realtime_ai_client import RealtimeAIClient
 
 from typing import Optional
 import json, uuid, yaml
+from datetime import datetime
 
 
 class RealtimeAssistantClient(BaseAssistantClient):
     """
     A class that manages a realtine assistant client.
 
-    :param config_json: The configuration data to use to create the chat client.
+    :param config_json: The configuration data to use to create the realtime client.
     :type config_json: str
     :param callbacks: The callbacks to use for the assistant client.
     :type callbacks: Optional[AssistantClientCallbacks]
@@ -32,7 +33,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
     def __init__(
             self, 
             config_json: str,
-            callbacks: Optional[AssistantClientCallbacks] = None,
+            callbacks: Optional[AssistantClientCallbacks],
             is_create: bool = True,
             timeout: Optional[float] = None,
             **client_args
@@ -44,16 +45,16 @@ class RealtimeAssistantClient(BaseAssistantClient):
     def from_json(
         cls,
         config_json: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AssistantClientCallbacks],
         timeout: Optional[float] = None,
         **client_args
     ) -> "RealtimeAssistantClient":
         """
         Creates a RealtimeAssistantClient instance from JSON configuration data.
 
-        :param config_json: JSON string containing the configuration for the chat assistant.
+        :param config_json: JSON string containing the configuration for the realtime assistant.
         :type config_json: str
-        :param callbacks: Optional callbacks for the chat assistant client.
+        :param callbacks: Optional callbacks for the realtime assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -75,16 +76,16 @@ class RealtimeAssistantClient(BaseAssistantClient):
     def from_yaml(
         cls,
         config_yaml: str,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AssistantClientCallbacks],
         timeout: Optional[float] = None,
         **client_args
     ) -> "RealtimeAssistantClient":
         """
         Creates an RealtimeAssistantClient instance from YAML configuration data.
 
-        :param config_yaml: YAML string containing the configuration for the chat assistant.
+        :param config_yaml: YAML string containing the configuration for the realtime assistant.
         :type config_yaml: str
-        :param callbacks: Optional callbacks for the chat assistant client.
+        :param callbacks: Optional callbacks for the realtime assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -106,16 +107,16 @@ class RealtimeAssistantClient(BaseAssistantClient):
     def from_config(
         cls,
         config: AssistantConfig,
-        callbacks: Optional[AssistantClientCallbacks] = None,
+        callbacks: Optional[AssistantClientCallbacks],
         timeout: Optional[float] = None,
         **client_args
     ) -> "RealtimeAssistantClient":
         """
         Creates a RealtimeAssistantClient instance from an AssistantConfig object.
 
-        :param config: AssistantConfig object containing the configuration for the chat assistant.
+        :param config: AssistantConfig object containing the configuration for the realtime assistant.
         :type config: AssistantConfig
-        :param callbacks: Optional callbacks for the chat assistant client.
+        :param callbacks: Optional callbacks for the realtime assistant client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -129,8 +130,8 @@ class RealtimeAssistantClient(BaseAssistantClient):
             config_json = config.to_json()
             return cls.from_json(config_json, callbacks, timeout, **client_args)
         except Exception as e:
-            logger.error(f"Failed to create chat client from config: {e}")
-            raise EngineError(f"Failed to create chat client from config: {e}")
+            logger.error(f"Failed to create realtime client from config: {e}")
+            raise EngineError(f"Failed to create realtime client from config: {e}")
 
     def _init_realtime_assistant_client(
             self, 
@@ -157,12 +158,67 @@ class RealtimeAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to initialize assistant instance: {e}")
             raise EngineError(f"Failed to initialize assistant instance: {e}")
 
+    def start(
+            self,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Starts the realtime assistant.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        pass
+
+    def stop(
+            self,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Stops the realtime assistant.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        pass
+
+    def generate_response(
+            self, 
+            thread_name : str
+    ) -> None:
+        """
+        Generates a realtime assistant response using the user's text input in the specified thread.
+
+        :param thread_name: The name of the thread to process.
+        :type thread_name: Optional[str]
+        """
+        # Ensure at least one of thread_name or user_request is provided
+
+        try:
+            logger.info(f"Generating response for thread: {thread_name}")
+            #if thread_name:
+            #    max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
+            #    conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
+            #    self._parse_conversation_messages(conversation.messages)
+            #elif user_request:
+            #    self._messages.append({"role": "user", "content": user_request})
+
+        except Exception as e:
+            logger.error(f"Error occurred during generating response: {e}")
+            raise EngineError(f"Error occurred during generating response: {e}")
+
     def purge(
             self,
             timeout: Optional[float] = None
     )-> None:
         """
-        Purges the chat assistant from the local configuration.
+        Purges the realtime assistant from the local configuration.
 
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
@@ -177,7 +233,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             timeout: Optional[float] = None
     )-> None:
         try:
-            logger.info(f"Purging chat assistant with name: {self.name}")
+            logger.info(f"Purging realtime assistant with name: {self.name}")
             # retrieve the assistant configuration
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
@@ -188,5 +244,5 @@ class RealtimeAssistantClient(BaseAssistantClient):
             self._clear_variables()
 
         except Exception as e:
-            logger.error(f"Failed to purge chat assistant with name: {self.name}: {e}")
-            raise EngineError(f"Failed to purge chat assistant with name: {self.name}: {e}")
+            logger.error(f"Failed to purge realtime assistant with name: {self.name}: {e}")
+            raise EngineError(f"Failed to purge realtime assistant with name: {self.name}: {e}")
