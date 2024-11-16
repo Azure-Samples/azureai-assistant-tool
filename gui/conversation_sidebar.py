@@ -23,11 +23,14 @@ from gui.utils import resource_path
 
 
 class AssistantItemWidget(QWidget):
+    checked_changed = Signal(str, bool)  # (assistant_name, is_checked)
+
     def __init__(self, name, parent=None):
         super().__init__(parent)
         self.layout = QHBoxLayout(self)
         self.checkbox = QCheckBox(self)
         self.label = QLabel(name, self)
+        self.name = name
 
         font = QFont("Arial", 11)
         self.checkbox.setFont(font)
@@ -36,6 +39,12 @@ class AssistantItemWidget(QWidget):
         self.layout.addWidget(self.label)
         self.layout.addStretch()
         self.setLayout(self.layout)
+        # Connect the checkbox state change to emit the custom signal
+        self.checkbox.stateChanged.connect(self.on_checkbox_state_changed)
+
+    def on_checkbox_state_changed(self, state):
+        is_checked = state == Qt.CheckState.Checked.value
+        self.checked_changed.emit(self.name, is_checked)
 
 
 class CustomListWidget(QListWidget):
@@ -232,6 +241,9 @@ class CustomListWidget(QListWidget):
 
 
 class ConversationSidebar(QWidget):
+
+    assistant_checkbox_toggled = Signal(str, bool)  # (assistant_name, is_checked)
+
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
@@ -322,6 +334,7 @@ class ConversationSidebar(QWidget):
             "}"
         )
         self.on_ai_client_type_changed(self.aiClientComboBox.currentIndex())
+        self.assistant_checkbox_toggled.connect(self.main_window.handle_assistant_checkbox_toggled)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
@@ -391,6 +404,8 @@ class ConversationSidebar(QWidget):
             item.setSizeHint(widget.sizeHint())
             self.assistantList.addItem(item)
             self.assistantList.setItemWidget(item, widget)
+            # Connect the widget's checked_changed signal to ConversationSidebar's signal
+            widget.checked_changed.connect(self.assistant_checkbox_toggled.emit)
 
         # Restore selection if the assistant is still in the list
         for i in range(self.assistantList.count()):

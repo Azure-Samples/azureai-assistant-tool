@@ -349,18 +349,24 @@ class AssistantConfigDialog(QDialog):
         self.audioLayout.addWidget(self.inputAudioTranscriptionModelLabel)
         self.audioLayout.addWidget(self.inputAudioTranscriptionModelComboBox)
 
-        # Keyword Detection Model
-        self.keywordDetectionModelLabel = QLabel('Keyword Detection Model:')
-        # Line edit for keyword detection model file path
-        self.keywordDetectionModelLineEdit = QLineEdit()
-        self.keywordDetectionModelLineEdit.setPlaceholderText("resources/kws.table")
-        self.audioLayout.addWidget(self.keywordDetectionModelLabel)
-        self.audioLayout.addWidget(self.keywordDetectionModelLineEdit)
+        # Keyword Detection Model File Path
+        self.keywordFilePathLabel = QLabel('Keyword Model File Path:')
+        self.keywordFilePathEdit = QLineEdit()
+        self.keywordFilePathEdit.setText("")
+        self.keywordFilePathButton = QPushButton('Select File...')
+        self.keywordFilePathButton.clicked.connect(self.select_keyword_file_path)
+
+        keywordFilePathLayout = QHBoxLayout()
+        keywordFilePathLayout.addWidget(self.keywordFilePathEdit)
+        keywordFilePathLayout.addWidget(self.keywordFilePathButton)
+
+        self.audioLayout.addWidget(self.keywordFilePathLabel)
+        self.audioLayout.addLayout(keywordFilePathLayout)
 
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
         self.turnDetectionComboBox = QComboBox()
-        self.turnDetectionComboBox.addItems(['server_vad', 'local_vad'])
+        self.turnDetectionComboBox.addItems(['local_vad', 'server_vad'])
         self.turnDetectionComboBox.currentIndexChanged.connect(self.update_vad_settings)
         self.audioLayout.addWidget(self.turnDetectionLabel)
         self.audioLayout.addWidget(self.turnDetectionComboBox)
@@ -370,6 +376,11 @@ class AssistantConfigDialog(QDialog):
         self.update_vad_settings()
 
         return audioTab
+
+    def select_keyword_file_path(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Keyword Model File", "", "Keyword Model Files (*.table)")
+        if file_path:
+            self.keywordFilePathEdit.setText(file_path)
 
     def update_vad_settings(self):
         """ Updates the UI based on the selected VAD option (server or local). """
@@ -651,20 +662,12 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.presencePenaltyLabel)
         completionLayout.addWidget(self.presencePenaltySlider)
         completionLayout.addWidget(self.presencePenaltyValueLabel)
-
-        self.maxMessagesLayout = QHBoxLayout()
-        self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context (1-100):')
-        self.maxMessagesEdit = QSpinBox()
-        self.maxMessagesEdit.setRange(1, 100)
-        self.maxMessagesEdit.setValue(10)
-        self.maxMessagesEdit.setToolTip("The maximum number of messages to include in the conversation thread context. If set to None, no limit will be applied.")
-        self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
-        self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
-
-        completionLayout.addLayout(self.maxMessagesLayout)
+        self.init_max_messages_edit(completionLayout)
 
     def init_realtime_assistant_completion_settings(self, completionLayout):
         self.init_temperature_slider(completionLayout)
+        self.init_max_messages_edit(completionLayout)
+
         self.maxResponseOutputTokensLayout = QHBoxLayout()
         # if not set, it will be set to None (default) in the completion request
         self.maxResponseOutputTokensLabel = QLabel('Max Response Output Tokens (1-4096 or "inf"):')
@@ -687,6 +690,17 @@ class AssistantConfigDialog(QDialog):
         completionLayout.addWidget(self.temperatureLabel)
         completionLayout.addWidget(self.temperatureSlider)
         completionLayout.addWidget(self.temperatureValueLabel)
+
+    def init_max_messages_edit(self, completionLayout):
+        self.maxMessagesLayout = QHBoxLayout()
+        self.maxMessagesLabel = QLabel('Max Number of Messages In Conversation Thread Context (1-100):')
+        self.maxMessagesEdit = QSpinBox()
+        self.maxMessagesEdit.setRange(1, 100)
+        self.maxMessagesEdit.setValue(10)
+        self.maxMessagesEdit.setToolTip("The maximum number of messages to include in the conversation thread context. If set to None, no limit will be applied.")
+        self.maxMessagesLayout.addWidget(self.maxMessagesLabel)
+        self.maxMessagesLayout.addWidget(self.maxMessagesEdit)
+        completionLayout.addLayout(self.maxMessagesLayout)
 
     def init_common_completion_settings(self, completionLayout):
         self.init_temperature_slider(completionLayout)
@@ -730,6 +744,7 @@ class AssistantConfigDialog(QDialog):
             self.temperatureSlider.setEnabled(isEnabled)
         elif self.assistant_type == "realtime_assistant":
             self.temperatureSlider.setEnabled(isEnabled)
+            self.maxMessagesEdit.setEnabled(isEnabled)
             self.maxResponseOutputTokensEdit.setEnabled(isEnabled)
 
     def ai_client_selection_changed(self):
@@ -951,6 +966,7 @@ class AssistantConfigDialog(QDialog):
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
             elif self.assistant_type == "realtime_assistant":
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
+                self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
                 self.maxResponseOutputTokensEdit.setText(str(completion_settings.get('max_output_tokens', 'inf')))
         else:
             # Apply default settings if no config is found
@@ -972,6 +988,7 @@ class AssistantConfigDialog(QDialog):
                 self.maxMessagesEdit.setValue(10)
             elif self.assistant_type == "realtime_assistant":
                 self.temperatureSlider.setValue(100)
+                self.maxMessagesEdit.setValue(10)
                 self.maxResponseOutputTokensEdit.setText("inf")
 
     def load_realtime_settings(self, realtime_config):
@@ -981,7 +998,7 @@ class AssistantConfigDialog(QDialog):
             self.inputAudioFormatComboBox.setCurrentText(realtime_config.input_audio_format)
             self.outputAudioFormatComboBox.setCurrentText(realtime_config.output_audio_format)
             self.inputAudioTranscriptionModelComboBox.setCurrentText(realtime_config.input_audio_transcription_model)
-            self.keywordDetectionModelLineEdit.setText(realtime_config.keyword_detection_model)
+            self.keywordFilePathEdit.setText(realtime_config.keyword_detection_model)
 
             turn_detection_type = realtime_config.turn_detection.get('type', 'local_vad')
             self.turnDetectionComboBox.setCurrentText(turn_detection_type)
@@ -1093,7 +1110,7 @@ class AssistantConfigDialog(QDialog):
             'input_audio_format': self.inputAudioFormatComboBox.currentText(),
             'output_audio_format': self.outputAudioFormatComboBox.currentText(),
             'input_audio_transcription_model': self.inputAudioTranscriptionModelComboBox.currentText(),
-            'keyword_detection_model': self.keywordDetectionModelLineEdit.text(),
+            'keyword_detection_model': self.keywordFilePathEdit.text(),
             'turn_detection': turn_detection
         }
 
@@ -1163,6 +1180,7 @@ class AssistantConfigDialog(QDialog):
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
+                    'max_text_messages': self.maxMessagesEdit.value(),
                     'max_output_tokens': self.maxResponseOutputTokensEdit.text()
                 }
 

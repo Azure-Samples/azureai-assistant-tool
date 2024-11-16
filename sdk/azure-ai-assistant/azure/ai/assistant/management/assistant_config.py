@@ -145,7 +145,7 @@ class RealtimeConfig:
         :return: The keyword detection model.
         :rtype: str
         """
-        return self._keyword_detection_model
+        return self._keyword_detection_model.strip()
     
     @keyword_detection_model.setter
     def keyword_detection_model(self, value) -> None:
@@ -957,11 +957,13 @@ class AssistantConfig:
             elif self._assistant_type == 'realtime_assistant':
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
+                    'max_text_messages': None,
                     'max_output_tokens': 'inf'
                 })
                 # Constructing RealtimeCompletionConfig from the dictionary
                 return RealtimeCompletionConfig(
                     temperature=completion_data['temperature'],
+                    max_text_messages=completion_data['max_text_messages'],
                     max_output_tokens=completion_data['max_output_tokens']
                 )
 

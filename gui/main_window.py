@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMes
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
+from PySide6.QtCore import Slot
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -393,6 +394,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Append the message to the conversation view
         self.conversation_view.append_message(sender, message, color)
 
+    @Slot(str, bool)
+    def handle_assistant_checkbox_toggled(self, assistant_name, is_checked):
+        if is_checked:
+            print(f"Assistant {assistant_name} is checked")
+        else:
+            print(f"Assistant {assistant_name} is unchecked")
+
     def setup_conversation_thread(self, is_scheduled_task=False):
         threads_client = self.conversation_thread_clients[self.active_ai_client_type]
         if threads_client is None:
@@ -539,8 +547,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     # Callbacks for AssistantManagerCallbacks
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
-        #if self.conversation_sidebar.is_listening and self.in_background:
-            # TODO Add notification to the user that the assistant is processing the input
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
 
     def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):

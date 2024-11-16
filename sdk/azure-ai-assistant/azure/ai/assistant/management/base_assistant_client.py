@@ -326,3 +326,13 @@ class BaseAssistantClient:
         :rtype: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]
         """
         return self._ai_client
+    
+    @property
+    def callbacks(self) -> Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]:
+        """
+        The callbacks used by the chat assistant.
+
+        :return: The callbacks.
+        :rtype: Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]
+        """
+        return self._callbacks
