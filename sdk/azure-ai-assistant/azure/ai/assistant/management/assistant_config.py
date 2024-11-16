@@ -190,7 +190,7 @@ class RealtimeConfig:
             'input_audio_format': self.input_audio_format,
             'output_audio_format': self.output_audio_format,
             'input_audio_transcription_model': self.input_audio_transcription_model,
-            'keyword_detection': self.keyword_detection_model,
+            'keyword_detection_model': self.keyword_detection_model,
             'turn_detection': self.turn_detection
         }
 
@@ -1019,10 +1019,10 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        if self._assistant_type == "chat_assistant":
-            return None
-        else:
+        if self._assistant_type == "assistant":
             return ToolResourcesConfig()
+        else:
+            return None
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):

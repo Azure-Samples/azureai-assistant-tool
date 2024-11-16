@@ -350,8 +350,10 @@ class ConversationSidebar(QWidget):
         if assistant_config:
             if assistant_config.assistant_type == "assistant":
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-            else:
+            elif assistant_config.assistant_type == "chat_assistant":
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+            elif assistant_config.assistant_type == "realtime_assistant":
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="realtime_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
             self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
             self.dialog.show()
 

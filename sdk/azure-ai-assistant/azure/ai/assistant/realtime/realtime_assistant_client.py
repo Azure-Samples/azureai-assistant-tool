@@ -11,7 +11,7 @@ from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONErr
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.realtime.audio_capture import AudioCapture, AudioCaptureEventHandler
 from azure.ai.assistant.realtime.audio_playback import AudioPlayer
-from realtime_ai.realtime_ai_client import RealtimeAIClient, RealtimeAIOptions, RealtimeAIEventHandler
+from realtime_ai.realtime_ai_client import RealtimeAIClient, RealtimeAIOptions, RealtimeAIEventHandler, AudioStreamOptions
 from realtime_ai.models.realtime_ai_events import *
 
 from typing import Optional
@@ -451,13 +451,18 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 turn_detection=assistant_config.realtime_config.turn_detection,
                 tools=tools,
                 tool_choice="auto",
-                temperature=assistant_config.text_completion_config.temperature,
-                max_output_tokens=assistant_config.text_completion_config.max_output_tokens
+                temperature=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
+                max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens
             )
 
             self._audio_player = AudioPlayer()
-            self._event_handler = MyRealtimeEventHandler(audio_player=self._audio_player, assistant_client=self)
-            self._realtime_ai_client = RealtimeAIClient(options=options, event_handler=self._event_handler)
+            self._event_handler = MyRealtimeEventHandler(audio_player=self._audio_player, ai_client=self)
+            audio_stream_options = AudioStreamOptions(
+                sample_rate=24000,
+                channels=1,
+                bytes_per_sample=2
+            )
+            self._realtime_ai_client = RealtimeAIClient(options=options, stream_options=audio_stream_options, event_handler=self._event_handler)
             self._event_handler.set_client(self._realtime_ai_client)
 
             self._audio_capture_event_handler = MyAudioCaptureEventHandler(

@@ -931,7 +931,7 @@ class AssistantConfigDialog(QDialog):
             self.load_completion_settings(self.assistant_config.text_completion_config)
 
             if self.assistant_type == "realtime_assistant":
-                self.load_realtime_settings(self.assistant_config.audio_config)
+                self.load_realtime_settings(self.assistant_config.realtime_config)
 
             # Set the output folder path if it's in the configuration
             output_folder_path = self.assistant_config.output_folder_path
@@ -994,7 +994,10 @@ class AssistantConfigDialog(QDialog):
     def load_realtime_settings(self, realtime_config):
         if realtime_config:
             self.voiceComboBox.setCurrentText(realtime_config.voice)
-            self.modalityComboBox.setCurrentText(realtime_config.modalities)
+            if realtime_config.modalities == ["text"]:
+                self.modalityComboBox.setCurrentText("text")
+            elif realtime_config.modalities == ["text", "audio"]:
+                self.modalityComboBox.setCurrentText("text_and_audio")
             self.inputAudioFormatComboBox.setCurrentText(realtime_config.input_audio_format)
             self.outputAudioFormatComboBox.setCurrentText(realtime_config.output_audio_format)
             self.inputAudioTranscriptionModelComboBox.setCurrentText(realtime_config.input_audio_transcription_model)
