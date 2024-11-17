@@ -42,7 +42,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         :param audio_data: Raw audio data in bytes.
         """
         if self._conversation_active:
-            logger.info("Sending audio data to the client.")
+            logger.debug("Sending audio data to the client.")
             self._client.send_audio(audio_data)
 
     def on_speech_start(self):
@@ -86,7 +86,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         :param result: The recognition result containing details about the detected keyword.
         """
         logger.info(f"Local Keyword: User keyword detected: {result}")
-        self._event_handler.on_keyword_armed(True)
+        self._event_handler.on_keyword_armed(False)
         self._keyword_detected = True
         self._conversation_active = True
 
@@ -103,7 +103,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
             return
 
         logger.info("Silence timeout reached. Rearming keyword detection.")
-        self._event_handler.on_keyword_armed(False)
+        self._event_handler.on_keyword_armed(True)
         logger.debug("Clearing input audio buffer.")
         self._client.clear_input_audio_buffer()
 
@@ -155,7 +155,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
             self._run_identifier = str(uuid.uuid4())
-            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_start_time=datetime.now(), user_input="Computer")
+            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_start_time=datetime.now(), user_input="Computer, Hello")
             self._realtime_client.send_text("Hello")
         else:
             self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_end_time=datetime.now(), thread_name=self._thread_name)
@@ -229,11 +229,12 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name)
         elif role == "assistant":
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name, metadata={"chat_assistant": self._ai_client._name})
-            self._ai_client.callbacks.on_run_update(
-                assistant_name=self._ai_client.name, 
-                run_identifier=self._run_identifier, 
-                run_status="in_progress", 
-                thread_name=self._thread_name)
+
+        self._ai_client.callbacks.on_run_update(
+            assistant_name=self._ai_client.name, 
+            run_identifier=self._run_identifier, 
+            run_status="in_progress", 
+            thread_name=self._thread_name)
 
     def on_response_done(self, event: ResponseDone):
         logger.debug(f"Assistant's response completed with status '{event.response.get('status')}' and ID '{event.response.get('id')}'")
@@ -448,7 +449,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 output_audio_format=assistant_config.realtime_config.output_audio_format,
                 input_audio_transcription_enabled=True,
                 input_audio_transcription_model=assistant_config.realtime_config.input_audio_transcription_model,
-                turn_detection=assistant_config.realtime_config.turn_detection,
+                turn_detection=None, #if assistant_config.realtime_config.turn_detection.get("type") == "local_vad" else assistant_config.realtime_config.turn_detection,
                 tools=tools,
                 tool_choice="auto",
                 temperature=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
@@ -464,6 +465,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             )
             self._realtime_ai_client = RealtimeAIClient(options=options, stream_options=audio_stream_options, event_handler=self._event_handler)
             self._event_handler.set_client(self._realtime_ai_client)
+            self._realtime_ai_client.start()
 
             self._audio_capture_event_handler = MyAudioCaptureEventHandler(
                 client=self._realtime_ai_client,
@@ -541,7 +543,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
         """
         try:
             self._stop_audio()
-            self._event_handler.set_thread_name(None)
             self.callbacks.on_assistant_unselected(assistant_name=self.name)
         except Exception as e:
             logger.error(f"Failed to stop realtime assistant: {e}")

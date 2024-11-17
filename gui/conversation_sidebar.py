@@ -15,6 +15,7 @@ from azure.ai.assistant.management.assistant_config_manager import AssistantConf
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
@@ -361,6 +362,8 @@ class ConversationSidebar(QWidget):
         try:
             if assistant_type == "chat_assistant":
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+            elif assistant_type == "realtime_assistant":
+                assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             else:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
@@ -444,8 +447,10 @@ class ConversationSidebar(QWidget):
                     assistant_config.config_folder = "config"
                     if assistant_config.assistant_type == "assistant":
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                    else:
+                    elif assistant_config.assistant_type == "chat_assistant":
                         assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                    elif assistant_config.assistant_type == "realtime_assistant":
+                        assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
                     self.assistant_client_manager.register_client(name, assistant_client)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")

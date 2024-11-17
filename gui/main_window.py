@@ -272,14 +272,18 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.AZURE_OPEN_AI
                 )
+                self.conversation_sidebar.toggle_mic_button.setVisible(True)
             elif self.active_ai_client_type == AIClientType.OPEN_AI:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI
                 )
+                self.conversation_sidebar.toggle_mic_button.setVisible(True)
             elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI_REALTIME
                 )
+                # make the mic button invisible for OpenAI Realtime
+                self.conversation_sidebar.toggle_mic_button.setVisible(False)             
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
 
@@ -406,16 +410,16 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 thread_name = ""
                 if self.conversation_sidebar.threadList.count() == 0 or not self.conversation_sidebar.threadList.selectedItems():
                     print(f"Creating new conversation thread for assistant {assistant_name}")
-                    #thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, False, timeout=self.connection_timeout)
+                    thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, False, timeout=self.connection_timeout)
                 else:
                     thread_name = self.conversation_sidebar.threadList.get_current_text()
                     print(f"Using existing conversation thread {thread_name} for assistant {assistant_name}")
-                #assistant_client.start(thread_name=thread_name)
+                assistant_client.start(thread_name=thread_name)
         else:
             print(f"Assistant {assistant_name} is unchecked")
             if assistant_client is not None and assistant_client.assistant_config.assistant_type == "realtime_assistant":
                 print(f"Realtime Assistant client {assistant_name} is ready for stop")
-                #assistant_client.stop()
+                assistant_client.stop()
 
     def setup_conversation_thread(self, is_scheduled_task=False):
         threads_client = self.conversation_thread_clients[self.active_ai_client_type]
