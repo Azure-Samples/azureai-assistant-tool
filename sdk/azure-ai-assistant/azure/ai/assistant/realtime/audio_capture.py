@@ -172,7 +172,7 @@ class AudioCapture:
             self.is_running = False
             raise
 
-    def stop(self):
+    def stop(self, terminate: bool = False):
         """
         Stops the audio capture stream and releases all resources.
         """
@@ -203,7 +203,7 @@ class AudioCapture:
                 logger.error(f"Error closing wave file: {e}")
 
         try:
-            if self.p is not None:
+            if self.p is not None and terminate:
                 self.p.terminate()
                 logger.info("PyAudio terminated.")
         except Exception as e:
@@ -370,7 +370,7 @@ class AudioCapture:
         """
         Closes the audio capture stream and the wave file, releasing all resources.
         """
-        self.stop()
+        self.stop(terminate=True)
         logger.info("AudioCapture resources have been released.")
 
     def __del__(self):

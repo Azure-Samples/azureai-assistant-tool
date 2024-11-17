@@ -30,7 +30,7 @@ class AudioPlayer:
         """
         Initializes the AudioPlayer with a pre-fetch buffer threshold.
 
-        :param min_buffer_fill: Minimum number of buffers that should be filled before starting.
+        :param min_buffer_fill: Minimum number of buffers that should be filled before starting playback.
         :param max_buffer_size: Maximum size of the buffer queue. 0 means unlimited.
         :param enable_wave_capture: Flag to enable capturing played audio to wave files.
         :param output_filename: Filename for the wave capture, defaults to 'playback_output.wav'.
@@ -39,7 +39,7 @@ class AudioPlayer:
         self.initial_min_buffer_fill = min_buffer_fill
         self.min_buffer_fill = min_buffer_fill
         self.buffer = queue.Queue(maxsize=max_buffer_size)
-        self.pyaudio_instance = None
+        self.pyaudio_instance = pyaudio.PyAudio()
         self.stream = None
         self.stop_event = threading.Event()
         self.playback_complete_event = threading.Event()
@@ -48,45 +48,16 @@ class AudioPlayer:
         self.output_filename = output_filename or "playback_output.wav"
         self.wave_file = None
         self.buffers_played = 0
-        self.is_running = False  # Tracks whether the player is running
+        self.is_running = False
         self.thread = None
         self.output_device_index = output_device_index
 
         # Lock for thread-safe operations
         self.lock = threading.RLock()
 
-    def _list_output_devices(self):
-        """Lists all available output devices for diagnostic purposes."""
-        logger.info("Available Output Devices:")
-        p = pyaudio.PyAudio()
-        try:
-            for i in range(p.get_device_count()):
-                device_info = p.get_device_info_by_index(i)
-                if device_info['maxOutputChannels'] > 0:
-                    logger.info(f"  ID {i}: {device_info['name']}")
-        except Exception as e:
-            logger.error(f"Error listing devices: {e}")
-        finally:
-            p.terminate()
-
-    def _initialize_pyaudio(self):
-        """Initializes a new PyAudio instance."""
-        if self.pyaudio_instance is not None:
-            logger.debug("Terminating existing PyAudio instance before re-initialization.")
-            try:
-                self.pyaudio_instance.terminate()
-                self.pyaudio_instance = None
-                logger.debug("Existing PyAudio instance terminated.")
-            except Exception as e:
-                logger.error(f"Error terminating existing PyAudio instance: {e}")
-                raise
-
-        try:
-            self.pyaudio_instance = pyaudio.PyAudio()
-            logger.info("PyAudio instance initialized.")
-        except Exception as e:
-            logger.error(f"Failed to initialize PyAudio: {e}")
-            raise
+        # Initialize wave file if capture is enabled
+        if self.enable_wave_capture:
+            self._initialize_wave_file()
 
     def _initialize_wave_file(self):
         """Sets up the wave file for capturing playback if enabled."""
@@ -100,23 +71,6 @@ class AudioPlayer:
             except Exception as e:
                 logger.error(f"Error opening wave file for playback capture: {e}")
                 self.enable_wave_capture = False
-
-    def _initialize_stream(self):
-        """Initializes the PyAudio stream with proper handling."""
-        try:
-            self.stream = self.pyaudio_instance.open(
-                format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                output=True,
-                frames_per_buffer=FRAMES_PER_BUFFER,
-                output_device_index=self.output_device_index
-            )
-            logger.info("PyAudio stream initialized.")
-        except (IOError, OSError) as e:
-            logger.error(f"Error initializing PyAudio stream: {e}")
-            self._list_output_devices()
-            raise
 
     def _start_thread(self):
         """Starts the playback thread."""
@@ -134,24 +88,27 @@ class AudioPlayer:
                 return
 
             try:
-                self._initialize_pyaudio()
-                self._initialize_wave_file()
-                self._initialize_stream()
+                self.stream = self.pyaudio_instance.open(
+                    format=FORMAT,
+                    channels=CHANNELS,
+                    rate=RATE,
+                    output=True,
+                    frames_per_buffer=FRAMES_PER_BUFFER,
+                    output_device_index=self.output_device_index
+                )
+                print(f"AudioPlayer started, stream: {self.stream}")
+
                 self.is_running = True
                 self.stop_event.clear()
                 self.playback_complete_event.clear()
                 self._start_thread()
                 logger.info("AudioPlayer started.")
 
-                # Fill the buffer initially
-                self.initial_buffer_fill()
-
             except Exception as e:
                 logger.error(f"Failed to start AudioPlayer: {e}")
                 self.is_running = False
                 self.stop_event.set()
                 self.playback_complete_event.set()
-                self._cleanup_resources()
 
     def stop(self):
         """
@@ -171,49 +128,37 @@ class AudioPlayer:
                 self.thread.join(timeout=5)
                 logger.info("Playback thread joined.")
 
-            self._cleanup_resources()
+            # Stop and close the stream
+            if self.stream is not None:
+                print(f"Stopping stream: {self.stream}")
+                try:
+                    if self.stream.is_active():
+                        self.stream.stop_stream()
+                    self.stream.close()
+                    self.stream = None  # Ensure stream reference is cleared
+                    logger.info("PyAudio stream stopped and closed.")
+                except Exception as e:
+                    logger.error(f"Error stopping PyAudio stream: {e}")
+
+            # Close the wave file if enabled
+            if self.enable_wave_capture and self.wave_file is not None:
+                try:
+                    self.wave_file.close()
+                    self.wave_file = None
+                    logger.info(f"Wave file '{self.output_filename}' closed.")
+                except Exception as e:
+                    logger.error(f"Error closing wave file: {e}")
 
             self.is_running = False
             self.stop_event.clear()
             self.playback_complete_event.set()
             logger.info("AudioPlayer stopped and resources released.")
 
-    def _cleanup_resources(self):
-        """Cleans up all resources including stream, wave file, and PyAudio instance."""
-        # Stop and close the stream
-        if self.stream is not None:
-            try:
-                if self.stream.is_active():
-                    self.stream.stop_stream()
-                self.stream.close()
-                logger.info("PyAudio stream stopped and closed.")
-            except Exception as e:
-                logger.error(f"Error stopping PyAudio stream: {e}")
-            finally:
-                self.stream = None
-
-        # Close the wave file if enabled
-        if self.enable_wave_capture and self.wave_file is not None:
-            try:
-                self.wave_file.close()
-                self.wave_file = None
-                logger.info(f"Wave file '{self.output_filename}' closed.")
-            except Exception as e:
-                logger.error(f"Error closing wave file: {e}")
-
-        # Terminate PyAudio instance
-        if self.pyaudio_instance is not None:
-            try:
-                self.pyaudio_instance.terminate()
-                self.pyaudio_instance = None
-                logger.info("PyAudio instance terminated.")
-            except Exception as e:
-                logger.error(f"Error terminating PyAudio instance: {e}")
-
     def playback_loop(self):
         """Main loop that manages the audio playback."""
         logger.debug("Playback loop started.")
         self.playback_complete_event.clear()
+        self.initial_buffer_fill()
 
         while not self.stop_event.is_set():
             try:
@@ -234,7 +179,7 @@ class AudioPlayer:
                 continue
             except Exception as e:
                 logger.error(f"Unexpected error in playback loop: {e}")
-                break
+                break  # Exit loop on unexpected errors
 
         logger.info("Playback loop exiting.")
         self.playback_complete_event.set()
@@ -250,6 +195,7 @@ class AudioPlayer:
                 logger.debug("Data written to wave file.")
         except IOError as e:
             logger.error(f"I/O error during stream write: {e}")
+            # Attempt to restart the stream
             try:
                 if self.stream and not self.stream.is_stopped():
                     self.stream.stop_stream()
@@ -280,7 +226,7 @@ class AudioPlayer:
         except queue.Full:
             logger.warning("Queue is full; dropping audio data.")
 
-    def is_audio_playing(self):
+    def is_audio_playing(self) -> bool:
         """Checks if audio is currently playing."""
         with self.buffer_lock:
             buffer_not_empty = not self.buffer.empty()
@@ -310,9 +256,17 @@ class AudioPlayer:
         logger.debug(f"Cleared {cleared_items} items from the buffer.")
 
     def close(self):
-        """Ensures resources are released by stopping playback."""
+        """Ensures resources are released by stopping playback and terminating PyAudio."""
         logger.info("Closing AudioPlayer.")
         self.stop()
+        # Terminate PyAudio instance when closing
+        if self.pyaudio_instance is not None:
+            try:
+                self.pyaudio_instance.terminate()
+                self.pyaudio_instance = None
+                logger.info("PyAudio instance terminated.")
+            except Exception as e:
+                logger.error(f"Error terminating PyAudio instance: {e}")
         logger.info("AudioPlayer resources have been released.")
 
     def __del__(self):

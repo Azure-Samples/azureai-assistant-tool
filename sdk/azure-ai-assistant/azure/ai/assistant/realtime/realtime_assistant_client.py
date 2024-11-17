@@ -156,7 +156,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if armed is False:
             self._run_identifier = str(uuid.uuid4())
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_start_time=datetime.now(), user_input="Computer, Hello")
-            self._realtime_client.send_text("Hello")
+            self._realtime_client.send_text("Hello", generate_response=False)
         else:
             self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_end_time=datetime.now(), thread_name=self._thread_name)
 
@@ -517,11 +517,11 @@ class RealtimeAssistantClient(BaseAssistantClient):
         """
         try:
             self._event_handler.set_thread_name(thread_name)
-            max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
-            conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
-            for message in reversed(conversation.messages):
-                if message.text_message:
-                    self._realtime_ai_client.send_text(message.text_message.content, role=message.role)
+            #max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
+            #conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
+            #for message in reversed(conversation.messages):
+            #    if message.text_message:
+            #        self._realtime_ai_client.send_text(message.text_message.content, role=message.role)
             self._start_audio()
             self.callbacks.on_assistant_selected(assistant_name=self.name, thread_name=thread_name)
         except Exception as e:
