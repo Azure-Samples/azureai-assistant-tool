@@ -452,7 +452,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 turn_detection=None, #if assistant_config.realtime_config.turn_detection.get("type") == "local_vad" else assistant_config.realtime_config.turn_detection,
                 tools=tools,
                 tool_choice="auto",
-                temperature=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
+                temperature=0.8 if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
                 max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens
             )
 
@@ -465,7 +465,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
             )
             self._realtime_ai_client = RealtimeAIClient(options=options, stream_options=audio_stream_options, event_handler=self._event_handler)
             self._event_handler.set_client(self._realtime_ai_client)
-            self._realtime_ai_client.start()
 
             self._audio_capture_event_handler = MyAudioCaptureEventHandler(
                 client=self._realtime_ai_client,
@@ -522,6 +521,10 @@ class RealtimeAssistantClient(BaseAssistantClient):
             #for message in reversed(conversation.messages):
             #    if message.text_message:
             #        self._realtime_ai_client.send_text(message.text_message.content, role=message.role)
+            if not self._realtime_ai_client.is_running:
+                logger.info(f"Starting realtime assistant with name: {self.name}")
+                self._realtime_ai_client.start()
+
             self._start_audio()
             self.callbacks.on_assistant_selected(assistant_name=self.name, thread_name=thread_name)
         except Exception as e:
@@ -547,6 +550,46 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to stop realtime assistant: {e}")
             raise EngineError(f"Failed to stop realtime assistant: {e}")
+
+    def connect(
+            self,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Connects the realtime assistant.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        try:
+            self._realtime_ai_client.start()
+        except Exception as e:
+            logger.error(f"Failed to connect realtime assistant: {e}")
+            raise EngineError(f"Failed to connect realtime assistant: {e}")
+
+    def disconnect(
+            self,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Closes the realtime assistant.
+
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        try:
+            self._realtime_ai_client.stop()
+            self._audio_capture.close()
+            self._audio_player.close()
+        except Exception as e:
+            logger.error(f"Failed to disconnect realtime assistant: {e}")
+            raise EngineError(f"Failed to disconnect realtime assistant: {e}")
 
     def _start_audio(self) -> None:
         """

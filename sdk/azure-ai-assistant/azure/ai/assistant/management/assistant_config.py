@@ -972,8 +972,8 @@ class AssistantConfig:
         if config_data.get('realtime_settings', None) is not None:
             realtime_data = config_data.get('realtime_settings', {
                 'voice': 'alloy',
-                'input_audio_format': 'pcm_24khz_mono',
-                'output_audio_format': 'pcm_24khz_mono',
+                'input_audio_format': 'pcm16',
+                'output_audio_format': 'pcm16',
                 'input_audio_transcription': 'whisper-1',
                 'keyword_detection_model': 'none',
                 'turn_detection': {

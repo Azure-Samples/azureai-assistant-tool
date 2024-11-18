@@ -87,6 +87,10 @@ class AudioPlayer:
                 logger.warning("AudioPlayer is already running.")
                 return
 
+            # ensure the pyaudio instance is initialized
+            if self.pyaudio_instance is None:
+                self.pyaudio_instance = pyaudio.PyAudio()
+
             try:
                 self.stream = self.pyaudio_instance.open(
                     format=FORMAT,

@@ -331,14 +331,14 @@ class AssistantConfigDialog(QDialog):
         # Input Audio Format
         self.inputAudioFormatLabel = QLabel('Input Audio Format:')
         self.inputAudioFormatComboBox = QComboBox()
-        self.inputAudioFormatComboBox.addItems(['pcm_24khz_mono'])
+        self.inputAudioFormatComboBox.addItems(['pcm16'])
         self.audioLayout.addWidget(self.inputAudioFormatLabel)
         self.audioLayout.addWidget(self.inputAudioFormatComboBox)
 
         # Output Audio Format
         self.outputAudioFormatLabel = QLabel('Output Audio Format:')
         self.outputAudioFormatComboBox = QComboBox()
-        self.outputAudioFormatComboBox.addItems(['pcm_24khz_mono'])
+        self.outputAudioFormatComboBox.addItems(['pcm16'])
         self.audioLayout.addWidget(self.outputAudioFormatLabel)
         self.audioLayout.addWidget(self.outputAudioFormatComboBox)
 

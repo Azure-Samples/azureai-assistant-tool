@@ -98,7 +98,7 @@ class AudioCapture:
         self.speech_started = False
 
         self.wave_file = None
-        self.p = pyaudio.PyAudio()
+        self.pyaudio_instance = pyaudio.PyAudio()
         self.stream = None
 
         if vad_parameters is not None:
@@ -141,7 +141,7 @@ class AudioCapture:
             try:
                 self.wave_file = wave.open("microphone_output.wav", "wb")
                 self.wave_file.setnchannels(self.channels)
-                self.wave_file.setsampwidth(self.p.get_sample_size(FORMAT))
+                self.wave_file.setsampwidth(self.pyaudio_instance.get_sample_size(FORMAT))
                 self.wave_file.setframerate(self.sample_rate)
                 logger.info("Wave file initialized for capture.")
             except Exception as e:
@@ -155,8 +155,12 @@ class AudioCapture:
             except Exception as e:
                 logger.error(f"Failed to start AzureKeywordRecognizer: {e}")
 
+        # ensure the pyaudio instance is initialized
+        if not self.pyaudio_instance:
+            self.pyaudio_instance = pyaudio.PyAudio()
+
         try:
-            self.stream = self.p.open(
+            self.stream = self.pyaudio_instance.open(
                 format=FORMAT,
                 channels=self.channels,
                 rate=self.sample_rate,
@@ -203,8 +207,8 @@ class AudioCapture:
                 logger.error(f"Error closing wave file: {e}")
 
         try:
-            if self.p is not None and terminate:
-                self.p.terminate()
+            if self.pyaudio_instance is not None and terminate:
+                self.pyaudio_instance.terminate()
                 logger.info("PyAudio terminated.")
         except Exception as e:
             logger.error(f"Error terminating PyAudio: {e}")

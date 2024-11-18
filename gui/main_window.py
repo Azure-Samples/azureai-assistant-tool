@@ -253,6 +253,15 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if self.active_ai_client_type == new_client_type:
             return
 
+        # Disconnect realtime clients if switching from OPEN_AI_REALTIME to a different type
+        if (self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME and
+            new_client_type != AIClientType.OPEN_AI_REALTIME):
+            assistant_clients = self.assistant_client_manager.get_all_clients()
+            for assistant_client in assistant_clients:
+                if (hasattr(assistant_client, 'assistant_config') and
+                    assistant_client.assistant_config.assistant_type == "realtime_assistant"):
+                    assistant_client.disconnect()
+
         # Save the conversation threads for the current active assistant
         if self.conversation_thread_clients[self.active_ai_client_type] is not None:
             self.conversation_thread_clients[self.active_ai_client_type].save_conversation_threads()
