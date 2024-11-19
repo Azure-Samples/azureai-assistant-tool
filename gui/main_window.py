@@ -734,6 +734,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 logger.debug(f"CloseEvent: save_conversation_threads for ai_client_type {ai_client_type.name}")
                 if self.conversation_thread_clients[ai_client_type] is not None:
                     self.conversation_thread_clients[ai_client_type].save_conversation_threads()
+            
+            assistant_clients = self.assistant_client_manager.get_all_clients()
+            for assistant_client in assistant_clients:
+                if (hasattr(assistant_client, 'assistant_config') and
+                    assistant_client.assistant_config.assistant_type == "realtime_assistant"):
+                    assistant_client.disconnect()
+
             self.executor.shutdown(wait=True)
             logger.info("Application closed successfully")
         except Exception as e:

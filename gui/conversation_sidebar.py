@@ -358,12 +358,16 @@ class ConversationSidebar(QWidget):
             self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
             self.dialog.show()
 
-    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type):
+    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
             if assistant_type == "chat_assistant":
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             elif assistant_type == "realtime_assistant":
-                assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
+                if assistant_client and assistant_client.assistant_config.assistant_type == "realtime_assistant":
+                    assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
+                else:
+                    assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             else:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
             self.assistant_client_manager.register_client(assistant_client.name, assistant_client)

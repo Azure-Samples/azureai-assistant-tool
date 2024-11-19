@@ -181,7 +181,7 @@ class AudioCapture:
         Stops the audio capture stream and releases all resources.
         """
         if not self.is_running:
-            logger.warning("AudioCapture is not running.")
+            logger.warning("AudioCapture is already stopped.")
             return
 
         try:

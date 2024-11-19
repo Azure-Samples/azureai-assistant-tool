@@ -35,7 +35,7 @@ class CustomSpinBox(QSpinBox):
 
 
 class AssistantConfigDialog(QDialog):
-    assistantConfigSubmitted = Signal(str, str, str)
+    assistantConfigSubmitted = Signal(str, str, str, str)
 
     def __init__(
             self, 
@@ -1210,7 +1210,7 @@ class AssistantConfigDialog(QDialog):
             return
 
         assistant_config_json = json.dumps(config, indent=4)
-        self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText(), self.assistant_type)
+        self.assistantConfigSubmitted.emit(assistant_config_json, self.aiClientComboBox.currentText(), self.assistant_type, self.assistant_name)
 
 
 class ExportAssistantDialog(QDialog):

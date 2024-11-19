@@ -18,6 +18,7 @@ from typing import Optional
 import json, uuid, yaml
 from datetime import datetime
 import threading, base64
+import copy
 
 
 class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
@@ -200,7 +201,9 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def on_conversation_item_input_audio_transcription_completed(self, event: ConversationItemInputAudioTranscriptionCompleted):
         logger.info(f"User transcription complete: {event.transcript}")
-        self.create_thread_message(message=event.transcript, role="user")
+        # remove new line characters from the end of the transcript
+        transcript = event.transcript.rstrip("\n")
+        self.create_thread_message(message=transcript, role="user")
 
     def on_response_audio_done(self, event: ResponseAudioDone):
         logger.debug(f"Audio done for response ID {event.response_id}, item ID {event.item_id}")
@@ -281,7 +284,13 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         try:
             self._function_processing = True
             logger.info(f"Executing function '{function_name}' with arguments: {arguments_str} for call ID {call_id}")
-            function_output = str(self._assistant_client._handle_function_call(function_name, arguments_str))
+            function_output = str(self._ai_client._handle_function_call(function_name, arguments_str))
+            self._ai_client.callbacks.on_function_call_processed(
+                assistant_name=self._ai_client.name, 
+                run_identifier=self._run_identifier, 
+                function_name=function_name, 
+                arguments=arguments_str, 
+                response=str(function_output))
             logger.info(f"Function output for call ID {call_id}: {function_output}")
             self._realtime_client.generate_response_from_function_call(call_id, function_output)
         except json.JSONDecodeError as e:
@@ -423,6 +432,29 @@ class RealtimeAssistantClient(BaseAssistantClient):
             logger.error(f"Failed to create realtime client from config: {e}")
             raise EngineError(f"Failed to create realtime client from config: {e}")
 
+    def update(
+            self,
+            config_json: str,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Updates the realtime assistant client with new configuration data.
+
+        :param config_json: The configuration data to use to update the realtime client.
+        :type config_json: str
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+
+        :return: None
+        :rtype: None
+        """
+        try:
+            config_data = json.loads(config_json)
+            self._init_realtime_assistant_client(config_data, is_create=False, timeout=timeout)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON format: {e}")
+            raise InvalidJSONError(f"Invalid JSON format: {e}")
+
     def _init_realtime_assistant_client(
             self, 
             config_data: dict,
@@ -432,14 +464,13 @@ class RealtimeAssistantClient(BaseAssistantClient):
         try:
             # Create or update the assistant
             assistant_config = AssistantConfig.from_dict(config_data)
-            if is_create:
-                assistant_config.assistant_id = str(uuid.uuid4())
+
             tools = self._update_tools(assistant_config)
             self._tools = tools if tools else None
             self._load_selected_functions(assistant_config)
             self._assistant_config = assistant_config
-            
-            options = RealtimeAIOptions(
+
+            realtime_options = RealtimeAIOptions(
                 api_key=self.ai_client.api_key,
                 model=assistant_config.model,
                 modalities=assistant_config.realtime_config.modalities,
@@ -456,6 +487,75 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens
             )
 
+            # Check if the _realtime_client attribute exists and is set
+            client_exists = hasattr(self, '_realtime_client') and self._realtime_client is not None
+
+            if is_create or not client_exists:
+                assistant_config.assistant_id = str(uuid.uuid4())
+                self._create_realtime_client(assistant_config, realtime_options=realtime_options, timeout=timeout)
+            else:
+                if self._realtime_client:
+                    self._realtime_client.update_session(options=realtime_options)
+                else:
+                    logger.warning("Realtime client not initialized, updating realtime session not done.")
+
+            # Update the local configuration using AssistantConfigManager
+            # TODO make optional to save the assistant_config in the config manager
+            config_manager = AssistantConfigManager.get_instance()
+            config_manager.update_config(self._name, assistant_config.to_json())
+
+        except Exception as e:
+            logger.error(f"Failed to initialize assistant instance: {e}")
+            raise EngineError(f"Failed to initialize assistant instance: {e}")
+
+    def _update_tools(self, assistant_config: AssistantConfig):
+        tools = []
+        logger.info(f"Updating tools for assistant: {assistant_config.name}")
+        
+        if assistant_config.file_search:
+            tools.append({"type": "file_search"})
+        
+        if assistant_config.functions:
+            modified_functions = []
+            for function in assistant_config.functions:
+                # Create a copy of the function spec to avoid modifying the original
+                modified_function = copy.deepcopy(function)
+                
+                # Check for old structure and modify to new structure
+                if "function" in modified_function:
+                    function_details = modified_function.pop("function")
+                    # Remove the module field if it exists
+                    function_details.pop("module", None)
+                    
+                    # Merge the `function_details` with `modified_function`
+                    modified_function.update(function_details)
+                
+                modified_functions.append(modified_function)
+            
+            tools.extend(modified_functions)
+        
+        if assistant_config.code_interpreter:
+            tools.append({"type": "code_interpreter"})
+        
+        return tools
+    
+    def _create_realtime_client(
+            self,
+            assistant_config: AssistantConfig,
+            realtime_options: RealtimeAIOptions,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Creates a realtime assistant client.
+
+        :param assistant_config: The assistant configuration.
+        :type assistant_config: AssistantConfig
+        :param realtime_options: The realtime AI options.
+        :type realtime_options: RealtimeAIOptions
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+        """
+        try:
             self._audio_player = AudioPlayer()
             self._event_handler = MyRealtimeEventHandler(audio_player=self._audio_player, ai_client=self)
             audio_stream_options = AudioStreamOptions(
@@ -463,11 +563,11 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 channels=1,
                 bytes_per_sample=2
             )
-            self._realtime_ai_client = RealtimeAIClient(options=options, stream_options=audio_stream_options, event_handler=self._event_handler)
-            self._event_handler.set_client(self._realtime_ai_client)
+            self._realtime_client = RealtimeAIClient(options=realtime_options, stream_options=audio_stream_options, event_handler=self._event_handler)
+            self._event_handler.set_client(self._realtime_client)
 
             self._audio_capture_event_handler = MyAudioCaptureEventHandler(
-                client=self._realtime_ai_client,
+                client=self._realtime_client,
                 event_handler=self._event_handler
             )
 
@@ -488,15 +588,10 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 },
                 enable_wave_capture=False,
                 keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
-            
-            # Update the local configuration using AssistantConfigManager
-            # TODO make optional to save the assistant_config in the config manager
-            config_manager = AssistantConfigManager.get_instance()
-            config_manager.update_config(self._name, assistant_config.to_json())
 
         except Exception as e:
-            logger.error(f"Failed to initialize assistant instance: {e}")
-            raise EngineError(f"Failed to initialize assistant instance: {e}")
+            logger.error(f"Failed to create realtime client: {e}")
+            raise EngineError(f"Failed to create realtime client: {e}")
 
     def start(
             self,
@@ -516,14 +611,9 @@ class RealtimeAssistantClient(BaseAssistantClient):
         """
         try:
             self._event_handler.set_thread_name(thread_name)
-            #max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
-            #conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
-            #for message in reversed(conversation.messages):
-            #    if message.text_message:
-            #        self._realtime_ai_client.send_text(message.text_message.content, role=message.role)
-            if not self._realtime_ai_client.is_running:
+            if not self._realtime_client.is_running:
                 logger.info(f"Starting realtime assistant with name: {self.name}")
-                self._realtime_ai_client.start()
+                self._realtime_client.start()
 
             self._start_audio()
             self.callbacks.on_assistant_selected(assistant_name=self.name, thread_name=thread_name)
@@ -565,7 +655,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :rtype: None
         """
         try:
-            self._realtime_ai_client.start()
+            self._realtime_client.start()
         except Exception as e:
             logger.error(f"Failed to connect realtime assistant: {e}")
             raise EngineError(f"Failed to connect realtime assistant: {e}")
@@ -584,7 +674,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :rtype: None
         """
         try:
-            self._realtime_ai_client.stop()
+            self._realtime_client.stop()
             self._audio_capture.close()
             self._audio_player.close()
         except Exception as e:
@@ -633,7 +723,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
 
         try:
             logger.info(f"Generating response for thread: {thread_name}")
-            # self._realtime_ai_client.generate_response()
+            # self._realtime_client.generate_response()
             #if thread_name:
             #    max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
             #    conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
@@ -678,3 +768,20 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to purge realtime assistant with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge realtime assistant with name: {self.name}: {e}")
+        
+    def _send_conversation_history(self, thread_name: str):
+        try:
+            max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
+            conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
+            for message in reversed(conversation.messages):
+                if message.text_message:
+                    logger.info(f"Sending text message: {message.text_message.content}, role: {message.role}")
+                    self._realtime_client.send_text(message.text_message.content, role=message.role, generate_response=False)
+        except Exception as e:
+            logger.error(f"Failed to send conversation history: {e}")
+            raise EngineError(f"Failed to send conversation history: {e}")
+        
+
+    def __del__(self):
+        self.disconnect()
+        self._clear_variables()

@@ -100,7 +100,7 @@ class AudioPlayer:
                     frames_per_buffer=FRAMES_PER_BUFFER,
                     output_device_index=self.output_device_index
                 )
-                print(f"AudioPlayer started, stream: {self.stream}")
+                logger.info(f"AudioPlayer started, stream: {self.stream}")
 
                 self.is_running = True
                 self.stop_event.clear()
@@ -120,7 +120,7 @@ class AudioPlayer:
         """
         with self.lock:
             if not self.is_running:
-                logger.warning("AudioPlayer is not running.")
+                logger.warning("AudioPlayer is already stopped.")
                 return
 
             self.stop_event.set()
@@ -134,7 +134,7 @@ class AudioPlayer:
 
             # Stop and close the stream
             if self.stream is not None:
-                print(f"Stopping stream: {self.stream}")
+                logger.info(f"Stopping stream: {self.stream}")
                 try:
                     if self.stream.is_active():
                         self.stream.stop_stream()
