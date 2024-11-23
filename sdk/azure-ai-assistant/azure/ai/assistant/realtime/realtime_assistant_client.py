@@ -15,10 +15,17 @@ from realtime_ai.realtime_ai_client import RealtimeAIClient, RealtimeAIOptions, 
 from realtime_ai.models.realtime_ai_events import *
 
 from typing import Optional
+from enum import auto
 import json, uuid, yaml
 from datetime import datetime
 import threading, base64
 import copy
+
+
+class ConversationState():
+    IDLE = auto()
+    KEYWORD_DETECTED = auto()
+    CONVERSATION_ACTIVE = auto()
 
 
 class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
@@ -31,8 +38,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         """
         self._client = client
         self._event_handler = event_handler
-        self._keyword_detected = False
-        self._conversation_active = False
+        self._state = ConversationState.IDLE
         self._silence_timeout = 10  # Silence timeout in seconds for rearming keyword detection
         self._silence_timer = None
 
@@ -42,26 +48,24 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
 
         :param audio_data: Raw audio data in bytes.
         """
-        if self._conversation_active:
+        if self._state == ConversationState.CONVERSATION_ACTIVE:
             logger.debug("Sending audio data to the client.")
             self._client.send_audio(audio_data)
 
     def on_speech_start(self):
         """
         Handles actions to perform when speech starts.
-
         """
         logger.info("Local VAD: User speech started")
-        logger.info(f"on_speech_start: Keyword detected: {self._keyword_detected}, Conversation active: {self._conversation_active}")
+        logger.info(f"on_speech_start: Current state: {self._state}")
 
-        if self._keyword_detected:
-            self._conversation_active = True
-            if self._silence_timer:
-                self._silence_timer.cancel()
+        if self._state == ConversationState.KEYWORD_DETECTED:
+            self._set_state(ConversationState.CONVERSATION_ACTIVE)
+            self._cancel_silence_timer()
 
         if (self._client.options.turn_detection is None and
             self._event_handler.is_audio_playing() and
-            self._conversation_active):
+            self._state == ConversationState.CONVERSATION_ACTIVE):
             logger.info("User started speaking while assistant is responding; interrupting the assistant's response.")
             self._client.clear_input_audio_buffer()
             self._client.cancel_response()
@@ -72,9 +76,9 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         Handles actions to perform when speech ends.
         """
         logger.info("Local VAD: User speech ended")
-        logger.info(f"on_speech_end: Keyword detected: {self._keyword_detected}, Conversation active: {self._conversation_active}")
+        logger.info(f"on_speech_end: Current state: {self._state}")
 
-        if self._conversation_active and self._client.options.turn_detection is None:
+        if self._state == ConversationState.CONVERSATION_ACTIVE and self._client.options.turn_detection is None:
             logger.debug("Using local VAD; requesting the client to generate a response after speech ends.")
             self._client.generate_response()
             logger.debug("Conversation is active. Starting silence timer.")
@@ -88,16 +92,20 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         """
         logger.info(f"Local Keyword: User keyword detected: {result}")
         self._event_handler.on_keyword_armed(False)
-        self._keyword_detected = True
-        self._conversation_active = True
+        self._set_state(ConversationState.KEYWORD_DETECTED)
+        self._start_silence_timer()
 
     def _start_silence_timer(self):
-        if self._silence_timer:
-            self._silence_timer.cancel()
-        self._silence_timer = threading.Timer(self._silence_timeout, self._reset_keyword_detection)
+        self._cancel_silence_timer()
+        self._silence_timer = threading.Timer(self._silence_timeout, self._reset_state_due_to_silence)
         self._silence_timer.start()
 
-    def _reset_keyword_detection(self):
+    def _cancel_silence_timer(self):
+        if self._silence_timer:
+            self._silence_timer.cancel()
+            self._silence_timer = None
+
+    def _reset_state_due_to_silence(self):
         if self._event_handler.is_audio_playing() or self._event_handler.is_function_processing():
             logger.info("Assistant is responding or processing a function. Waiting to reset keyword detection.")
             self._start_silence_timer()
@@ -107,9 +115,13 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         self._event_handler.on_keyword_armed(True)
         logger.debug("Clearing input audio buffer.")
         self._client.clear_input_audio_buffer()
+        self._set_state(ConversationState.IDLE)
 
-        self._keyword_detected = False
-        self._conversation_active = False
+    def _set_state(self, new_state: ConversationState):
+        logger.debug(f"Transitioning from {self._state} to {new_state}")
+        self._state = new_state
+        if new_state != ConversationState.CONVERSATION_ACTIVE:
+            self._cancel_silence_timer()
 
 
 class MyRealtimeEventHandler(RealtimeAIEventHandler):
@@ -157,7 +169,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if armed is False:
             self._run_identifier = str(uuid.uuid4())
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_start_time=datetime.now(), user_input="Computer, Hello")
-            self._realtime_client.send_text("Hello", generate_response=False)
+            self._realtime_client.send_text("Hello")
         else:
             self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_end_time=datetime.now(), thread_name=self._thread_name)
 
