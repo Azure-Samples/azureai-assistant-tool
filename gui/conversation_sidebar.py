@@ -239,6 +239,12 @@ class CustomListWidget(QListWidget):
     def is_thread_selected(self, thread_name):
         """Check if the given thread name is the selected thread."""
         return self.get_current_text() == thread_name
+    
+    def get_last_thread_name(self):
+        """Return the name of the last thread in the list."""
+        if self.count() > 0:
+            return self.item(self.count() - 1).text()
+        return ""
 
 
 class ConversationSidebar(QWidget):

@@ -385,7 +385,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 if self.conversation_sidebar.threadList.count() == 0 or not self.conversation_sidebar.threadList.selectedItems():
                     thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, False, timeout=self.connection_timeout)
                 else:
-                    thread_name = self.conversation_sidebar.threadList.get_current_text()
+                    # If the thread is selected, get the current selected thread name
+                    # If the thread is not selected, get the last thread name
+                    if self.conversation_sidebar.threadList.selectedItems():
+                        thread_name = self.conversation_sidebar.threadList.get_current_text()
+                    else:
+                        thread_name = self.conversation_sidebar.threadList.get_last_thread_name()
+                self.conversation_sidebar.select_conversation_thread_by_name(thread_name)
                 assistant_client.start(thread_name=thread_name)
         else:
             if assistant_client is not None and assistant_client.assistant_config.assistant_type == "realtime_assistant":
