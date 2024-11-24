@@ -17,7 +17,8 @@ class ActivityStatus(Enum):
     PROCESSING = "Processing"
     PROCESSING_USER_INPUT = "UserInput"
     PROCESSING_SCHEDULED_TASK = "ScheduledTask"
-    LISTENING = "Listening"
+    LISTENING_SPEECH = "ListeningSpeech"
+    LISTENING_KEYWORD = "ListeningKeyword"
 
 
 class StatusBar:
@@ -37,8 +38,11 @@ class StatusBar:
 
     def animate_processing_label(self):
         frames = ["   ", ".  ", ".. ", "..."]
-        if ActivityStatus.LISTENING in self.active_statuses:
-            base_text = "Listening"
+        if ActivityStatus.LISTENING_SPEECH in self.active_statuses:
+            base_text = "Listening Speech"
+            self.processingLabel.setText(f"{base_text}{frames[self.processingDots]}")
+        elif ActivityStatus.LISTENING_KEYWORD in self.active_statuses:
+            base_text = "Listening Keyword"
             self.processingLabel.setText(f"{base_text}{frames[self.processingDots]}")
         elif ActivityStatus.PROCESSING in self.active_statuses:
             base_text = "Processing"

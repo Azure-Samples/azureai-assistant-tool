@@ -239,6 +239,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Disconnect realtime clients if switching from OPEN_AI_REALTIME to a different type
         if (self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME and
             new_client_type != AIClientType.OPEN_AI_REALTIME):
+
+            # Stop listening keyword because no realtime assistants are used anymore
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+
+            # Disconnect all realtime assistants
             assistant_clients = self.assistant_client_manager.get_all_clients()
             for assistant_client in assistant_clients:
                 if (hasattr(assistant_client, 'assistant_config') and
@@ -385,8 +390,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 if self.conversation_sidebar.threadList.count() == 0 or not self.conversation_sidebar.threadList.selectedItems():
                     thread_name = self.conversation_sidebar.create_conversation_thread(threads_client, False, timeout=self.connection_timeout)
                 else:
-                    # If the thread is selected, get the current selected thread name
-                    # If the thread is not selected, get the last thread name
                     if self.conversation_sidebar.threadList.selectedItems():
                         thread_name = self.conversation_sidebar.threadList.get_current_text()
                     else:
@@ -521,8 +524,27 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
 
     # Callbacks for AssistantManagerCallbacks
+    def on_assistant_selected(self, assistant_name, assistant_type, thread_name):
+        print(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
+        if assistant_type == "realtime_assistant":
+            self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+
+    def on_assistant_unselected(self, assistant_name, assistant_type):
+        print(f"Assistant unselected: {assistant_name}, {assistant_type}")
+        if assistant_type == "realtime_assistant":
+            # if this is last assistant unselected, stop listening keyword
+            selected_assistants = self.conversation_sidebar.get_selected_assistants()
+            if not selected_assistants:
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
+
+        assistant_client = self.assistant_client_manager.get_client(assistant_name)
+        if assistant_client is not None:
+            if assistant_client.assistant_config.assistant_type == "realtime_assistant":
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+                self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
 
     def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         self.diagnostics_sidebar.function_call_signal.call_signal.emit(
@@ -579,6 +601,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
+
+        assistant_client = self.assistant_client_manager.get_client(assistant_name)
+        if assistant_client is not None:
+            if assistant_client.assistant_config.assistant_type == "realtime_assistant":
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
+                self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:

@@ -1,4 +1,5 @@
-import logging
+from azure.ai.assistant.management.logger_module import logger
+
 import pyaudio
 import numpy as np
 from typing import Optional
@@ -12,8 +13,6 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 24000  # Default sample rate
 FRAMES_PER_BUFFER = 1024
-
-logger = logging.getLogger(__name__)
 
 
 class AudioCaptureEventHandler(ABC):

@@ -6,11 +6,13 @@ from azure.ai.assistant.management.message import ConversationMessage
 
 class AssistantClientCallbacks:
 
-    def on_assistant_selected(self, assistant_name, thread_name):
+    def on_assistant_selected(self, assistant_name, assistant_type, thread_name):
         """Callback for when an assistant is selected.
         
         :param assistant_name: The name of the assistant.
         :type assistant_name: str
+        :param assistant_type: The type of the assistant.
+        :type assistant_type: str
         :param thread_name: The name of the thread.
         :type thread_name: str
 
@@ -19,11 +21,13 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_assistant_unselected(self, assistant_name):
+    def on_assistant_unselected(self, assistant_name, assistant_type):
         """Callback for when an assistant is unselected.
         
         :param assistant_name: The name of the assistant.
         :type assistant_name: str
+        :param assistant_type: The type of the assistant.
+        :type assistant_type: str
 
         :return: None
         :rtype: None
