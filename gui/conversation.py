@@ -306,7 +306,7 @@ class ConversationView(QWidget):
         return False
 
     def append_conversation_messages(self, messages: List[ConversationMessage]):
-        print(f"Appending full conversation: {len(messages)} messages to the conversation view")
+        logger.info(f"Appending full conversation: {len(messages)} messages to the conversation view")
         self.text_to_url_map = {}
         for message in reversed(messages):
             self.append_conversation_message(message, full_messages_append=True)
@@ -365,10 +365,10 @@ class ConversationView(QWidget):
 
         with self._lock:
             if self.is_any_assistant_streaming() and sender == "user" and not full_messages_append:
-                print(f"Append USER MESSAGE while assistant is streaming, clear and save streaming content")
+                logger.info(f"Append USER MESSAGE while assistant is streaming, clear and save streaming content")
                 self.clear_and_save_assistant_streaming()
             elif self.is_any_assistant_streaming() and sender != "user":
-                print(f"Clear ASSISTANT: {sender} streaming content, full_messages_append: {full_messages_append}")
+                logger.info(f"Clear ASSISTANT: {sender} streaming content, full_messages_append: {full_messages_append}")
                 self.clear_assistant_streaming(sender)
 
             # Generate HTML content based on message segments
@@ -422,8 +422,8 @@ class ConversationView(QWidget):
     def restore_assistant_streaming(self):
         for assistant_name in self.is_assistant_streaming.keys():
             if self.stream_snapshot[assistant_name]:
-                print(f"Restoring streamed content for ASSISTANT: {assistant_name}")
-                print(f"Restored stream snapshot: {self.stream_snapshot[assistant_name]}")
+                logger.info(f"Restoring streamed content for ASSISTANT: {assistant_name}")
+                logger.info(f"Restored stream snapshot: {self.stream_snapshot[assistant_name]}")
                 self.conversationView.moveCursor(QTextCursor.End)
                 self.conversationView.insertHtml(f"<b style='color:black;'>{html.escape(assistant_name)}:</b> ")
                 self.conversationView.insertHtml(self.stream_snapshot[assistant_name])
@@ -433,11 +433,11 @@ class ConversationView(QWidget):
     def clear_and_save_assistant_streaming(self):
         for assistant_name in self.is_assistant_streaming.keys():
             if self.is_assistant_streaming[assistant_name] == AssistantStreamingState.STREAMING:
-                print(f"Clearing and saving streamed content for ASSISTANT: {assistant_name}")
+                logger.info(f"Clearing and saving streamed content for ASSISTANT: {assistant_name}")
                 current_streamed_content = "".join(self.streaming_buffer[assistant_name])
                 self.stream_snapshot[assistant_name] = current_streamed_content
                 self.clear_selected_text_from_conversation(assistant_name=assistant_name, selected_text=current_streamed_content)
-                print(f"Saved stream snapshot: {self.stream_snapshot[assistant_name]}")
+                logger.info(f"Saved stream snapshot: {self.stream_snapshot[assistant_name]}")
                 self.streaming_buffer[assistant_name].clear()
 
     def clear_selected_text_from_conversation(self, assistant_name, selected_text):

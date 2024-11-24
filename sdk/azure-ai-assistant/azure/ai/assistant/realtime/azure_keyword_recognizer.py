@@ -117,7 +117,6 @@ class AzureKeywordRecognizer:
         """
         result = event.result
         if result.reason == speechsdk.ResultReason.RecognizedKeyword:
-            print(f"Keyword detected")
             if self.keyword_detected_callback:
                 self.keyword_detected_callback(result)
 

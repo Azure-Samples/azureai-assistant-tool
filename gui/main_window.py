@@ -525,12 +525,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     # Callbacks for AssistantManagerCallbacks
     def on_assistant_selected(self, assistant_name, assistant_type, thread_name):
-        print(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
+        logger.info(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
         if assistant_type == "realtime_assistant":
             self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
     def on_assistant_unselected(self, assistant_name, assistant_type):
-        print(f"Assistant unselected: {assistant_name}, {assistant_type}")
+        logger.info(f"Assistant unselected: {assistant_name}, {assistant_type}")
         if assistant_type == "realtime_assistant":
             # if this is last assistant unselected, stop listening keyword
             selected_assistants = self.conversation_sidebar.get_selected_assistants()
