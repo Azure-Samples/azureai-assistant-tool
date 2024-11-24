@@ -16,6 +16,8 @@ from bs4 import BeautifulSoup
 import html, os, re, subprocess, sys, tempfile
 import base64, random, time
 from typing import List
+from collections import defaultdict
+import threading
 
 
 class ConversationInputView(QTextEdit):
@@ -223,6 +225,11 @@ class ConversationView(QWidget):
         self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.init_ui()
         self.text_to_url_map = {}
+        self.streaming_buffer = defaultdict(list)
+        self.stream_snapshot = defaultdict(str)
+        self.is_streaming = defaultdict(bool)
+        self._lock = threading.Lock()
+        
         # TODO make this better configurable. To have the output folder for each assistant is good, however
         # if assistant gets destroyed at some point, the output folder cannot be accessed from assistant config
         # anymore. So maybe it could be better to have a global output folder and then subfolders for each 
@@ -296,39 +303,43 @@ class ConversationView(QWidget):
             return lightness < 127
         return False
 
-    def append_messages(self, messages: List[ConversationMessage]):
+    def append_conversation_messages(self, messages: List[ConversationMessage]):
+        print(f"Appending {len(messages)} messages to the conversation view")
         self.text_to_url_map = {}
-
         for message in reversed(messages):
-            # Handle text message content
-            if message.text_message:
-                text_message = message.text_message
-                # Determine the color based on the role and the theme
-                if self.is_dark_mode():
-                    # Colors for dark mode
-                    color = 'blue' if message.role != "assistant" else '#D3D3D3'
-                else:
-                    # Colors for light mode
-                    color = 'blue' if message.role != "assistant" else 'black'
+            self.append_conversation_message(message, called_from_conversation=True)
 
-                # Append the formatted text message
-                self.append_message(message.sender, text_message.content, color=color)
+    def append_conversation_message(self, message: ConversationMessage, called_from_conversation=False):
+        print(f"Appending message from {message.sender}")
+        # Handle text message content
+        if message.text_message:
+            text_message = message.text_message
+            # Determine the color based on the role and the theme
+            if self.is_dark_mode():
+                # Colors for dark mode
+                color = 'blue' if message.role != "assistant" else '#D3D3D3'
+            else:
+                # Colors for light mode
+                color = 'blue' if message.role != "assistant" else 'black'
 
-            # Handle file message content
-            if len(message.file_messages) > 0:
-                for file_message in message.file_messages:
+            # Append the formatted text message
+            self.append_message(message.sender, text_message.content, color=color, called_from_conversation=called_from_conversation)
+
+        # Handle file message content
+        if len(message.file_messages) > 0:
+            for file_message in message.file_messages:
                 # Synchronously retrieve and process the file
-                    file_path = file_message.retrieve_file(self.file_path)
-                    if file_path:
-                        self.append_message(message.sender, f"File saved: {file_path}", color='green')
+                file_path = file_message.retrieve_file(self.file_path)
+                if file_path:
+                    self.append_message(message.sender, f"File saved: {file_path}", color='green', called_from_conversation=called_from_conversation)
 
-            # Handle image message content
-            if len(message.image_messages) > 0:
-                for image_message in message.image_messages:
-                    # Synchronously retrieve and process the image
-                    image_path = image_message.retrieve_image(self.file_path)
-                    if image_path:
-                        self.append_image(image_path)
+        # Handle image message content
+        if len(message.image_messages) > 0:
+            for image_message in message.image_messages:
+                # Synchronously retrieve and process the image
+                image_path = image_message.retrieve_image(self.file_path)
+                if image_path:
+                    self.append_image(image_path)
 
     def convert_image_to_base64(self, image_path):
         with open(image_path, "rb") as image_file:
@@ -338,68 +349,119 @@ class ConversationView(QWidget):
     def append_image(self, image_path):
         base64_image = self.convert_image_to_base64(image_path)
         # Move cursor to the end for each insertion
-        cursor = self.conversationView.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.conversationView.setTextCursor(cursor)
+        self.conversationView.moveCursor(QTextCursor.End)
 
         image_html = f"<img src='data:image/png;base64,{base64_image}' alt='Image' style='width:100px; height:auto;'>"
-        cursor.insertHtml(image_html)
-        cursor.insertText("\n\n")  # Add newlines for spacing
+        self.conversationView.insertHtml(image_html)
+        self.conversationView.insertHtml("<br><br>")
 
         # Scroll to the latest update
         scrollbar = self.conversationView.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         self.conversationView.update()  # Force the widget to update and redraw
 
-    def append_message(self, sender, message, color='black'):
-        # Move cursor to the end for each insertion
-        cursor = self.conversationView.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.conversationView.setTextCursor(cursor)
+    def append_message(self, sender, message, color='black', called_from_conversation=False):
+        with self._lock:
+            if self.is_assistant_streaming() and sender == "user" and not called_from_conversation:
+                print(f"Appending message from user while assistant is streaming")
+                self.clear_and_save_streaming_content()
+            if self.is_assistant_streaming() and sender != "user":
+                # clear streaming variables for the assistant
+                print(f"Clearing streaming content for {sender}")
+                self.stream_snapshot.clear()
+                self.streaming_buffer.clear()
+                self.is_streaming[sender] = False
 
-        # Insert sender's name in bold
-        cursor.insertHtml(f"<b style='color:{color};'>{sender}:</b> ")
+            # Move cursor to the end for each insertion
+            self.conversationView.moveCursor(QTextCursor.End)
 
-        # Parse the message into segments
-        segments = self.parse_message(message)
+            # Insert sender's name in bold
+            self.conversationView.insertHtml(f"<b style='color:{color};'>{sender}:</b> ")
 
-        for is_code, text in segments:
-            if is_code:
-                escaped_code = html.escape(text).replace('\n', '<br>')
-                formatted_code = f"<pre class='code-block'>{escaped_code}</pre>"
-                cursor.insertHtml(formatted_code)
-            else:
-                text = self.format_file_links(text)
-                text = self.format_urls(text)
-                formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{text}</span>"
-                cursor.insertHtml(formatted_text)
-            cursor.insertText("\n")  # Add a newline after each segment for spacing
-        cursor.insertText("\n")
-        # Scroll to the latest update
-        scrollbar = self.conversationView.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-        self.conversationView.update()  # Force the widget to update and redraw
+            # Parse the message into segments
+            segments = self.parse_message(message)
+
+            for is_code, text in segments:
+                if is_code:
+                    escaped_code = html.escape(text).replace('\n', '<br>')
+                    formatted_code = f"<pre class='code-block'>{escaped_code}</pre>"
+                    self.conversationView.insertHtml(formatted_code)
+                else:
+                    text = self.format_file_links(text)
+                    text = self.format_urls(text)
+                    formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{text}</span>"
+                    self.conversationView.insertHtml(formatted_text)
+                self.conversationView.insertHtml("<br>")
+            self.conversationView.insertHtml("<br>")
+            # Scroll to the latest update
+            scrollbar = self.conversationView.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+            self.conversationView.update()  # Force the widget to update and redraw
+
+            if self.is_assistant_streaming() and sender == "user" and not called_from_conversation:
+                print(f"Saving message from while assistant is streaming")
+                self.restore_streaming_content()
 
     def append_message_chunk(self, sender, message_chunk, is_start_of_message):
-        # Move cursor to the end for each insertion
-        cursor = self.conversationView.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.conversationView.setTextCursor(cursor)
+        with self._lock:
+            # Move cursor to the end for each insertion
+            self.conversationView.moveCursor(QTextCursor.End)
+            if is_start_of_message:  # If a new message, insert the assistant's name in bold and black
+                self.conversationView.insertHtml(f"<b style='color:black;'>{html.escape(sender)}:</b> ")
+        
+            escaped_text = html.escape(message_chunk)
+            formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{escaped_text}</span>"
+            self.conversationView.insertHtml(formatted_text)
 
-        # If this is the start of a new message, insert the sender's name in bold
-        if is_start_of_message:
-            cursor.insertHtml(f"<b style='color:black;'>{html.escape(sender)}:</b> ")
+            self.is_streaming[sender] = True
+            self.streaming_buffer[sender].append(message_chunk)
 
-        # Insert the message chunk as plain text.
-        escaped_text = html.escape(message_chunk)
-        #print(escaped_text)
-        formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{escaped_text}</span>"
-        cursor.insertHtml(formatted_text)
+            # Scroll to the latest update
+            scrollbar = self.conversationView.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+            self.conversationView.update()
 
-        # Scroll to the latest update without adding new lines after each chunk.
-        scrollbar = self.conversationView.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-        self.conversationView.update()
+    def is_assistant_streaming(self) -> bool:
+        return any(self.is_streaming.values())
+
+    def restore_streaming_content(self):
+        print("### Restoring streaming content ###")
+        for assistant_name in self.is_streaming.keys():
+            if self.stream_snapshot[assistant_name]:
+                print(f"Restoring streaming content for {assistant_name}")
+                print(f"Restored snapshot: {self.stream_snapshot[assistant_name]}")
+                self.conversationView.moveCursor(QTextCursor.End)
+                self.conversationView.insertHtml(f"<b style='color:black;'>{html.escape(assistant_name)}:</b> ")
+                self.conversationView.insertHtml(self.stream_snapshot[assistant_name])
+                del self.stream_snapshot[assistant_name]  # Clear the snapshot
+                self.is_streaming[assistant_name] = True
+
+    def clear_and_save_streaming_content(self):
+        print("### Clearing and saving streaming content ###")
+        for assistant_name in self.is_streaming.keys():
+
+            if self.is_streaming[assistant_name]:
+                print(f"Clearing and saving streaming content for {assistant_name}")
+                full_streamed_content = "".join(self.streaming_buffer[assistant_name])
+                self.stream_snapshot[assistant_name] = full_streamed_content
+                # Get the QTextEdit's current content
+                current_text = self.conversationView.toPlainText()
+                # Only proceed if the text ends with the full_streamed_content
+                if current_text.endswith(full_streamed_content):
+                    # Create a QTextCursor associated with the QTextEdit
+                    cursor = self.conversationView.textCursor()
+                    # Calculate the position where full_streamed_content starts
+                    start_position = cursor.position() - len(full_streamed_content) - len(assistant_name) - 2
+                    # Select the text from start_position to the end of the document
+                    cursor.setPosition(start_position, QTextCursor.MoveAnchor)
+                    cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
+                    # Remove the selected text
+                    cursor.removeSelectedText()
+                    # Set the modified text cursor back to the QTextEdit
+                    self.conversationView.setTextCursor(cursor)
+
+                print(f"Saved snapshot: {self.stream_snapshot[assistant_name]}")
+                self.streaming_buffer[assistant_name].clear()
 
     def format_urls(self, text):
         # Regular expression to match URLs, ensuring parentheses are handled correctly

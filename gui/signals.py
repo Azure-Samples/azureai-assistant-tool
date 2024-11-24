@@ -23,6 +23,9 @@ class SpeechSynthesisCompleteSignal(QObject):
 class ConversationViewClear(QObject):
     update_signal = Signal()
 
+class ConversationAppendMessageSignal(QObject):
+    append_signal = Signal(object)
+
 class ConversationAppendMessagesSignal(QObject):
     append_signal = Signal(list)
 

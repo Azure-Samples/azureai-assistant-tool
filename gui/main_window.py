@@ -46,6 +46,7 @@ from gui.signals import (
     UserInputSendSignal,
     UserInputSignal,
     ErrorSignal,
+    ConversationAppendMessageSignal,
     ConversationAppendMessagesSignal,
     ConversationAppendImageSignal
 )
@@ -179,11 +180,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.error_signal = ErrorSignal()
         self.conversation_view_clear_signal = ConversationViewClear()
         self.conversation_append_messages_signal = ConversationAppendMessagesSignal()
+        self.conversation_append_message_signal = ConversationAppendMessageSignal()
         self.conversation_append_image_signal = ConversationAppendImageSignal()
         self.conversation_append_chunk_signal = ConversationAppendChunkSignal()
 
         # Connect the signals to slots (methods)
-        self.append_conversation_signal.update_signal.connect(self.append_conversation_message)
+        self.append_conversation_signal.update_signal.connect(self.conversation_view.append_message)
         self.speech_hypothesis_signal.update_signal.connect(self.on_speech_hypothesis)
         self.speech_final_signal.send_signal.connect(self.on_user_input_complete)
         self.speech_synthesis_complete_signal.complete_signal.connect(self.on_speech_synthesis_complete)
@@ -194,7 +196,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.update_conversation_title_signal.update_signal.connect(self.conversation_sidebar.threadList.update_item_by_name)
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
         self.conversation_view_clear_signal.update_signal.connect(self.conversation_view.conversationView.clear)
-        self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_messages)
+        self.conversation_append_messages_signal.append_signal.connect(self.conversation_view.append_conversation_messages)
+        self.conversation_append_message_signal.append_signal.connect(self.conversation_view.append_conversation_message)
         self.conversation_append_image_signal.append_signal.connect(self.conversation_view.append_image)
         self.conversation_append_chunk_signal.append_signal.connect(self.conversation_view.append_message_chunk)
 
@@ -380,7 +383,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.speech_input_handler.stop_listening_from_mic()
 
             # Append user's text with preserved formatting
-            self.append_conversation_message("user", user_input, color='blue')
+            self.append_conversation_signal.update_signal.emit("user", user_input, "blue")
 
             # Update the thread title based on the user's input
             if self.use_system_assistant_for_thread_name:
@@ -402,10 +405,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             error_message = f"An error occurred while processing the user input: {e}"
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
-
-    def append_conversation_message(self, sender, message, color):
-        # Append the message to the conversation view
-        self.conversation_view.append_message(sender, message, color)
 
     @Slot(str, bool)
     def handle_assistant_checkbox_toggled(self, assistant_name, is_checked):
@@ -591,14 +590,15 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message.text_message.content, is_first_message)
             return
 
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
-        if run_status == "in_progress" and conversation.messages:
+        if run_status == "in_progress" and message is not None:
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
-            self.update_conversation_messages(conversation)
+            self.conversation_append_message_signal.append_signal.emit(message)
 
-        elif run_status == "completed" and conversation.messages:
+        elif run_status == "completed":
             logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is completed, conversation updated")
-            self.update_conversation_messages(conversation)
+            conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
+            if conversation.messages:
+                self.update_conversation_messages(conversation)
 
             if self.conversation_sidebar.is_listening:
                 self.speech_input_handler.start_listening_from_mic()

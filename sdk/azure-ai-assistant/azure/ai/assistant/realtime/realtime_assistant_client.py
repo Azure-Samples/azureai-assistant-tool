@@ -245,11 +245,25 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         elif role == "assistant":
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name, metadata={"chat_assistant": self._ai_client._name})
 
-        self._ai_client.callbacks.on_run_update(
-            assistant_name=self._ai_client.name, 
-            run_identifier=self._run_identifier, 
-            run_status="in_progress", 
-            thread_name=self._thread_name)
+        conversation_message : ConversationMessage = ConversationMessage(self._ai_client)
+        conversation_message.text_message = TextMessage(message)
+        conversation_message.role = role
+        if role == "user":
+            conversation_message.sender = "user"
+            self._ai_client.callbacks.on_run_update(
+                assistant_name=self._ai_client.name, 
+                run_identifier=self._run_identifier, 
+                run_status="in_progress", 
+                thread_name=self._thread_name,
+                is_first_message=False,
+                message=conversation_message)
+        else:
+            conversation_message.sender = self._ai_client.name
+            self._ai_client.callbacks.on_run_update(
+                assistant_name=self._ai_client.name, 
+                run_identifier=self._run_identifier, 
+                run_status="completed", 
+                thread_name=self._thread_name)
 
     def on_response_done(self, event: ResponseDone):
         logger.debug(f"Assistant's response completed with status '{event.response.get('status')}' and ID '{event.response.get('id')}'")

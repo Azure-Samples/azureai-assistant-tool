@@ -562,7 +562,7 @@ class ConversationSidebar(QWidget):
             # Retrieve the messages for the selected thread
             conversation = threads_client.retrieve_conversation(unique_thread_name, timeout=self.main_window.connection_timeout)
             if conversation.messages is not None:
-                self.main_window.conversation_view.append_messages(conversation.messages)
+                self.main_window.conversation_view.append_conversation_messages(conversation.messages)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while selecting the thread: {e}")
 
