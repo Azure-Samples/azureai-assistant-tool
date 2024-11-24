@@ -8,11 +8,6 @@ from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMes
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
-from PySide6.QtCore import Slot
-
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import os, time, json
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.attachment import Attachment, AttachmentType
@@ -27,8 +22,6 @@ from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.message import ConversationMessage
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
-from gui.speech_input_handler import SpeechInputHandler
-from gui.speech_synthesis_handler import SpeechSynthesisHandler
 from gui.assistant_client_manager import AssistantClientManager
 from gui.conversation_sidebar import ConversationSidebar
 from gui.diagnostic_sidebar import DiagnosticsSidebar
@@ -38,19 +31,21 @@ from gui.signals import (
     AppendConversationSignal,
     ConversationViewClear,
     StartProcessingSignal,
-    SpeechSynthesisCompleteSignal,
     StartStatusAnimationSignal,
     StopProcessingSignal,
     StopStatusAnimationSignal,
     UpdateConversationTitleSignal,
-    UserInputSendSignal,
-    UserInputSignal,
     ErrorSignal,
     ConversationAppendMessageSignal,
     ConversationAppendMessagesSignal,
     ConversationAppendImageSignal
 )
 from gui.utils import init_system_assistant
+
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import os, time, json
+
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
@@ -142,7 +137,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.initialize_ui_components()
         self.initialize_signals()
         self.initialize_ui_layout()
-        self.initialize_speech()
 
     def initialize_ui_components(self):
         # Main window settings
@@ -169,9 +163,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def initialize_signals(self):
         # setup signals
         self.append_conversation_signal = AppendConversationSignal()
-        self.speech_hypothesis_signal = UserInputSignal()
-        self.speech_final_signal = UserInputSendSignal()
-        self.speech_synthesis_complete_signal = SpeechSynthesisCompleteSignal()
         self.start_animation_signal = StartStatusAnimationSignal()
         self.stop_animation_signal = StopStatusAnimationSignal()
         self.start_processing_signal = StartProcessingSignal()
@@ -186,9 +177,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         # Connect the signals to slots (methods)
         self.append_conversation_signal.update_signal.connect(self.conversation_view.append_message)
-        self.speech_hypothesis_signal.update_signal.connect(self.on_speech_hypothesis)
-        self.speech_final_signal.send_signal.connect(self.on_user_input_complete)
-        self.speech_synthesis_complete_signal.complete_signal.connect(self.on_speech_synthesis_complete)
         self.start_animation_signal.start_signal.connect(self.status_bar.start_animation)
         self.stop_animation_signal.stop_signal.connect(self.status_bar.stop_animation)
         self.start_processing_signal.start_signal.connect(self.start_processing_input)
@@ -239,14 +227,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         # Set the main splitter as the central widget
         self.setCentralWidget(main_splitter)
 
-    def initialize_speech(self):
-        try:
-            self.speech_input_handler = SpeechInputHandler(self, self.speech_hypothesis_signal.update_signal, self.speech_final_signal.send_signal)
-            self.speech_synthesis_handler = SpeechSynthesisHandler(self, self.speech_synthesis_complete_signal.complete_signal)
-        except ValueError as e:
-            QMessageBox.warning(self, "Warning", f"An error occurred while initializing the speech input handler: {e}")
-            logger.error(f"Error initializing speech input handler: {e}")
-
     def set_active_ai_client_type(self, new_client_type : AIClientType):
         # If the active AI client type is not yet initialized, return and set the active AI client type in deferred_init
         if not hasattr(self, 'conversation_thread_clients'):
@@ -284,18 +264,14 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.AZURE_OPEN_AI
                 )
-                self.conversation_sidebar.toggle_mic_button.setVisible(True)
             elif self.active_ai_client_type == AIClientType.OPEN_AI:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI
                 )
-                self.conversation_sidebar.toggle_mic_button.setVisible(True)
             elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI_REALTIME
                 )
-                # make the mic button invisible for OpenAI Realtime
-                self.conversation_sidebar.toggle_mic_button.setVisible(False)             
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
 
@@ -365,9 +341,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.assistants_processing[assistant_name]['user_input'] = False
                 self.status_bar.stop_animation(ActivityStatus.PROCESSING_USER_INPUT)
 
-    def on_speech_hypothesis(self, text):
-        self.conversation_view.inputField.setText(text)
-
     def on_user_input_complete(self, user_input):
         try:
             on_user_input_complete_start = time.time() 
@@ -377,10 +350,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 QMessageBox.warning(self, "Error", "Please select an assistant first.")
                 return
             thread_name = self.setup_conversation_thread()
-
-            # stop listening if mic is on
-            if self.conversation_sidebar.is_listening:
-                self.speech_input_handler.stop_listening_from_mic()
 
             # Append user's text with preserved formatting
             self.append_conversation_signal.update_signal.emit("user", user_input, "blue")
@@ -406,7 +375,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
-    @Slot(str, bool)
     def handle_assistant_checkbox_toggled(self, assistant_name, is_checked):
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
         if is_checked:
@@ -546,27 +514,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         attachments_dicts = [att for att in attachments_dicts if att["file_path"] != image_path]
         self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
 
-    # Callbacks for ConversationSidebarCallbacks
-    def on_listening_started(self):
-        logger.debug("on_listening_started on main_window")
-        if not self.speech_input_handler.is_initialized:
-            QMessageBox.warning(self, "Error", "Speech input is not properly initialized, check the AZURE_AI_SPEECH_KEY and AZURE_AI_SPEECH_REGION environment variables are set correctly.")
-            return False
-        return self.speech_input_handler.start_listening_from_mic()
-
-    def on_listening_stopped(self):
-        logger.debug("on_listening_stopped on main_window")
-        self.speech_input_handler.stop_listening_from_mic()
-
-    def on_speech_synthesis_complete(self):
-        logger.debug("on_speech_synthesis_complete on main_window")
-        if self.conversation_sidebar.is_listening:
-            self.speech_input_handler.start_listening_from_mic()
-
-    # Callbacks for ConversationViewCallbacks
-    def on_text_input_field_clicked(self):
-        logger.debug("on_text_field_clicked on main_window")
-
     # Callbacks for AssistantManagerCallbacks
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
@@ -586,22 +533,18 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         if run_status == "streaming":
             if message.text_message:
-                logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is streaming")
+                logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status}, stream chunk update")
                 self.conversation_append_chunk_signal.append_signal.emit(assistant_name, message.text_message.content, is_first_message)
             return
 
         if run_status == "in_progress" and message is not None:
-            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is in progress, conversation updated")
+            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status}, message append update")
             self.conversation_append_message_signal.append_signal.emit(message)
-
-        elif run_status == "completed":
-            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status} is completed, conversation updated")
+        else:
+            logger.info(f"Run update for assistant {assistant_name} with run identifier {run_identifier} and status {run_status}, full conversation update")
             conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
             if conversation.messages:
                 self.update_conversation_messages(conversation)
-
-            if self.conversation_sidebar.is_listening:
-                self.speech_input_handler.start_listening_from_mic()
 
     def on_run_failed(self, assistant_name, run_identifier, run_end_time, error_code, error_message, thread_name):
         error_string = f"Run failed due to error code: {error_code}, message: {error_message}"
@@ -627,17 +570,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             )
             raise ValueError("No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
                              "Please check Diagnostics for more detailed information and troubleshooting steps.")
-
-        if self.conversation_sidebar.is_listening:
-            # microphone needs to be stopped before speech synthesis otherwise synthesis output will be heard by the microphone
-            self.speech_input_handler.stop_listening_from_mic()
-            logger.debug(f"Start speech synthesis for last assistant message: {last_assistant_message.content}")
-            input_text = last_assistant_message.content
-            if self.user_text_summarization_in_synthesis and hasattr(self, 'speech_transcription_summarizer'):
-                input_text = self.speech_transcription_summarizer.process_messages(user_request=input_text, stream=False)
-            result_future = self.speech_synthesis_handler.synthesize_speech_async(input_text)
-            logger.debug(f"Speech synthesis result_future: {result_future}")
-            # when synthesis is complete, on_speech_synthesis_complete will be called and listening from microphone will be started again
 
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
@@ -720,9 +652,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def closeEvent(self, event):
         try:
-            # Stop microphone listening if it's on
-            if hasattr(self, 'speech_input_handler') and self.speech_input_handler is not None:
-                self.speech_input_handler.stop_listening_from_mic()
             self.assistant_config_manager.save_configs()
             for ai_client_type in AIClientType:
                 logger.debug(f"CloseEvent: save_conversation_threads for ai_client_type {ai_client_type.name}")

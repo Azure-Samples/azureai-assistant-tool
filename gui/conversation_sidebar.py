@@ -262,26 +262,11 @@ class ConversationSidebar(QWidget):
         self.cancelRunButton.setFixedHeight(23)
         self.cancelRunButton.setFont(QFont("Arial", 11))
 
-        # Load icons
-        self.mic_on_icon = QIcon(resource_path("gui/images/mic_on.png"))
-        self.mic_off_icon = QIcon(resource_path("gui/images/mic_off.png"))
-
-        # Create a toggle button for the microphone
-        self.toggle_mic_button = QPushButton(self)
-        # Create and style the toggle_mic_button
-        self.toggle_mic_button.setFixedSize(20, 23)
-        self.toggle_mic_button.setIcon(self.mic_off_icon)
-        self.toggle_mic_button.setIconSize(QSize(23, 23))  # Set size as needed
-        self.toggle_mic_button.setStyleSheet("QPushButton { border: none; }")
-
         # Horizontal layout to hold both buttons
         buttonLayout = QHBoxLayout()
         buttonLayout.addWidget(self.addThreadButton)
         buttonLayout.addWidget(self.cancelRunButton)
-        buttonLayout.addWidget(self.toggle_mic_button)
         buttonLayout.setSpacing(10)  # Adjust spacing as needed
-
-        self.is_listening = False
 
         # Create a list widget for displaying the threads
         self.threadList = CustomListWidget(self)
@@ -298,7 +283,6 @@ class ConversationSidebar(QWidget):
         self.cancelRunButton.clicked.connect(self.main_window.on_cancel_run_button_clicked)
         self.threadList.itemClicked.connect(self.select_conversation_thread_by_item)
         self.threadList.itemDeleted.connect(self.on_selected_thread_delete)
-        self.toggle_mic_button.clicked.connect(self.toggle_mic)
 
         # Create a list widget for displaying assistants
         self.assistantList = QListWidget(self)
@@ -529,20 +513,6 @@ class ConversationSidebar(QWidget):
 
     def select_conversation_thread_by_name(self, unique_thread_name):
         self._select_thread(unique_thread_name)
-
-    def toggle_mic(self):
-        self.is_listening = not self.is_listening
-        if self.is_listening:
-            is_started = self.main_window.on_listening_started()
-            if not is_started:
-                self.is_listening = False
-                return
-            self.toggle_mic_button.setIcon(self.mic_on_icon)
-            logger.info("Microphone is now active.")
-        else:
-            self.toggle_mic_button.setIcon(self.mic_off_icon)
-            self.main_window.on_listening_stopped()
-            logger.info("Microphone is now inactive.")
 
     def _select_threadlist_item(self, unique_thread_name):
         # Select the thread item in the sidebar

@@ -169,10 +169,6 @@ class ConversationInputView(QTextEdit):
         super().mouseReleaseEvent(event)
 
     def mousePressEvent(self, event):
-        # Call on_text_field_clicked on the main window reference
-        self.main_window.on_text_input_field_clicked()
-
-        # Call the base class implementation to ensure normal text editing functionality
         super().mousePressEvent(event)
 
 
@@ -304,13 +300,12 @@ class ConversationView(QWidget):
         return False
 
     def append_conversation_messages(self, messages: List[ConversationMessage]):
-        print(f"Appending {len(messages)} messages to the conversation view")
+        print(f"Appending full conversation: {len(messages)} messages to the conversation view")
         self.text_to_url_map = {}
         for message in reversed(messages):
-            self.append_conversation_message(message, called_from_conversation=True)
+            self.append_conversation_message(message, full_messages_append=True)
 
-    def append_conversation_message(self, message: ConversationMessage, called_from_conversation=False):
-        print(f"Appending message from {message.sender}")
+    def append_conversation_message(self, message: ConversationMessage, full_messages_append=False):
         # Handle text message content
         if message.text_message:
             text_message = message.text_message
@@ -323,7 +318,7 @@ class ConversationView(QWidget):
                 color = 'blue' if message.role != "assistant" else 'black'
 
             # Append the formatted text message
-            self.append_message(message.sender, text_message.content, color=color, called_from_conversation=called_from_conversation)
+            self.append_message(message.sender, text_message.content, color=color, full_messages_append=full_messages_append)
 
         # Handle file message content
         if len(message.file_messages) > 0:
@@ -331,7 +326,7 @@ class ConversationView(QWidget):
                 # Synchronously retrieve and process the file
                 file_path = file_message.retrieve_file(self.file_path)
                 if file_path:
-                    self.append_message(message.sender, f"File saved: {file_path}", color='green', called_from_conversation=called_from_conversation)
+                    self.append_message(message.sender, f"File saved: {file_path}", color='green', full_messages_append=full_messages_append)
 
         # Handle image message content
         if len(message.image_messages) > 0:
@@ -355,21 +350,17 @@ class ConversationView(QWidget):
         self.conversationView.insertHtml(image_html)
         self.conversationView.insertHtml("<br><br>")
 
-        # Scroll to the latest update
-        scrollbar = self.conversationView.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-        self.conversationView.update()  # Force the widget to update and redraw
+        self.scroll_to_bottom()
 
-    def append_message(self, sender, message, color='black', called_from_conversation=False):
+    def append_message(self, sender, message, color='black', full_messages_append=False):
         with self._lock:
-            if self.is_assistant_streaming() and sender == "user" and not called_from_conversation:
-                print(f"Appending message from user while assistant is streaming")
-                self.clear_and_save_streaming_content()
-            if self.is_assistant_streaming() and sender != "user":
-                # clear streaming variables for the assistant
-                print(f"Clearing streaming content for {sender}")
-                self.stream_snapshot.clear()
-                self.streaming_buffer.clear()
+            if self.is_assistant_streaming() and sender == "user" and not full_messages_append:
+                print(f"Append USER MESSAGE while assistant is streaming, clear and save streaming content")
+                self.clear_and_save_streamed_content()
+            elif self.is_assistant_streaming() and sender != "user":
+                print(f"Clear ASSISTANT: {sender} streaming content, full_messages_append: {full_messages_append}")
+                self.stream_snapshot[sender] = ""
+                self.streaming_buffer[sender].clear()
                 self.is_streaming[sender] = False
 
             # Move cursor to the end for each insertion
@@ -393,14 +384,11 @@ class ConversationView(QWidget):
                     self.conversationView.insertHtml(formatted_text)
                 self.conversationView.insertHtml("<br>")
             self.conversationView.insertHtml("<br>")
-            # Scroll to the latest update
-            scrollbar = self.conversationView.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
-            self.conversationView.update()  # Force the widget to update and redraw
 
-            if self.is_assistant_streaming() and sender == "user" and not called_from_conversation:
-                print(f"Saving message from while assistant is streaming")
-                self.restore_streaming_content()
+            self.scroll_to_bottom()
+
+            if self.is_assistant_streaming() and sender == "user" and not full_messages_append:
+                self.restore_streamed_content()
 
     def append_message_chunk(self, sender, message_chunk, is_start_of_message):
         with self._lock:
@@ -416,52 +404,48 @@ class ConversationView(QWidget):
             self.is_streaming[sender] = True
             self.streaming_buffer[sender].append(message_chunk)
 
-            # Scroll to the latest update
-            scrollbar = self.conversationView.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
-            self.conversationView.update()
+            self.scroll_to_bottom()
 
     def is_assistant_streaming(self) -> bool:
         return any(self.is_streaming.values())
 
-    def restore_streaming_content(self):
-        print("### Restoring streaming content ###")
+    def restore_streamed_content(self):
         for assistant_name in self.is_streaming.keys():
             if self.stream_snapshot[assistant_name]:
-                print(f"Restoring streaming content for {assistant_name}")
-                print(f"Restored snapshot: {self.stream_snapshot[assistant_name]}")
+                print(f"Restoring streamed content for ASSISTANT: {assistant_name}")
+                print(f"Restored stream snapshot: {self.stream_snapshot[assistant_name]}")
                 self.conversationView.moveCursor(QTextCursor.End)
                 self.conversationView.insertHtml(f"<b style='color:black;'>{html.escape(assistant_name)}:</b> ")
                 self.conversationView.insertHtml(self.stream_snapshot[assistant_name])
-                del self.stream_snapshot[assistant_name]  # Clear the snapshot
+                del self.stream_snapshot[assistant_name]
                 self.is_streaming[assistant_name] = True
 
-    def clear_and_save_streaming_content(self):
-        print("### Clearing and saving streaming content ###")
+    def clear_and_save_streamed_content(self):
         for assistant_name in self.is_streaming.keys():
-
             if self.is_streaming[assistant_name]:
-                print(f"Clearing and saving streaming content for {assistant_name}")
-                full_streamed_content = "".join(self.streaming_buffer[assistant_name])
-                self.stream_snapshot[assistant_name] = full_streamed_content
-                # Get the QTextEdit's current content
-                current_text = self.conversationView.toPlainText()
-                # Only proceed if the text ends with the full_streamed_content
-                if current_text.endswith(full_streamed_content):
-                    # Create a QTextCursor associated with the QTextEdit
-                    cursor = self.conversationView.textCursor()
-                    # Calculate the position where full_streamed_content starts
-                    start_position = cursor.position() - len(full_streamed_content) - len(assistant_name) - 2
-                    # Select the text from start_position to the end of the document
-                    cursor.setPosition(start_position, QTextCursor.MoveAnchor)
-                    cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
-                    # Remove the selected text
-                    cursor.removeSelectedText()
-                    # Set the modified text cursor back to the QTextEdit
-                    self.conversationView.setTextCursor(cursor)
-
-                print(f"Saved snapshot: {self.stream_snapshot[assistant_name]}")
+                print(f"Clearing and saving streamed content for ASSISTANT: {assistant_name}")
+                current_streamed_content = "".join(self.streaming_buffer[assistant_name])
+                self.stream_snapshot[assistant_name] = current_streamed_content
+                self.clear_selected_text_from_conversation(assistant_name=assistant_name, selected_text=current_streamed_content)
+                print(f"Saved stream snapshot: {self.stream_snapshot[assistant_name]}")
                 self.streaming_buffer[assistant_name].clear()
+
+    def clear_selected_text_from_conversation(self, assistant_name, selected_text):
+        # Get the QTextEdit's current content
+        current_text = self.conversationView.toPlainText()
+        # Only proceed if the text ends with the selected_text
+        if current_text.endswith(selected_text):
+            # Create a QTextCursor associated with the QTextEdit
+            cursor = self.conversationView.textCursor()
+            # Calculate the position where selected_text starts, including the assistant's name and -2 for the colon and space
+            start_position = cursor.position() - len(selected_text) - len(assistant_name) - 2
+            # Select the text from start_position to the end of the document
+            cursor.setPosition(start_position, QTextCursor.MoveAnchor)
+            cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
+            # Remove the selected text
+            cursor.removeSelectedText()
+            # Set the modified text cursor back to the QTextEdit
+            self.conversationView.setTextCursor(cursor)
 
     def format_urls(self, text):
         # Regular expression to match URLs, ensuring parentheses are handled correctly
@@ -535,3 +519,8 @@ class ConversationView(QWidget):
             else:
                 segments.append((is_code, part))
         return segments
+
+    def scroll_to_bottom(self):
+        scrollbar = self.conversationView.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        self.conversationView.update()

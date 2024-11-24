@@ -16,8 +16,6 @@ from azure.ai.assistant.management.assistant_config import ToolResourcesConfig, 
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 from azure.ai.assistant.management.logger_module import logger
-from gui.signals import UserInputSendSignal, UserInputSignal
-from gui.speech_input_handler import SpeechInputHandler
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.utils import resource_path
