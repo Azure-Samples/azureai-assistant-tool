@@ -18,6 +18,12 @@ import base64, random, time
 from typing import List
 from collections import defaultdict
 import threading
+from enum import Enum
+
+
+class AssistantStreamingState(Enum):
+    NOT_STREAMING = 0
+    STREAMING = 1
 
 
 class ConversationInputView(QTextEdit):
@@ -223,8 +229,8 @@ class ConversationView(QWidget):
         self.text_to_url_map = {}
         self.streaming_buffer = defaultdict(list)
         self.stream_snapshot = defaultdict(str)
-        self.is_streaming = defaultdict(bool)
-        self._lock = threading.Lock()
+        self.is_assistant_streaming = defaultdict(lambda: AssistantStreamingState.NOT_STREAMING)
+        self._lock = threading.RLock()
         
         # TODO make this better configurable. To have the output folder for each assistant is good, however
         # if assistant gets destroyed at some point, the output folder cannot be accessed from assistant config
@@ -353,42 +359,39 @@ class ConversationView(QWidget):
         self.scroll_to_bottom()
 
     def append_message(self, sender, message, color='black', full_messages_append=False):
+
+        # Insert sender's name in bold
+        html_content = f"<b style='color:{color};'>{sender}:</b> "
+
         with self._lock:
-            if self.is_assistant_streaming() and sender == "user" and not full_messages_append:
+            if self.is_any_assistant_streaming() and sender == "user" and not full_messages_append:
                 print(f"Append USER MESSAGE while assistant is streaming, clear and save streaming content")
-                self.clear_and_save_streamed_content()
-            elif self.is_assistant_streaming() and sender != "user":
+                self.clear_and_save_assistant_streaming()
+            elif self.is_any_assistant_streaming() and sender != "user":
                 print(f"Clear ASSISTANT: {sender} streaming content, full_messages_append: {full_messages_append}")
-                self.stream_snapshot[sender] = ""
-                self.streaming_buffer[sender].clear()
-                self.is_streaming[sender] = False
+                self.clear_assistant_streaming(sender)
 
-            # Move cursor to the end for each insertion
-            self.conversationView.moveCursor(QTextCursor.End)
-
-            # Insert sender's name in bold
-            self.conversationView.insertHtml(f"<b style='color:{color};'>{sender}:</b> ")
-
-            # Parse the message into segments
-            segments = self.parse_message(message)
-
-            for is_code, text in segments:
+            # Generate HTML content based on message segments
+            for is_code, text in self.parse_message(message):
                 if is_code:
                     escaped_code = html.escape(text).replace('\n', '<br>')
                     formatted_code = f"<pre class='code-block'>{escaped_code}</pre>"
-                    self.conversationView.insertHtml(formatted_code)
+                    html_content += formatted_code
                 else:
                     text = self.format_file_links(text)
                     text = self.format_urls(text)
                     formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{text}</span>"
-                    self.conversationView.insertHtml(formatted_text)
-                self.conversationView.insertHtml("<br>")
-            self.conversationView.insertHtml("<br>")
+                    html_content += formatted_text
+                html_content += "<br>"
+            html_content += "<br>"
 
+            # Insert the complete HTML content in one go
+            self.conversationView.moveCursor(QTextCursor.End)
+            self.conversationView.insertHtml(html_content)
             self.scroll_to_bottom()
 
-            if self.is_assistant_streaming() and sender == "user" and not full_messages_append:
-                self.restore_streamed_content()
+            if self.is_any_assistant_streaming() and sender == "user" and not full_messages_append:
+                self.restore_assistant_streaming()
 
     def append_message_chunk(self, sender, message_chunk, is_start_of_message):
         with self._lock:
@@ -401,16 +404,23 @@ class ConversationView(QWidget):
             formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{escaped_text}</span>"
             self.conversationView.insertHtml(formatted_text)
 
-            self.is_streaming[sender] = True
+            self.is_assistant_streaming[sender] = AssistantStreamingState.STREAMING
             self.streaming_buffer[sender].append(message_chunk)
 
             self.scroll_to_bottom()
 
-    def is_assistant_streaming(self) -> bool:
-        return any(self.is_streaming.values())
+    def clear_assistant_streaming(self, assistant_name):
+        with self._lock:
+            self.is_assistant_streaming[assistant_name] = AssistantStreamingState.NOT_STREAMING
+            self.stream_snapshot[assistant_name] = ""
+            self.streaming_buffer[assistant_name].clear()
 
-    def restore_streamed_content(self):
-        for assistant_name in self.is_streaming.keys():
+    def is_any_assistant_streaming(self):
+        with self._lock:
+            return any(state == AssistantStreamingState.STREAMING for state in self.is_assistant_streaming.values())
+
+    def restore_assistant_streaming(self):
+        for assistant_name in self.is_assistant_streaming.keys():
             if self.stream_snapshot[assistant_name]:
                 print(f"Restoring streamed content for ASSISTANT: {assistant_name}")
                 print(f"Restored stream snapshot: {self.stream_snapshot[assistant_name]}")
@@ -418,11 +428,11 @@ class ConversationView(QWidget):
                 self.conversationView.insertHtml(f"<b style='color:black;'>{html.escape(assistant_name)}:</b> ")
                 self.conversationView.insertHtml(self.stream_snapshot[assistant_name])
                 del self.stream_snapshot[assistant_name]
-                self.is_streaming[assistant_name] = True
+                self.is_assistant_streaming[assistant_name] = AssistantStreamingState.STREAMING
 
-    def clear_and_save_streamed_content(self):
-        for assistant_name in self.is_streaming.keys():
-            if self.is_streaming[assistant_name]:
+    def clear_and_save_assistant_streaming(self):
+        for assistant_name in self.is_assistant_streaming.keys():
+            if self.is_assistant_streaming[assistant_name] == AssistantStreamingState.STREAMING:
                 print(f"Clearing and saving streamed content for ASSISTANT: {assistant_name}")
                 current_streamed_content = "".join(self.streaming_buffer[assistant_name])
                 self.stream_snapshot[assistant_name] = current_streamed_content
@@ -448,16 +458,20 @@ class ConversationView(QWidget):
             self.conversationView.setTextCursor(cursor)
 
     def format_urls(self, text):
-        # Regular expression to match URLs, ensuring parentheses are handled correctly
-        url_pattern = r'((https?://[^\s)]+))'
-        url_regex = re.compile(url_pattern)
-
-        # Replace URLs with HTML anchor tags
+        # Enhanced URL pattern that excludes punctuation at the end.
+        url_pattern = re.compile(
+            r'(\bhttps?://'               # Start with http:// or https://
+            r'[-A-Z0-9+&@#/%=~_|$?!:.,]*' # Followed by the domain part and allowable characters in a URL.
+            r'[-A-Z0-9+&@#/%=~_|$]'       # URL must finish with an allowable character to avoid punctuation at the end.
+            r')', re.IGNORECASE)           # Make the regex case-insensitive.
+        
+        # Function to add HTML anchor tag around URLs.
         def replace_with_link(match):
-            url = match.group(1)
-            return f'<a href="{url}" style="color:blue;">{url}</a>'
+            url = match.group(0)
+            return f'<a href="{url}" style="color:blue; text-decoration: underline;">{url}</a>'
 
-        return url_regex.sub(replace_with_link, text)
+        # Substitute URLs in the text with HTML anchor tags.
+        return url_pattern.sub(replace_with_link, text)
 
     def format_file_links(self, text):
         # Pattern to find citations in the form [Download text]( [index])
