@@ -241,14 +241,12 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def create_thread_message(self, message: str, role: str):
         if role == "user":
+            # Add the user message to the thread
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name)
-        elif role == "assistant":
-            self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name, metadata={"chat_assistant": self._ai_client._name})
-
-        conversation_message : ConversationMessage = ConversationMessage(self._ai_client)
-        conversation_message.text_message = TextMessage(message)
-        conversation_message.role = role
-        if role == "user":
+            # Update the run with the user message
+            conversation_message : ConversationMessage = ConversationMessage(self._ai_client)
+            conversation_message.text_message = TextMessage(message)
+            conversation_message.role = role
             conversation_message.sender = "user"
             self._ai_client.callbacks.on_run_update(
                 assistant_name=self._ai_client.name, 
@@ -257,12 +255,14 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                 thread_name=self._thread_name,
                 is_first_message=False,
                 message=conversation_message)
-        else:
-            conversation_message.sender = self._ai_client.name
+        elif role == "assistant":
+            # Add the assistant message to the thread
+            self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name, metadata={"chat_assistant": self._ai_client._name})
+            # Update the run with the assistant message
             self._ai_client.callbacks.on_run_update(
                 assistant_name=self._ai_client.name, 
                 run_identifier=self._run_identifier, 
-                run_status="completed", 
+                run_status="in_progress", 
                 thread_name=self._thread_name)
 
     def on_response_done(self, event: ResponseDone):
@@ -672,7 +672,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ) -> None:
         """
-        Connects the realtime assistant.
+        Connects the realtime assistant (uses WebSockets).
 
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
@@ -691,7 +691,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ) -> None:
         """
-        Closes the realtime assistant.
+        Closes the connection to the realtime assistant.
 
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
