@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
@@ -69,7 +70,7 @@ class AssistantsMenu:
         self.dialog.show()
 
     def create_new_edit_chat_assistant(self):
-        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", function_config_manager=self.function_config_manager)
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, function_config_manager=self.function_config_manager)
         
         # Connect the custom signal to a method to process the submitted data
         self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
@@ -78,7 +79,7 @@ class AssistantsMenu:
         self.dialog.show()
 
     def create_new_edit_realtime_assistant(self):
-        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="realtime_assistant", function_config_manager=self.function_config_manager)
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, function_config_manager=self.function_config_manager)
         
         # Connect the custom signal to a method to process the submitted data
         self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
@@ -88,13 +89,15 @@ class AssistantsMenu:
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
-            if assistant_type == "chat_assistant":
+            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            elif assistant_type == "assistant":
+
+            elif assistant_type == AssistantType.ASSISTANT.value:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            elif assistant_type == "realtime_assistant":
+
+            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
-                if assistant_client and assistant_client.assistant_config.assistant_type == "realtime_assistant":
+                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT:
                     assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
                 else:
                     assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)

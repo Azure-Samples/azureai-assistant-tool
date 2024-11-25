@@ -4,14 +4,14 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6 import QtGui
-from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QSizePolicy, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
-from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QIcon, QTextOption
+from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QTextOption
 
 import json, os, shutil, threading
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.assistant_config import ToolResourcesConfig, VectorStoreConfig
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
@@ -38,7 +38,7 @@ class AssistantConfigDialog(QDialog):
     def __init__(
             self, 
             parent=None, 
-            assistant_type : str = "assistant",
+            assistant_type : str = AssistantType.ASSISTANT.value,
             assistant_name : str = None,
             function_config_manager : FunctionConfigManager = None
     ):
@@ -97,7 +97,7 @@ class AssistantConfigDialog(QDialog):
         self.tabWidget.addTab(completionTab, "Completion")
 
         # Create Audio tab for real-time assistant
-        if self.assistant_type == "realtime_assistant":
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             self.create_realtime_tab()
             self.tabWidget.addTab(self.create_realtime_tab(), "Realtime")
 
@@ -141,7 +141,7 @@ class AssistantConfigDialog(QDialog):
         # AI client selection
         self.aiClientLabel = QLabel('AI Client:')
         self.aiClientComboBox = QComboBox()
-        if self.assistant_type == "realtime_assistant":
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             # Only add OPEN_AI_REALTIME for Realtime Assistants
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI_REALTIME.name)
             self.aiClientComboBox.setEnabled(False)  # Optional: Disabling to prevent user change
@@ -289,7 +289,7 @@ class AssistantConfigDialog(QDialog):
                 list_widget = self.systemFunctionsList if function_type == 'system' else self.userFunctionsList
                 self.create_function_section(list_widget, function_type, funcs)
 
-        if self.assistant_type == "assistant":
+        if self.assistant_type == AssistantType.ASSISTANT.value:
             # Section for managing code interpreter files
             self.setup_code_interpreter_files(toolsLayout)
 
@@ -563,11 +563,11 @@ class AssistantConfigDialog(QDialog):
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
-        if self.assistant_type == "assistant":
+        if self.assistant_type == AssistantType.ASSISTANT.value:
             self.init_assistant_completion_settings(completionLayout)
-        elif self.assistant_type == "chat_assistant":
+        elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             self.init_chat_assistant_completion_settings(completionLayout)
-        elif self.assistant_type == "realtime_assistant":
+        elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             self.init_realtime_assistant_completion_settings(completionLayout)
 
         self.toggleCompletionSettings()
@@ -725,14 +725,14 @@ class AssistantConfigDialog(QDialog):
         # Determine if controls should be enabled based on the checkbox and assistant type
         isEnabled = not self.useDefaultSettingsCheckBox.isChecked()
         
-        if self.assistant_type == "assistant":
+        if self.assistant_type == AssistantType.ASSISTANT.value:
             self.temperatureSlider.setEnabled(isEnabled)
             self.topPSlider.setEnabled(isEnabled)
             self.responseFormatComboBox.setEnabled(isEnabled)
             self.maxCompletionTokensEdit.setEnabled(isEnabled)
             self.maxPromptTokensEdit.setEnabled(isEnabled)
             self.truncationTypeComboBox.setEnabled(isEnabled)
-        elif self.assistant_type == "chat_assistant":
+        elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             self.frequencyPenaltySlider.setEnabled(isEnabled)
             self.maxTokensEdit.setEnabled(isEnabled)
             self.presencePenaltySlider.setEnabled(isEnabled)
@@ -740,7 +740,7 @@ class AssistantConfigDialog(QDialog):
             self.topPSlider.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
             self.temperatureSlider.setEnabled(isEnabled)
-        elif self.assistant_type == "realtime_assistant":
+        elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             self.temperatureSlider.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
             self.maxResponseOutputTokensEdit.setEnabled(isEnabled)
@@ -827,7 +827,7 @@ class AssistantConfigDialog(QDialog):
         self.functions = []
         self.file_search = False
         self.code_interpreter = False
-        if self.assistant_type == "assistant":
+        if self.assistant_type == AssistantType.ASSISTANT.value:
             self.fileSearchCheckBox.setChecked(False)
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
@@ -928,7 +928,7 @@ class AssistantConfigDialog(QDialog):
             # Load completion settings
             self.load_completion_settings(self.assistant_config.text_completion_config)
 
-            if self.assistant_type == "realtime_assistant":
+            if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.load_realtime_settings(self.assistant_config.realtime_config)
 
             # Set the output folder path if it's in the configuration
@@ -940,8 +940,9 @@ class AssistantConfigDialog(QDialog):
         if text_completion_config:
             self.useDefaultSettingsCheckBox.setChecked(False)
             completion_settings = text_completion_config.to_dict()
+
             # Load settings into UI elements based on assistant type
-            if self.assistant_type == "assistant":
+            if self.assistant_type == AssistantType.ASSISTANT.value:
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
                 self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
@@ -954,7 +955,8 @@ class AssistantConfigDialog(QDialog):
                     last_messages = truncation_strategy.get('last_messages')
                     if last_messages is not None:
                         self.lastMessagesSpinBox.setValue(last_messages)
-            elif self.assistant_type == "chat_assistant":
+
+            elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
                 self.maxTokensEdit.setValue(completion_settings.get('max_tokens', 1000))
                 self.presencePenaltySlider.setValue(completion_settings.get('presence_penalty', 0) * 100)
@@ -962,21 +964,23 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
-            elif self.assistant_type == "realtime_assistant":
+
+            elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
                 self.maxResponseOutputTokensEdit.setText(str(completion_settings.get('max_output_tokens', 'inf')))
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
-            if self.assistant_type == "assistant":
+            if self.assistant_type == AssistantType.ASSISTANT.value:
                 self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
                 self.responseFormatComboBox.setCurrentText("text")
                 self.maxCompletionTokensEdit.setValue(1000)
                 self.maxPromptTokensEdit.setValue(1000)
                 self.truncationTypeComboBox.setCurrentText("auto")
-            elif self.assistant_type == "chat_assistant":
+
+            elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.frequencyPenaltySlider.setValue(0)
                 self.maxTokensEdit.setValue(1000)
                 self.presencePenaltySlider.setValue(0)
@@ -984,7 +988,8 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
                 self.maxMessagesEdit.setValue(10)
-            elif self.assistant_type == "realtime_assistant":
+
+            elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.temperatureSlider.setValue(100)
                 self.maxMessagesEdit.setValue(10)
                 self.maxResponseOutputTokensEdit.setText("inf")
@@ -1125,7 +1130,7 @@ class AssistantConfigDialog(QDialog):
 
         # Conditional setup for completion settings based on assistant_type
         completion_settings = None
-        if self.assistant_type == "chat_assistant":
+        if self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'frequency_penalty': self.frequencyPenaltySlider.value() / 100,
@@ -1136,7 +1141,8 @@ class AssistantConfigDialog(QDialog):
                     'top_p': self.topPSlider.value() / 100,
                     'max_text_messages': self.maxMessagesEdit.value()
                 }
-        elif self.assistant_type == "assistant":
+
+        elif self.assistant_type == AssistantType.ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
                 truncation_strategy = {
                     'type': self.truncationTypeComboBox.currentText(),
@@ -1177,7 +1183,8 @@ class AssistantConfigDialog(QDialog):
                 code_interpreter_files=code_interpreter_files,
                 file_search_vector_stores=vector_stores
             )
-        elif self.assistant_type == "realtime_assistant":
+
+        elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
@@ -1191,15 +1198,15 @@ class AssistantConfigDialog(QDialog):
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
-            'tool_resources': tool_resources.to_dict() if self.assistant_type == "assistant" else None,
+            'tool_resources': tool_resources.to_dict() if self.assistant_type == AssistantType.ASSISTANT.value else None,
             'functions': self.functions,
             'file_search': self.fileSearchCheckBox.isChecked() if self.assistant_type == "assistant" else False,
-            'code_interpreter': self.codeInterpreterCheckBox.isChecked() if self.assistant_type == "assistant" else False,
+            'code_interpreter': self.codeInterpreterCheckBox.isChecked() if self.assistant_type == AssistantType.ASSISTANT.value else False,
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,
             'completion_settings': completion_settings,
-            'realtime_settings': self.get_realtime_settings() if self.assistant_type == "realtime_assistant" else None
+            'realtime_settings': self.get_realtime_settings() if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value else None
         }
 
         # Validation and emission of the configuration
@@ -1266,7 +1273,7 @@ class ExportAssistantDialog(QDialog):
                 template_content = template_file.read()
 
             main_content = template_content.replace("ASSISTANT_NAME", assistant_name)
-            if assistant_config.assistant_type == "chat_assistant":
+            if assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 main_content = main_content.replace("assistant_client", "chat_assistant_client")
                 main_content = main_content.replace("AssistantClient", "ChatAssistantClient")
 

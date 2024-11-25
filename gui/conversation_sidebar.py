@@ -14,6 +14,7 @@ from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
@@ -339,22 +340,24 @@ class ConversationSidebar(QWidget):
         assistant_name = widget.label.text()
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         if assistant_config:
-            if assistant_config.assistant_type == "assistant":
+            if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-            elif assistant_config.assistant_type == "chat_assistant":
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-            elif assistant_config.assistant_type == "realtime_assistant":
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="realtime_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+
+            elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+
+            elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
             self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
             self.dialog.show()
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
-            if assistant_type == "chat_assistant":
+            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            elif assistant_type == "realtime_assistant":
+            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
-                if assistant_client and assistant_client.assistant_config.assistant_type == "realtime_assistant":
+                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                     assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
                 else:
                     assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
@@ -433,18 +436,20 @@ class ConversationSidebar(QWidget):
         """Populate the assistant list with the given assistant names."""
         try:
             assistant_names = self.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
-            # TODO retrieve assistant clients using cloud API
-            #assistant_list = AssistantClient.get_assistant_list(ai_client_type)
             for name in assistant_names:
                 if not self.assistant_client_manager.get_client(name):
                     assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
                     assistant_config.config_folder = "config"
-                    if assistant_config.assistant_type == "assistant":
+
+                    if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                    elif assistant_config.assistant_type == "chat_assistant":
+
+                    elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                         assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                    elif assistant_config.assistant_type == "realtime_assistant":
+
+                    elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                         assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+
                     self.assistant_client_manager.register_client(name, assistant_client)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")

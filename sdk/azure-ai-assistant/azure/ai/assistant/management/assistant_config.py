@@ -6,6 +6,13 @@ from azure.ai.assistant.management.logger_module import logger
 
 import json, os
 from typing import Optional, Union
+from enum import Enum
+
+
+class AssistantType(Enum):
+    REALTIME_ASSISTANT = "realtime_assistant"
+    CHAT_ASSISTANT = "chat_assistant"
+    ASSISTANT = "assistant"
 
 
 class RealtimeConfig:
@@ -884,7 +891,7 @@ class AssistantConfig:
         self._assistant_id = config_data.get('assistant_id', None) if config_data.get('assistant_id', '') != '' else None
         self._ai_client_type = config_data.get('ai_client_type', 'OPEN_AI')
         self._model = config_data['model']
-        self._assistant_type = config_data.get('assistant_type', 'assistant')
+        self._assistant_type = config_data.get('assistant_type', AssistantType.ASSISTANT.value)
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
@@ -911,7 +918,7 @@ class AssistantConfig:
 
     def _setup_completion_settings(self, config_data):
         if config_data.get('completion_settings', None) is not None:
-            if self._assistant_type == 'chat_assistant':
+            if self._assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 completion_data = config_data.get('completion_settings', {
                     'frequency_penalty': 0.0,
                     'max_tokens': 1000,
@@ -933,7 +940,7 @@ class AssistantConfig:
                     seed=None,
                     max_text_messages=completion_data['max_text_messages']
                 )
-            elif self._assistant_type == 'assistant':
+            elif self._assistant_type == AssistantType.ASSISTANT.value:
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
                     'max_completion_tokens': 1000,
@@ -954,7 +961,7 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     truncation_strategy=completion_data['truncation_strategy']
                 )
-            elif self._assistant_type == 'realtime_assistant':
+            elif self._assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
                     'max_text_messages': None,
@@ -1019,7 +1026,7 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        if self._assistant_type == "assistant":
+        if self._assistant_type == AssistantType.ASSISTANT.value:
             return ToolResourcesConfig()
         else:
             return None

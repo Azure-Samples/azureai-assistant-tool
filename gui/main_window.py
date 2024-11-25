@@ -15,6 +15,7 @@ from azure.ai.assistant.management.task_manager import TaskManager
 from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
@@ -232,10 +233,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if not hasattr(self, 'conversation_thread_clients'):
             return
         
-        # If the new client type is the same as the current active client type, return
-        if self.active_ai_client_type == new_client_type:
-            return
-
         # Disconnect realtime clients if switching from OPEN_AI_REALTIME to a different type
         if (self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME and
             new_client_type != AIClientType.OPEN_AI_REALTIME):
@@ -247,7 +244,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             assistant_clients = self.assistant_client_manager.get_all_clients()
             for assistant_client in assistant_clients:
                 if (hasattr(assistant_client, 'assistant_config') and
-                    assistant_client.assistant_config.assistant_type == "realtime_assistant"):
+                    assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value):
                     assistant_client.disconnect()
 
         # Save the conversation threads for the current active assistant
@@ -348,32 +345,24 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def on_user_input_complete(self, user_input):
         try:
-            on_user_input_complete_start = time.time() 
             assistants = self.conversation_sidebar.get_selected_assistants()
-            # check if assistants is empty list
             if not assistants:
                 QMessageBox.warning(self, "Error", "Please select an assistant first.")
                 return
-            thread_name = self.setup_conversation_thread()
 
-            # Append user's text with preserved formatting
+            thread_name = self.setup_conversation_thread()
             self.append_conversation_signal.update_signal.emit("user", user_input, "blue")
 
             # Update the thread title based on the user's input
             if self.use_system_assistant_for_thread_name:
-                start_time = time.time()
                 updated_thread_name = self.update_conversation_title(user_input, thread_name, False)
-                end_time = time.time()
-                logger.debug(f"Total time taken for updating conversation title: {end_time - start_time} seconds")
                 self.update_conversation_title_signal.update_signal.emit(thread_name, updated_thread_name)
                 thread_name = updated_thread_name
 
-            # get files from conversation thread list
+            # Get files from conversation thread list
             attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
 
             self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments_dicts)
-            on_user_input_complete_end = time.time()  # End timing after thread starts
-            logger.debug(f"Time taken for entering user input: {on_user_input_complete_end - on_user_input_complete_start} seconds")
             self.conversation_view.inputField.clear()
         except Exception as e:
             error_message = f"An error occurred while processing the user input: {e}"
@@ -383,7 +372,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def handle_assistant_checkbox_toggled(self, assistant_name, is_checked):
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
         if is_checked:
-            if assistant_client is not None and assistant_client.assistant_config.assistant_type == "realtime_assistant":
+            if assistant_client is not None and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 threads_client = self.conversation_thread_clients[self.active_ai_client_type]
   
                 thread_name = ""
@@ -397,7 +386,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.conversation_sidebar.select_conversation_thread_by_name(thread_name)
                 assistant_client.start(thread_name=thread_name)
         else:
-            if assistant_client is not None and assistant_client.assistant_config.assistant_type == "realtime_assistant":
+            if assistant_client is not None and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client.stop()
 
     def setup_conversation_thread(self, is_scheduled_task=False):
@@ -425,9 +414,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
 
             self._update_attachments_from_ui_to_thread(thread_client, thread_id, attachments_dicts)
-
             self._create_thread_message(thread_client, user_input, thread_name, attachments_dicts)
-
             self._update_attachments_in_ui_from_thread(thread_client, thread_id)
 
             updated_conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
@@ -480,14 +467,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
         if assistant_client is not None:
-            start_time = time.time()
             assistant_client.process_messages(
                 thread_name=thread_name, 
                 timeout=self.connection_timeout, 
                 stream=self.use_streaming_for_assistant
             )
-            end_time = time.time()
-            logger.debug(f"Total time taken for processing user input: {end_time - start_time} seconds")
 
         self.stop_processing_signal.stop_signal.emit(assistant_name, is_scheduled_task)
 
@@ -526,12 +510,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     # Callbacks for AssistantManagerCallbacks
     def on_assistant_selected(self, assistant_name, assistant_type, thread_name):
         logger.info(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
-        if assistant_type == "realtime_assistant":
+        if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
     def on_assistant_unselected(self, assistant_name, assistant_type):
         logger.info(f"Assistant unselected: {assistant_name}, {assistant_type}")
-        if assistant_type == "realtime_assistant":
+        if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             # if this is last assistant unselected, stop listening keyword
             selected_assistants = self.conversation_sidebar.get_selected_assistants()
             if not selected_assistants:
@@ -542,7 +526,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
         if assistant_client is not None:
-            if assistant_client.assistant_config.assistant_type == "realtime_assistant":
+            if assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
                 self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
 
@@ -604,7 +588,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
         if assistant_client is not None:
-            if assistant_client.assistant_config.assistant_type == "realtime_assistant":
+            if assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
@@ -695,7 +679,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             assistant_clients = self.assistant_client_manager.get_all_clients()
             for assistant_client in assistant_clients:
                 if (hasattr(assistant_client, 'assistant_config') and
-                    assistant_client.assistant_config.assistant_type == "realtime_assistant"):
+                    assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value):
                     assistant_client.disconnect()
 
             self.executor.shutdown(wait=True)
