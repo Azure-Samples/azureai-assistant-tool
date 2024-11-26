@@ -133,6 +133,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._call_id_to_function_name = {}
         self._lock = threading.Lock()
         self._realtime_client = None
+        self._audio_capture = None
         self._function_processing = False
         self._ai_client = ai_client
         self._is_keyword_triggered_run = False
@@ -157,8 +158,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def is_function_processing(self):
         return self._function_processing
     
-    def set_client(self, client: RealtimeAIClient):
+    def set_realtime_client(self, client: RealtimeAIClient):
         self._realtime_client = client
+
+    def set_capture_client(self, client: AudioCapture):
+        self._audio_capture = client
 
     def set_thread_name(self, thread_name: str):
         self._thread_name = thread_name
@@ -169,12 +173,14 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def on_keyword_armed(self, armed: bool):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
+            self._audio_capture.stop_keyword_recognition()
             self._is_keyword_triggered_run = True
             self._keyword_run_identifier = str(uuid.uuid4())
             self._realtime_client.send_text("Hello")
-            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="hello")
+            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="keyword input")
         else:
             self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+            self._audio_capture.start_keyword_recognition()
             self._is_keyword_triggered_run = False
             self._keyword_run_identifier = None
 
@@ -192,7 +198,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if not self._is_keyword_triggered_run:
             if self._text_run_identifier is None:
                 self._text_run_identifier = str(uuid.uuid4())
-                self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="hello")
+                self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
         
     def on_response_content_part_added(self, event: ResponseContentPartAdded):
         logger.debug(f"New Part Added: {event.part}")
@@ -275,10 +281,16 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                 thread_name=self._thread_name)
 
     def on_response_done(self, event: ResponseDone):
-        logger.info(f"Assistant's response completed with status '{event.response.get('status')}' and ID '{event.response.get('id')}'")
+        logger.info(f"Assistant's response completed with response event content: {event}")
         if not self._is_keyword_triggered_run:
-            self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
-            self._text_run_identifier = None
+            output_list = event.response.get('output', [])
+            # Check if any of the items in the output list is of type 'function_call', if not, end the run
+            is_function_call_present = any(
+                item.get('type') == 'function_call' for item in output_list
+            )
+            if not is_function_call_present:
+                self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+                self._text_run_identifier = None
 
     def on_session_created(self, event: SessionCreated):
         logger.info(f"Session created: {event.session}")
@@ -548,10 +560,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
 
     def _update_tools(self, assistant_config: AssistantConfig):
         tools = []
-        logger.info(f"Updating tools for assistant: {assistant_config.name}")
-        
-        if assistant_config.file_search:
-            tools.append({"type": "file_search"})
+        logger.info(f"Updating tools for realtime assistant: {assistant_config.name}")
         
         if assistant_config.functions:
             modified_functions = []
@@ -571,10 +580,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 modified_functions.append(modified_function)
             
             tools.extend(modified_functions)
-        
-        if assistant_config.code_interpreter:
-            tools.append({"type": "code_interpreter"})
-        
+                
         return tools
     
     def _create_realtime_client(
@@ -602,7 +608,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 bytes_per_sample=2
             )
             self._realtime_client = RealtimeAIClient(options=realtime_options, stream_options=audio_stream_options, event_handler=self._event_handler)
-            self._event_handler.set_client(self._realtime_client)
+            self._event_handler.set_realtime_client(self._realtime_client)
 
             self._audio_capture_event_handler = MyAudioCaptureEventHandler(
                 client=self._realtime_client,
@@ -626,6 +632,8 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 },
                 enable_wave_capture=False,
                 keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
+
+            self._event_handler.set_capture_client(self._audio_capture)
 
         except Exception as e:
             logger.error(f"Failed to create realtime client: {e}")

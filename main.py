@@ -24,5 +24,6 @@ def main():
     # Execute the application's main loop
     sys.exit(app.exec())
 
+
 if __name__ == '__main__':
     main()

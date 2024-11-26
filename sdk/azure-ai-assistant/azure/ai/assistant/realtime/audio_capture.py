@@ -246,7 +246,7 @@ class AudioCapture:
 
         try:
             speech_detected, is_speech = self.vad.process_audio_chunk(audio_data)
-            if self.keyword_recognizer:
+            if self.keyword_recognizer and self.keyword_recognizer.is_started:
                 self.keyword_recognizer.push_audio(audio_data)
         except Exception as e:
             logger.error(f"Error processing VAD: {e}")
@@ -362,12 +362,32 @@ class AudioCapture:
         logger.info("Keyword detected")
         if self.keyword_recognizer:
             try:
-                self.keyword_recognizer.stop_recognition()
                 self.event_handler.on_keyword_detected(result)
-                self.keyword_recognizer.start_recognition()
                 logger.debug("Keyword recognizer restarted after detection.")
             except Exception as e:
                 logger.error(f"Error handling keyword detection: {e}")
+
+    def start_keyword_recognition(self):
+        """
+        Starts the keyword recognition process.
+        """
+        if self.keyword_recognizer and not self.keyword_recognizer.is_started:
+            try:
+                self.keyword_recognizer.start_recognition()
+                logger.info("Keyword recognizer started.")
+            except Exception as e:
+                logger.error(f"Failed to start AzureKeywordRecognizer: {e}")
+
+    def stop_keyword_recognition(self):
+        """
+        Stops the keyword recognition process.
+        """
+        if self.keyword_recognizer and self.keyword_recognizer.is_started:
+            try:
+                self.keyword_recognizer.stop_recognition()
+                logger.info("Keyword recognizer stopped.")
+            except Exception as e:
+                logger.error(f"Error stopping AzureKeywordRecognizer: {e}")
 
     def close(self):
         """

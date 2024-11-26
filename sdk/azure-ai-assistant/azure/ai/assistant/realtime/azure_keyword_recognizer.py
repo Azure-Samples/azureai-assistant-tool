@@ -1,4 +1,5 @@
 import azure.cognitiveservices.speech as speechsdk
+from azure.ai.assistant.management.logger_module import logger
 from scipy.signal import resample_poly
 import numpy as np
 
@@ -77,6 +78,7 @@ class AzureKeywordRecognizer:
 
         # Define the keyword recognition model
         self.keyword_model = speechsdk.KeywordRecognitionModel(filename=model_file)
+        self.is_started = False
 
         if not callable(callback):
             raise ValueError("Callback must be a callable function.")
@@ -91,13 +93,23 @@ class AzureKeywordRecognizer:
                          It should accept a single argument with the recognition result.
         """
         # Start continuous keyword recognition
+        if not self.recognizer.recognized.is_connected():
+            self.recognizer.recognized.connect(self._on_recognized)
+        if not self.recognizer.canceled.is_connected():
+            self.recognizer.canceled.connect(self._on_canceled)
+
         self.recognizer.recognize_once_async(model=self.keyword_model)
+        self.is_started = True
 
     def stop_recognition(self):
         """
         Stops the keyword recognition process.
         """
-        self.recognizer.stop_recognition_async()
+        future = self.recognizer.stop_recognition_async()
+        future.get()
+        self.recognizer.recognized.disconnect_all()
+        self.recognizer.canceled.disconnect_all()
+        self.is_started = False
 
     def push_audio(self, pcm_data):
         """
@@ -105,6 +117,10 @@ class AzureKeywordRecognizer:
 
         :param pcm_data: Numpy array of PCM audio samples.
         """
+        if not self.is_started:
+            # If keyword recognition is not started, ignore the audio data
+            return
+
         if self.sample_rate == 24000:
             converted_audio = convert_sample_rate(pcm_data, orig_sr=24000, target_sr=16000)
             self.audio_stream.write(converted_audio.tobytes())
@@ -124,6 +140,6 @@ class AzureKeywordRecognizer:
         """
         Internal callback when recognition is canceled.
         """
-        print(f"Recognition canceled: {event.reason}")
+        logger.warning(f"Recognition canceled: {event.reason}")
         if event.result.reason == speechsdk.ResultReason.Canceled:
-            print(f"Cancellation details: {event.cancellation_details}")
+            logger.warning(f"Cancellation details: {event.cancellation_details}")
