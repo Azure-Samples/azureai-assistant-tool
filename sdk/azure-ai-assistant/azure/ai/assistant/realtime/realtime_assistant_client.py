@@ -135,9 +135,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._realtime_client = None
         self._function_processing = False
         self._ai_client = ai_client
-        self._run_identifier = None
+        self._is_keyword_triggered_run = False
         self._is_first_message = True
         self._thread_name = None
+        self._keyword_run_identifier = None
+        self._text_run_identifier = None
 
     @property
     def audio_player(self):
@@ -167,11 +169,14 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def on_keyword_armed(self, armed: bool):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
-            self._run_identifier = str(uuid.uuid4())
-            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_start_time=datetime.now(), user_input="Computer, Hello")
+            self._is_keyword_triggered_run = True
+            self._keyword_run_identifier = str(uuid.uuid4())
             self._realtime_client.send_text("Hello")
+            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="hello")
         else:
-            self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._run_identifier, run_end_time=datetime.now(), thread_name=self._thread_name)
+            self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+            self._is_keyword_triggered_run = False
+            self._keyword_run_identifier = None
 
     def on_input_audio_buffer_speech_stopped(self, event: InputAudioBufferSpeechStopped):
         logger.info(f"Server VAD: Speech stopped at {event.audio_end_ms}ms, Item ID: {event.item_id}")
@@ -180,11 +185,15 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         logger.debug(f"Audio Buffer Committed: {event.item_id}")
 
     def on_conversation_item_created(self, event: ConversationItemCreated):
-        logger.debug(f"New Conversation Item: {event.item}")
+        logger.info(f"New Conversation Item: {event.item}")
 
     def on_response_created(self, event: ResponseCreated):
-        logger.debug(f"Response Created: {event.response}")
-
+        logger.info(f"Response Created: {event.response}")
+        if not self._is_keyword_triggered_run:
+            if self._text_run_identifier is None:
+                self._text_run_identifier = str(uuid.uuid4())
+                self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="hello")
+        
     def on_response_content_part_added(self, event: ResponseContentPartAdded):
         logger.debug(f"New Part Added: {event.part}")
 
@@ -200,7 +209,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         message.text_message = TextMessage(event.delta)
         self._ai_client.callbacks.on_run_update(
             assistant_name=self._ai_client.name, 
-            run_identifier=self._run_identifier, 
+            run_identifier="", 
             run_status="streaming", 
             thread_name=self._thread_name, 
             is_first_message=self._is_first_message, 
@@ -250,7 +259,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             conversation_message.sender = "user"
             self._ai_client.callbacks.on_run_update(
                 assistant_name=self._ai_client.name, 
-                run_identifier=self._run_identifier, 
+                run_identifier="",
                 run_status="in_progress", 
                 thread_name=self._thread_name,
                 is_first_message=False,
@@ -261,12 +270,15 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             # Update the run with the assistant message
             self._ai_client.callbacks.on_run_update(
                 assistant_name=self._ai_client.name, 
-                run_identifier=self._run_identifier, 
+                run_identifier="", 
                 run_status="in_progress", 
                 thread_name=self._thread_name)
 
     def on_response_done(self, event: ResponseDone):
-        logger.debug(f"Assistant's response completed with status '{event.response.get('status')}' and ID '{event.response.get('id')}'")
+        logger.info(f"Assistant's response completed with status '{event.response.get('status')}' and ID '{event.response.get('id')}'")
+        if not self._is_keyword_triggered_run:
+            self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+            self._text_run_identifier = None
 
     def on_session_created(self, event: SessionCreated):
         logger.info(f"Session created: {event.session}")
@@ -313,7 +325,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             function_output = str(self._ai_client._handle_function_call(function_name, arguments_str))
             self._ai_client.callbacks.on_function_call_processed(
                 assistant_name=self._ai_client.name, 
-                run_identifier=self._run_identifier, 
+                run_identifier=self._text_run_identifier if not self._is_keyword_triggered_run else self._keyword_run_identifier,
                 function_name=function_name, 
                 arguments=arguments_str, 
                 response=str(function_output))
@@ -737,25 +749,21 @@ class RealtimeAssistantClient(BaseAssistantClient):
 
     def generate_response(
             self, 
-            thread_name : str
+            user_input : str
     ) -> None:
         """
         Generates a realtime assistant response using the user's text input in the specified thread.
 
-        :param thread_name: The name of the thread to process.
-        :type thread_name: Optional[str]
+        :param user_input: The user's text input.
+        :type user_input: str
         """
-        # Ensure at least one of thread_name or user_request is provided
-
         try:
-            logger.info(f"Generating response for thread: {thread_name}")
-            # self._realtime_client.generate_response()
-            #if thread_name:
-            #    max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
-            #    conversation = self._conversation_thread_client.retrieve_conversation(thread_name=thread_name, max_text_messages=max_text_messages)
-            #    self._parse_conversation_messages(conversation.messages)
-            #elif user_request:
-            #    self._messages.append({"role": "user", "content": user_request})
+            if not self._realtime_client.is_running:
+                logger.info(f"Starting realtime assistant with name: {self.name}")
+                self._realtime_client.start()
+
+            logger.info(f"Sending text message: {user_input}")
+            self._realtime_client.send_text(user_input)
 
         except Exception as e:
             logger.error(f"Error occurred during generating response: {e}")
