@@ -133,12 +133,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._call_id_to_function_name = {}
         self._lock = threading.Lock()
         self._realtime_client = None
-        self._audio_capture = None
+        self._audio_capture_client = None
         self._function_processing = False
         self._ai_client = ai_client
-        self._is_keyword_triggered_run = False
         self._is_first_message = True
-        self._is_assistant_response_created = False
+        self._is_transcription_for_audio_created = False
         self._thread_name = None
         self._keyword_run_identifier = None
         self._text_run_identifier = None
@@ -163,7 +162,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._realtime_client = client
 
     def set_capture_client(self, client: AudioCapture):
-        self._audio_capture = client
+        self._audio_capture_client = client
 
     def set_thread_name(self, thread_name: str):
         self._thread_name = thread_name
@@ -174,15 +173,15 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def on_keyword_armed(self, armed: bool):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
-            self._audio_capture.stop_keyword_recognition()
-            self._is_keyword_triggered_run = True
+            if self._audio_capture_client:
+                self._audio_capture_client.stop_keyword_recognition()
             self._keyword_run_identifier = str(uuid.uuid4())
             self._realtime_client.send_text("Hello")
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="keyword input")
         else:
             self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
-            self._audio_capture.start_keyword_recognition()
-            self._is_keyword_triggered_run = False
+            if self._audio_capture_client:
+                self._audio_capture_client.start_keyword_recognition()
             self._keyword_run_identifier = None
 
     def on_input_audio_buffer_speech_stopped(self, event: InputAudioBufferSpeechStopped):
@@ -193,22 +192,14 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def on_conversation_item_created(self, event: ConversationItemCreated):
         logger.info(f"New Conversation Item: {event.item}")
-        # Check if the conversation item is from the assistant
         with self._lock:
-            try:
-                if event.item.get("role") == "assistant":
-                    if not self._is_keyword_triggered_run and self._text_run_identifier is None:
-                        self._text_run_identifier = str(uuid.uuid4())
-                        print("on_conversation_item_created: on_run_start")
-                        self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
-            except Exception as e:
-                error_message = f"Failed to process conversation item: {e}"
-                print(error_message)
-                logger.error(error_message)
+            if event.item.get("role") != "assistant":
+                return
+            if not self._keyword_run_identifier and self._text_run_identifier is None:
+                self._text_run_identifier = str(uuid.uuid4())
+                print("on_conversation_item_created: on_run_start")
+                self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
 
-    def is_assistant_conversation_item(self, item):
-        return item.get("role") == "assistant"
-    
     def on_response_created(self, event: ResponseCreated):
         logger.info(f"Response Created: {event.response}")
         
@@ -242,7 +233,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         logger.info(f"User transcription complete: {event.transcript}")
         # remove new line characters from the end of the transcript
         transcript = event.transcript.rstrip("\n")
-        self.create_thread_message(message=transcript, role="user")
+        self._create_thread_message(message=transcript, role="user")
 
     def on_response_audio_done(self, event: ResponseAudioDone):
         logger.debug(f"Audio done for response ID {event.response_id}, item ID {event.item_id}")
@@ -259,25 +250,24 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         with self._lock:
             try:
                 item_content = event.item.get("content", [])
-                if item_content:
-                    for item in item_content:
-                        if item.get("type") == "audio":
-                            transcript = item.get("transcript")
-                            if transcript:
-                                logger.info(f"Assistant transcription complete: {transcript}")
-                                self.create_thread_message(message=transcript, role="assistant")
-                                self._is_first_message = True
-                                self._is_assistant_response_created = True
+                for item in item_content:
+                    # If audio content is present, process the transcript
+                    if item.get("type") != "audio":
+                        continue
+                    transcript = item.get("transcript")
+                    if transcript:
+                        logger.info(f"Assistant transcription complete: {transcript}")
+                        self._create_thread_message(message=transcript, role="assistant")
+                        self._is_first_message = True
+                        self._is_transcription_for_audio_created = True
             except Exception as e:
                 error_message = f"Failed to process output item: {e}"
                 print(error_message)
                 logger.error(error_message)
 
-    def create_thread_message(self, message: str, role: str):
+    def _create_thread_message(self, message: str, role: str):
         if role == "user":
-            # Add the user message to the thread
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name)
-            # Update the run with the user message
             conversation_message : ConversationMessage = ConversationMessage(self._ai_client)
             conversation_message.text_message = TextMessage(message)
             conversation_message.role = role
@@ -290,9 +280,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                 is_first_message=False,
                 message=conversation_message)
         elif role == "assistant":
-            # Add the assistant message to the thread
             self._ai_client._conversation_thread_client.create_conversation_thread_message(message=message, thread_name=self._thread_name, metadata={"chat_assistant": self._ai_client._name})
-            # Update the run with the assistant message
             self._ai_client.callbacks.on_run_update(
                 assistant_name=self._ai_client.name, 
                 run_identifier="", 
@@ -304,35 +292,42 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
         with self._lock:
             try:
-                # Check if response has failed
-                if event.response.get('status') == 'failed':
-                    self._handle_failed_response(event.response)
+                completed = self._handle_response_done(event)
+                if completed:
                     self._text_run_identifier = None
-                    self._is_assistant_response_created = False
-                    return
-
-                if not self._is_keyword_triggered_run:
-                    is_function_call_present = self._check_function_call(event.response.get('output', []))
-                    if not is_function_call_present:
-                        if self._is_assistant_response_created is False:
-                            print("on_response_done: Text modality, creating thread message")
-                            messages = self._extract_content_messages(event.response.get('output', []))
-                            print(f"on_response_done: Messages: {messages}")
-                            if messages:
-                                self.create_thread_message(message=messages, role="assistant")
-                        print("on_response_done: on_run_end")
-                        self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
-                        self._text_run_identifier = None
-                        self._is_assistant_response_created = False
+                    self._is_transcription_for_audio_created = False
             except Exception as e:
                 error_message = f"Failed to process response: {e}"
                 print(error_message)
                 logger.error(error_message)
                 self._text_run_identifier = None
-                self._is_assistant_response_created = False
+                self._is_transcription_for_audio_created = False
+
+    def _handle_response_done(self, event : ResponseDone) -> bool:
+        # Check if the response is failed
+        if event.response.get('status') == 'failed':
+            self._handle_failed_response(event.response)
+            return True
+        
+        # If keyword triggered run is not active, check the text triggered run messages here
+        elif not self._keyword_run_identifier:
+            is_function_call_present = self._check_function_call(event.response.get('output', []))
+
+            # if function call is present, do not end the run yet
+            if not is_function_call_present:
+                if self._is_transcription_for_audio_created is False:
+                    print("on_response_done: Text modality, creating thread message")
+                    messages = self._extract_content_messages(event.response.get('output', []))
+                    print(f"on_response_done: Messages: {messages}")
+                    if messages:
+                        self._create_thread_message(message=messages, role="assistant")
+                print("on_response_done: on_run_end")
+                self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+                return True
+
+        return False
 
     def _handle_failed_response(self, response):
-        """Extract and handle failed response details."""
         status_details = response.get('status_details', {})
         error = status_details.get('error', {})
         
@@ -340,7 +335,8 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         error_code = error.get('code')
         error_message = error.get('message')
         
-        run_identifier = self._text_run_identifier if not self._is_keyword_triggered_run else self._keyword_run_identifier
+        # Handle the failed response in both keyword and text triggered runs
+        run_identifier = self._text_run_identifier if not self._keyword_run_identifier else self._keyword_run_identifier
         self._ai_client.callbacks.on_run_failed(assistant_name=self._ai_client.name, run_identifier=run_identifier, run_end_time=str(datetime.now()), error_code="", error_message=error_message, thread_name=self._thread_name)
         logger.error(f"Failed response: Type: {error_type}, Code: {error_code}, Message: {error_message}")
 
@@ -356,11 +352,9 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                     if content.get('type') == 'text':
                         content_messages.append(content.get('text'))
         
-        # Return None if no content messages were found
         if not content_messages:
             return None
         
-        # Join all content messages into a single string
         return "\n".join(content_messages)
 
     def on_session_created(self, event: SessionCreated):
@@ -408,7 +402,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             function_output = str(self._ai_client._handle_function_call(function_name, arguments_str))
             self._ai_client.callbacks.on_function_call_processed(
                 assistant_name=self._ai_client.name, 
-                run_identifier=self._text_run_identifier if not self._is_keyword_triggered_run else self._keyword_run_identifier,
+                run_identifier=self._text_run_identifier if not self._keyword_run_identifier else self._keyword_run_identifier,
                 function_name=function_name, 
                 arguments=arguments_str, 
                 response=str(function_output))
