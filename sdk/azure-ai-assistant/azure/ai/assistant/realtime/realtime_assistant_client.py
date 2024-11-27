@@ -138,6 +138,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._ai_client = ai_client
         self._is_keyword_triggered_run = False
         self._is_first_message = True
+        self._is_assistant_response_created = False
         self._thread_name = None
         self._keyword_run_identifier = None
         self._text_run_identifier = None
@@ -192,13 +193,24 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def on_conversation_item_created(self, event: ConversationItemCreated):
         logger.info(f"New Conversation Item: {event.item}")
+        # Check if the conversation item is from the assistant
+        with self._lock:
+            try:
+                if event.item.get("role") == "assistant":
+                    if not self._is_keyword_triggered_run and self._text_run_identifier is None:
+                        self._text_run_identifier = str(uuid.uuid4())
+                        print("on_conversation_item_created: on_run_start")
+                        self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
+            except Exception as e:
+                error_message = f"Failed to process conversation item: {e}"
+                print(error_message)
+                logger.error(error_message)
 
+    def is_assistant_conversation_item(self, item):
+        return item.get("role") == "assistant"
+    
     def on_response_created(self, event: ResponseCreated):
         logger.info(f"Response Created: {event.response}")
-        if not self._is_keyword_triggered_run:
-            if self._text_run_identifier is None:
-                self._text_run_identifier = str(uuid.uuid4())
-                self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
         
     def on_response_content_part_added(self, event: ResponseContentPartAdded):
         logger.debug(f"New Part Added: {event.part}")
@@ -244,15 +256,22 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         logger.debug(f"Content part done: '{part_text}' of type '{part_type}' for response ID {event.response_id}")
 
     def on_response_output_item_done(self, event: ResponseOutputItemDone):
-        item_content = event.item.get("content", [])
-        if item_content:
-            for item in item_content:
-                if item.get("type") == "audio":
-                    transcript = item.get("transcript")
-                    if transcript:
-                        logger.info(f"Assistant transcription complete: {transcript}")
-                        self.create_thread_message(message=transcript, role="assistant")
-                        self._is_first_message = True
+        with self._lock:
+            try:
+                item_content = event.item.get("content", [])
+                if item_content:
+                    for item in item_content:
+                        if item.get("type") == "audio":
+                            transcript = item.get("transcript")
+                            if transcript:
+                                logger.info(f"Assistant transcription complete: {transcript}")
+                                self.create_thread_message(message=transcript, role="assistant")
+                                self._is_first_message = True
+                                self._is_assistant_response_created = True
+            except Exception as e:
+                error_message = f"Failed to process output item: {e}"
+                print(error_message)
+                logger.error(error_message)
 
     def create_thread_message(self, message: str, role: str):
         if role == "user":
@@ -282,15 +301,67 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def on_response_done(self, event: ResponseDone):
         logger.info(f"Assistant's response completed with response event content: {event}")
-        if not self._is_keyword_triggered_run:
-            output_list = event.response.get('output', [])
-            # Check if any of the items in the output list is of type 'function_call', if not, end the run
-            is_function_call_present = any(
-                item.get('type') == 'function_call' for item in output_list
-            )
-            if not is_function_call_present:
-                self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+
+        with self._lock:
+            try:
+                # Check if response has failed
+                if event.response.get('status') == 'failed':
+                    self._handle_failed_response(event.response)
+                    self._text_run_identifier = None
+                    self._is_assistant_response_created = False
+                    return
+
+                if not self._is_keyword_triggered_run:
+                    is_function_call_present = self._check_function_call(event.response.get('output', []))
+                    if not is_function_call_present:
+                        if self._is_assistant_response_created is False:
+                            print("on_response_done: Text modality, creating thread message")
+                            messages = self._extract_content_messages(event.response.get('output', []))
+                            print(f"on_response_done: Messages: {messages}")
+                            if messages:
+                                self.create_thread_message(message=messages, role="assistant")
+                        print("on_response_done: on_run_end")
+                        self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+                        self._text_run_identifier = None
+                        self._is_assistant_response_created = False
+            except Exception as e:
+                error_message = f"Failed to process response: {e}"
+                print(error_message)
+                logger.error(error_message)
                 self._text_run_identifier = None
+                self._is_assistant_response_created = False
+
+    def _handle_failed_response(self, response):
+        """Extract and handle failed response details."""
+        status_details = response.get('status_details', {})
+        error = status_details.get('error', {})
+        
+        error_type = error.get('type')
+        error_code = error.get('code')
+        error_message = error.get('message')
+        
+        run_identifier = self._text_run_identifier if not self._is_keyword_triggered_run else self._keyword_run_identifier
+        self._ai_client.callbacks.on_run_failed(assistant_name=self._ai_client.name, run_identifier=run_identifier, run_end_time=str(datetime.now()), error_code="", error_message=error_message, thread_name=self._thread_name)
+        logger.error(f"Failed response: Type: {error_type}, Code: {error_code}, Message: {error_message}")
+
+    def _check_function_call(self, output_list):
+        return any(item.get('type') == 'function_call' for item in output_list)
+
+    def _extract_content_messages(self, output_list):
+        content_messages = []
+        for item in output_list:
+            if item.get('type') == 'message':
+                content_list = item.get('content', [])
+                for content in content_list:
+                    if content.get('type') == 'text':
+                        content_messages.append(content.get('text'))
+        
+        # Return None if no content messages were found
+        if not content_messages:
+            return None
+        
+        # Join all content messages into a single string
+        return "\n".join(content_messages)
 
     def on_session_created(self, event: SessionCreated):
         logger.info(f"Session created: {event.session}")
@@ -681,6 +752,9 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :rtype: None
         """
         try:
+            if self._realtime_client.is_running:
+                logger.info(f"Stopping realtime assistant with name: {self.name}")
+                self._realtime_client.stop()
             self._stop_audio()
             self.callbacks.on_assistant_unselected(assistant_name=self.name, assistant_type="realtime_assistant")
         except Exception as e:
