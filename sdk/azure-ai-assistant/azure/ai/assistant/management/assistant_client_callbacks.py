@@ -6,8 +6,8 @@ from azure.ai.assistant.management.message import ConversationMessage
 
 class AssistantClientCallbacks:
 
-    def on_assistant_selected(self, assistant_name, assistant_type, thread_name):
-        """Callback for when an assistant is selected.
+    def on_connected(self, assistant_name, assistant_type, thread_name):
+        """Callback for when an assistant is connected.
         
         :param assistant_name: The name of the assistant.
         :type assistant_name: str
@@ -21,8 +21,8 @@ class AssistantClientCallbacks:
         """
         pass
 
-    def on_assistant_unselected(self, assistant_name, assistant_type):
-        """Callback for when an assistant is unselected.
+    def on_disconnected(self, assistant_name, assistant_type):
+        """Callback for when an assistant is disconnected.
         
         :param assistant_name: The name of the assistant.
         :type assistant_name: str

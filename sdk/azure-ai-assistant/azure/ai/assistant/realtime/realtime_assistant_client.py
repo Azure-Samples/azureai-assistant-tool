@@ -721,7 +721,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 self._realtime_client.start()
 
             self._start_audio()
-            self.callbacks.on_assistant_selected(assistant_name=self.name, assistant_type="realtime_assistant", thread_name=thread_name)
+            self.callbacks.on_connected(assistant_name=self.name, assistant_type="realtime_assistant", thread_name=thread_name)
         except Exception as e:
             logger.error(f"Failed to start realtime assistant: {e}")
             raise EngineError(f"Failed to start realtime assistant: {e}")
@@ -744,7 +744,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 logger.info(f"Stopping realtime assistant with name: {self.name}")
                 self._realtime_client.stop()
             self._stop_audio()
-            self.callbacks.on_assistant_unselected(assistant_name=self.name, assistant_type="realtime_assistant")
+            self.callbacks.on_disconnected(assistant_name=self.name, assistant_type="realtime_assistant")
         except Exception as e:
             logger.error(f"Failed to stop realtime assistant: {e}")
             raise EngineError(f"Failed to stop realtime assistant: {e}")
