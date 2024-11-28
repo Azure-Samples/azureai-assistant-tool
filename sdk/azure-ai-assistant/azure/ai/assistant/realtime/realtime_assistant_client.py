@@ -128,8 +128,6 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def __init__(self, audio_player: AudioPlayer, ai_client: "RealtimeAssistantClient"):
         super().__init__()
         self._audio_player = audio_player
-        self._current_item_id = None
-        self._current_audio_content_index = None
         self._call_id_to_function_name = {}
         self._lock = threading.Lock()
         self._realtime_client = None
@@ -145,19 +143,13 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     @property
     def audio_player(self):
         return self._audio_player
-
-    def get_current_conversation_item_id(self):
-        return self._current_item_id
-    
-    def get_current_audio_content_id(self):
-        return self._current_audio_content_index
-    
+  
     def is_audio_playing(self):
         return self._audio_player.is_audio_playing()
-    
+
     def is_function_processing(self):
         return self._function_processing
-    
+
     def set_realtime_client(self, client: RealtimeAIClient):
         self._realtime_client = client
 
@@ -202,14 +194,12 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
 
     def on_response_created(self, event: ResponseCreated):
         logger.info(f"Response Created: {event.response}")
-        
+
     def on_response_content_part_added(self, event: ResponseContentPartAdded):
         logger.debug(f"New Part Added: {event.part}")
 
     def on_response_audio_delta(self, event: ResponseAudioDelta):
         logger.debug(f"Received audio delta for Response ID {event.response_id}, Item ID {event.item_id}, Content Index {event.content_index}")
-        self._current_item_id = event.item_id
-        self._current_audio_content_index = event.content_index
         self.handle_audio_delta(event)
 
     def on_response_audio_transcript_delta(self, event: ResponseAudioTranscriptDelta):
