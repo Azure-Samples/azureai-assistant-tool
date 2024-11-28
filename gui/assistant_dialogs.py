@@ -361,6 +361,15 @@ class AssistantConfigDialog(QDialog):
         self.audioLayout.addWidget(self.keywordFilePathLabel)
         self.audioLayout.addLayout(keywordFilePathLayout)
 
+        # Keyword Rearm silence timeout in seconds
+        self.keywordRearmSilenceTimeoutLabel = QLabel('Keyword Rearm Silence Timeout (seconds):')
+        self.keywordRearmSilenceTimeoutSpinBox = QSpinBox()
+        self.keywordRearmSilenceTimeoutSpinBox.setRange(0, 60)
+        self.keywordRearmSilenceTimeoutSpinBox.setValue(10)
+        self.keywordRearmSilenceTimeoutSpinBox.setToolTip("The time in seconds to wait after user is not speaking to rearm the keyword detection.")
+        self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutLabel)
+        self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutSpinBox)
+
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
         self.turnDetectionComboBox = QComboBox()
@@ -1005,6 +1014,7 @@ class AssistantConfigDialog(QDialog):
             self.outputAudioFormatComboBox.setCurrentText(realtime_config.output_audio_format)
             self.inputAudioTranscriptionModelComboBox.setCurrentText(realtime_config.input_audio_transcription_model)
             self.keywordFilePathEdit.setText(realtime_config.keyword_detection_model)
+            self.keywordRearmSilenceTimeoutSpinBox.setValue(realtime_config.keyword_rearm_silence_timeout)
 
             turn_detection_type = realtime_config.turn_detection.get('type', 'local_vad')
             self.turnDetectionComboBox.setCurrentText(turn_detection_type)
@@ -1110,17 +1120,18 @@ class AssistantConfigDialog(QDialog):
                 'min_speech_duration': self.minSpeechDurationSpinBox.value(),
                 'min_silence_duration': self.minSilenceDurationSpinBox.value()
             }
-        audio_config = {
+        realtime_config = {
             'voice': self.voiceComboBox.currentText(),
             'modalities': self.modalityComboBox.currentText(),
             'input_audio_format': self.inputAudioFormatComboBox.currentText(),
             'output_audio_format': self.outputAudioFormatComboBox.currentText(),
             'input_audio_transcription_model': self.inputAudioTranscriptionModelComboBox.currentText(),
             'keyword_detection_model': self.keywordFilePathEdit.text(),
+            'keyword_rearm_silence_timeout': self.keywordRearmSilenceTimeoutSpinBox.value(),
             'turn_detection': turn_detection
         }
 
-        return audio_config
+        return realtime_config
 
     def save_configuration(self):
         if self.tabWidget.currentIndex() == 3:

@@ -31,6 +31,8 @@ class RealtimeConfig:
     :type input_audio_transcription_model: str
     :param keyword_detection_model: The keyword detection model.
     :type keyword_detection_model: str
+    :param keyword_rearm_silence_timeout: The keyword rearm silence timeout.
+    :type keyword_rearm_silence_timeout: int
     :param turn_detection: The turn detection.
     :type turn_detection: dict
     """
@@ -41,6 +43,7 @@ class RealtimeConfig:
                  output_audio_format: str,
                  input_audio_transcription_model: str,
                  keyword_detection_model: str,
+                 keyword_rearm_silence_timeout: int,
                  turn_detection: dict
     ) -> None:
         self._voice = voice
@@ -49,6 +52,7 @@ class RealtimeConfig:
         self._output_audio_format = output_audio_format
         self._input_audio_transcription_model = input_audio_transcription_model
         self._keyword_detection_model = keyword_detection_model
+        self._keyword_rearm_silence_timeout = keyword_rearm_silence_timeout
         self._turn_detection = turn_detection
 
     @property
@@ -165,6 +169,26 @@ class RealtimeConfig:
         self._keyword_detection_model = value
 
     @property
+    def keyword_rearm_silence_timeout(self) -> int:
+        """
+        Get the keyword rearm silence timeout.
+
+        :return: The keyword rearm silence timeout.
+        :rtype: int
+        """
+        return self._keyword_rearm_silence_timeout
+    
+    @keyword_rearm_silence_timeout.setter
+    def keyword_rearm_silence_timeout(self, value) -> None:
+        """
+        Set the keyword rearm silence timeout.
+
+        :param value: The keyword rearm silence timeout.
+        :type value: int
+        """
+        self._keyword_rearm_silence_timeout = value
+
+    @property
     def turn_detection(self) -> dict:
         """
         Get the turn detection.
@@ -198,6 +222,7 @@ class RealtimeConfig:
             'output_audio_format': self.output_audio_format,
             'input_audio_transcription_model': self.input_audio_transcription_model,
             'keyword_detection_model': self.keyword_detection_model,
+            'keyword_rearm_silence_timeout': self.keyword_rearm_silence_timeout,
             'turn_detection': self.turn_detection
         }
 
@@ -983,6 +1008,7 @@ class AssistantConfig:
                 'output_audio_format': 'pcm16',
                 'input_audio_transcription': 'whisper-1',
                 'keyword_detection_model': 'none',
+                'keyword_rearm_silence_timeout': 10,
                 'turn_detection': {
                     'type': 'local_vad',
                     'chunk_size': 1024,
@@ -999,6 +1025,7 @@ class AssistantConfig:
                 output_audio_format=realtime_data['output_audio_format'],
                 input_audio_transcription_model=realtime_data['input_audio_transcription_model'],
                 keyword_detection_model=realtime_data['keyword_detection_model'],
+                keyword_rearm_silence_timeout=realtime_data['keyword_rearm_silence_timeout'],
                 turn_detection=realtime_data['turn_detection']
             )
         else:

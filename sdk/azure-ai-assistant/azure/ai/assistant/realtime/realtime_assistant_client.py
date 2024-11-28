@@ -29,17 +29,16 @@ class ConversationState():
 
 
 class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
-    def __init__(self, client: RealtimeAIClient, event_handler: "MyRealtimeEventHandler"):
+    def __init__(self, client: "RealtimeAssistantClient"):
         """
         Initializes the event handler.
         
-        :param client: Instance of RealtimeClient.
-        :param event_handler: Instance of MyRealtimeEventHandler.
+        :param client: Instance of RealtimeAssistantClient.
+        :type client: RealtimeAssistantClient
         """
         self._client = client
-        self._event_handler = event_handler
+        self._event_handler = client._event_handler
         self._state = ConversationState.IDLE
-        self._silence_timeout = 10  # Silence timeout in seconds for rearming keyword detection
         self._silence_timer = None
 
     def send_audio_data(self, audio_data: bytes):
@@ -50,7 +49,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         """
         if self._state == ConversationState.CONVERSATION_ACTIVE:
             logger.debug("Sending audio data to the client.")
-            self._client.send_audio(audio_data)
+            self._client._realtime_client.send_audio(audio_data)
 
     def on_speech_start(self):
         """
@@ -63,12 +62,12 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
             self._set_state(ConversationState.CONVERSATION_ACTIVE)
             self._cancel_silence_timer()
 
-        if (self._client.options.turn_detection is None and
+        if (self._client._realtime_client.options.turn_detection is None and
             self._event_handler.is_audio_playing() and
             self._state == ConversationState.CONVERSATION_ACTIVE):
             logger.info("User started speaking while assistant is responding; interrupting the assistant's response.")
-            self._client.clear_input_audio_buffer()
-            self._client.cancel_response()
+            self._client._realtime_client.clear_input_audio_buffer()
+            self._client._realtime_client.cancel_response()
             self._event_handler.audio_player.drain_and_restart()
 
     def on_speech_end(self):
@@ -78,9 +77,9 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         logger.info("Local VAD: User speech ended")
         logger.info(f"on_speech_end: Current state: {self._state}")
 
-        if self._state == ConversationState.CONVERSATION_ACTIVE and self._client.options.turn_detection is None:
+        if self._state == ConversationState.CONVERSATION_ACTIVE and self._client._realtime_client.options.turn_detection is None:
             logger.debug("Using local VAD; requesting the client to generate a response after speech ends.")
-            self._client.generate_response()
+            self._client._realtime_client.generate_response()
             logger.debug("Conversation is active. Starting silence timer.")
             self._start_silence_timer()
 
@@ -97,7 +96,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
 
     def _start_silence_timer(self):
         self._cancel_silence_timer()
-        self._silence_timer = threading.Timer(self._silence_timeout, self._reset_state_due_to_silence)
+        self._silence_timer = threading.Timer(self._client.assistant_config.realtime_config.keyword_rearm_silence_timeout, self._reset_state_due_to_silence)
         self._silence_timer.start()
 
     def _cancel_silence_timer(self):
@@ -114,7 +113,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         logger.info("Silence timeout reached. Rearming keyword detection.")
         self._event_handler.on_keyword_armed(True)
         logger.debug("Clearing input audio buffer.")
-        self._client.clear_input_audio_buffer()
+        self._client._realtime_client.clear_input_audio_buffer()
         self._set_state(ConversationState.IDLE)
 
     def _set_state(self, new_state: ConversationState):
@@ -669,10 +668,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             self._realtime_client = RealtimeAIClient(options=realtime_options, stream_options=audio_stream_options, event_handler=self._event_handler)
             self._event_handler.set_realtime_client(self._realtime_client)
 
-            self._audio_capture_event_handler = MyAudioCaptureEventHandler(
-                client=self._realtime_client,
-                event_handler=self._event_handler
-            )
+            self._audio_capture_event_handler = MyAudioCaptureEventHandler(client=self)
 
             self._audio_capture = AudioCapture(
                 event_handler=self._audio_capture_event_handler, 
