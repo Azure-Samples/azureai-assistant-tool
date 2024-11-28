@@ -189,7 +189,6 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                 return
             if not self._keyword_run_identifier and self._text_run_identifier is None:
                 self._text_run_identifier = self._create_identifier("text")
-                print("on_conversation_item_created: on_run_start")
                 self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
 
     def on_response_created(self, event: ResponseCreated):
@@ -252,7 +251,6 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                         self._is_transcription_for_audio_created = True
             except Exception as e:
                 error_message = f"Failed to process output item: {e}"
-                print(error_message)
                 logger.error(error_message)
 
     def _create_thread_message(self, message: str, role: str):
@@ -288,7 +286,6 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                     self._is_transcription_for_audio_created = False
             except Exception as e:
                 error_message = f"Failed to process response: {e}"
-                print(error_message)
                 logger.error(error_message)
                 self._text_run_identifier = None
                 self._is_transcription_for_audio_created = False
@@ -306,12 +303,9 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             # if function call is present, do not end the run yet
             if not is_function_call_present:
                 if self._is_transcription_for_audio_created is False:
-                    print("on_response_done: Text modality, creating thread message")
                     messages = self._extract_content_messages(event.response.get('output', []))
-                    print(f"on_response_done: Messages: {messages}")
                     if messages:
                         self._create_thread_message(message=messages, role="assistant")
-                print("on_response_done: on_run_end")
                 self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
                 return True
 
