@@ -556,8 +556,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
 
         if self.is_realtime_assistant(assistant_name):
-            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
-            self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
+            if "keyword" in run_identifier:
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+                self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
 
     def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         self.diagnostics_sidebar.function_call_signal.call_signal.emit(
@@ -616,8 +617,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
 
         if self.is_realtime_assistant(assistant_name):
-            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
-            self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+            if "keyword" in run_identifier:
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
+                self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:

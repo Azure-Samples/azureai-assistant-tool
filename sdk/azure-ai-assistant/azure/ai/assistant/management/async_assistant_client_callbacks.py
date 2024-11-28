@@ -22,7 +22,7 @@ class AsyncAssistantClientCallbacks:
         """
         pass
 
-    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message= None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.

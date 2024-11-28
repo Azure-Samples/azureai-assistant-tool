@@ -167,7 +167,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if armed is False:
             if self._audio_capture_client:
                 self._audio_capture_client.stop_keyword_recognition()
-            self._keyword_run_identifier = str(uuid.uuid4())
+            self._keyword_run_identifier = self._create_identifier("keyword")
             self._realtime_client.send_text("Hello")
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="keyword input")
         else:
@@ -188,7 +188,7 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             if event.item.get("role") != "assistant":
                 return
             if not self._keyword_run_identifier and self._text_run_identifier is None:
-                self._text_run_identifier = str(uuid.uuid4())
+                self._text_run_identifier = self._create_identifier("text")
                 print("on_conversation_item_created: on_run_start")
                 self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._text_run_identifier, run_start_time=str(datetime.now()), user_input="text input")
 
@@ -327,6 +327,12 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         
         # Handle the failed response in both keyword and text triggered runs
         run_identifier = self._text_run_identifier if not self._keyword_run_identifier else self._keyword_run_identifier
+
+        # If the run is not started at all, call on_run_start with new run_identifier to make sure the contract is followed
+        if run_identifier is None:
+            run_identifier = self._create_identifier("failed")
+            self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=run_identifier, run_start_time=str(datetime.now()), user_input="run failed")
+
         self._ai_client.callbacks.on_run_failed(assistant_name=self._ai_client.name, run_identifier=run_identifier, run_end_time=str(datetime.now()), error_code="", error_message=error_message, thread_name=self._thread_name)
         logger.error(f"Failed response: Type: {error_type}, Code: {error_code}, Message: {error_message}")
 
@@ -417,6 +423,10 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
                 logger.error(f"Failed to decode audio delta: {e}")
         else:
             logger.warning("Received 'ResponseAudioDelta' event without 'delta' field.")
+
+    def _create_identifier(self, prefix: str) -> str:
+        short_id = uuid.uuid4().hex[:8]
+        return f"{prefix}_{short_id}"
 
 
 class RealtimeAssistantClient(BaseAssistantClient):
