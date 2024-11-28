@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 import azure.cognitiveservices.speech as speechsdk
 from azure.ai.assistant.management.logger_module import logger
 from scipy.signal import resample_poly

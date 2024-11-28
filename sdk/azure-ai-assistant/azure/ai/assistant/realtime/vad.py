@@ -1,8 +1,12 @@
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
 import numpy as np
 import logging
 
 # Set up logging for VAD
 logger = logging.getLogger(__name__)
+
 
 class VoiceActivityDetector:
     def __init__(self, sample_rate, chunk_size, window_duration=1.0,
