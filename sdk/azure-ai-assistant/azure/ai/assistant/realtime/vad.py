@@ -75,7 +75,7 @@ class VoiceActivityDetector:
         if len(self.noise_rms_history) == self.window_size:
             noise_rms = np.mean(self.noise_rms_history)
             self.dynamic_threshold = noise_rms * self.silence_ratio
-            logger.debug(f"Updated dynamic_threshold: {self.dynamic_threshold:.4f}")
+            #logger.debug(f"Updated dynamic_threshold: {self.dynamic_threshold:.4f}")
 
     def is_speech_frame(self, rms):
         """
@@ -100,7 +100,7 @@ class VoiceActivityDetector:
         # Update noise RMS during initial phase
         if len(self.noise_rms_history) < self.window_size:
             self.update_noise_rms(rms)
-            logger.debug(f"Noise RMS updated: {rms:.4f}")
+            #logger.debug(f"Noise RMS updated: {rms:.4f}")
             return (False, self.is_speech)
 
         speech = self.is_speech_frame(rms)

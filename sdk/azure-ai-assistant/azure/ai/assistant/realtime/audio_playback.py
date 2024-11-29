@@ -158,6 +158,12 @@ class AudioPlayer:
             self.is_running = False
             self.stop_event.clear()
             self.playback_complete_event.set()
+
+            # Clear the buffer
+            self._clear_buffer()
+            self.buffers_played = 0
+            self.min_buffer_fill = self.initial_min_buffer_fill
+
             logger.info("AudioPlayer stopped and resources released.")
 
     def playback_loop(self):
@@ -181,7 +187,7 @@ class AudioPlayer:
                 logger.debug(f"Audio played. Buffers played count: {self.buffers_played}")
 
             except queue.Empty:
-                logger.debug("Playback queue empty; waiting for data.")
+                #logger.debug("Playback queue empty; waiting for data.")
                 continue
             except Exception as e:
                 logger.error(f"Unexpected error in playback loop: {e}")

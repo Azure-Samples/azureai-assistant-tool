@@ -331,19 +331,19 @@ class AudioCapture:
         if new_length >= buffer_size:
             buffer[:] = new_audio[-buffer_size:]
             pointer = 0
-            logger.debug("Buffer overwritten with new audio data.")
+            #logger.debug("Buffer overwritten with new audio data.")
         else:
             end_space = buffer_size - pointer
             if new_length <= end_space:
                 buffer[pointer:pointer + new_length] = new_audio
                 pointer += new_length
-                logger.debug(f"Buffer updated. New pointer position: {pointer}")
+                #logger.debug(f"Buffer updated. New pointer position: {pointer}")
             else:
                 buffer[pointer:] = new_audio[:end_space]
                 remaining = new_length - end_space
                 buffer[:remaining] = new_audio[end_space:]
                 pointer = remaining
-                logger.debug(f"Buffer wrapped around. New pointer position: {pointer}")
+                #logger.debug(f"Buffer wrapped around. New pointer position: {pointer}")
         return pointer
 
     def _get_buffer_content(self, buffer: np.ndarray, pointer: int, buffer_size: int) -> np.ndarray:
@@ -356,9 +356,9 @@ class AudioCapture:
         :return: Ordered audio data as a NumPy array.
         """
         if pointer == 0:
-            logger.debug("Buffer content retrieved without wrapping.")
+            #logger.debug("Buffer content retrieved without wrapping.")
             return buffer.copy()
-        logger.debug("Buffer content retrieved with wrapping.")
+        #logger.debug("Buffer content retrieved with wrapping.")
         return np.concatenate((buffer[pointer:], buffer[:pointer]))
 
     def _on_keyword_detected(self, result):

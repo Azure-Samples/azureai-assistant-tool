@@ -547,7 +547,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     # Callbacks for AssistantManagerCallbacks
     def on_connected(self, assistant_name, assistant_type, thread_name):
-        logger.info(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
+        logger.info(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}")
         if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             if self.has_keyword_detection_model(assistant_name):
                 self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
