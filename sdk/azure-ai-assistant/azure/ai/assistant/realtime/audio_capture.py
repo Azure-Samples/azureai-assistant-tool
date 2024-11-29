@@ -2,6 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.assistant.management.exceptions import EngineError
 
 import pyaudio
 import numpy as np
@@ -127,7 +128,9 @@ class AudioCapture:
                 )
                 logger.info("Keyword recognizer initialized.")
             except Exception as e:
-                logger.error(f"Failed to initialize AzureKeywordRecognizer: {e}")
+                error_message = f"Failed to initialize AzureKeywordRecognizer: {e}"
+                logger.error(error_message)
+                raise EngineError(error_message)
 
         self.is_running = False
 

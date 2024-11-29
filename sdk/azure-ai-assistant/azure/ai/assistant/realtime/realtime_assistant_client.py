@@ -602,10 +602,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 assistant_config.assistant_id = str(uuid.uuid4())
                 self._create_realtime_client(assistant_config, realtime_options=realtime_options, timeout=timeout)
             else:
-                if self._realtime_client:
-                    self._realtime_client.update_session(options=realtime_options)
-                else:
-                    logger.warning("Realtime client not initialized, updating realtime session not done.")
+                self._update_realtime_client(assistant_config, realtime_options=realtime_options, timeout=timeout)
 
             # Update the local configuration using AssistantConfigManager
             # TODO make optional to save the assistant_config in the config manager
@@ -693,6 +690,60 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to create realtime client: {e}")
             raise EngineError(f"Failed to create realtime client: {e}")
+
+    def _update_realtime_client(
+            self,
+            assistant_config: AssistantConfig,
+            realtime_options: RealtimeAIOptions,
+            timeout: Optional[float] = None
+    ) -> None:
+        """
+        Updates the realtime assistant client. Currently, only the audio capture and realtime options are updated.
+
+        :param assistant_config: The assistant configuration.
+        :type assistant_config: AssistantConfig
+        :param realtime_options: The realtime AI options.
+        :type realtime_options: RealtimeAIOptions
+        :param timeout: The HTTP request timeout in seconds.
+        :type timeout: Optional[float]
+        """
+        try:
+            # Update the audio capture by closing the existing instance and creating a new one
+            if self._audio_capture:
+                self._audio_capture.close()
+                self._audio_capture = None
+            
+            self._audio_capture = AudioCapture(
+                event_handler=self._audio_capture_event_handler, 
+                sample_rate=24000,
+                channels=1,
+                frames_per_buffer=1024,
+                buffer_duration_sec=1.0,
+                cross_fade_duration_ms=20,
+                vad_parameters={
+                    "sample_rate": 24000,
+                    "chunk_size": 1024,
+                    "window_duration": 1.5,
+                    "silence_ratio": 1.5,
+                    "min_speech_duration": 0.3,
+                    "min_silence_duration": 1.0
+                },
+                enable_wave_capture=False,
+                keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
+
+            if self._event_handler:
+                self._event_handler.set_capture_client(self._audio_capture)
+            else:
+                raise EngineError("Event handler is not set and cannot be updated.")
+            
+            if self._realtime_client:
+                self._realtime_client.update_session(options=realtime_options)
+            else:
+                raise EngineError("Realtime client is not set and cannot be updated.")
+
+        except Exception as e:
+            logger.error(f"Failed to update realtime client: {e}")
+            raise EngineError(f"Failed to update realtime client: {e}")
 
     def start(
             self,

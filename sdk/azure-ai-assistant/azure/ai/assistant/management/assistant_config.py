@@ -1007,7 +1007,7 @@ class AssistantConfig:
                 'input_audio_format': 'pcm16',
                 'output_audio_format': 'pcm16',
                 'input_audio_transcription': 'whisper-1',
-                'keyword_detection_model': 'none',
+                'keyword_detection_model': '',
                 'keyword_rearm_silence_timeout': 10,
                 'turn_detection': {
                     'type': 'local_vad',

@@ -237,14 +237,15 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if (self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME and
             new_client_type != AIClientType.OPEN_AI_REALTIME):
 
-            # Stop listening keyword because no realtime assistants are used anymore
-            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
-
             # Disconnect all realtime assistants
             assistant_clients = self.assistant_client_manager.get_all_clients()
             for assistant_client in assistant_clients:
                 if self.is_realtime_assistant(assistant_client.name):
                     assistant_client.disconnect()
+
+            # Stop showing listening keyword and speech animations when switching from OPEN_AI_REALTIME
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
 
         # Save the conversation threads for the current active assistant
         if self.conversation_thread_clients[self.active_ai_client_type] is not None:
@@ -538,20 +539,27 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value
         return False
 
+    def has_keyword_detection_model(self, assistant_name):
+        assistant_client = self.assistant_client_manager.get_client(assistant_name)
+        if assistant_client.assistant_config.realtime_config.keyword_detection_model:
+            return True
+        return False
+
     # Callbacks for AssistantManagerCallbacks
     def on_connected(self, assistant_name, assistant_type, thread_name):
         logger.info(f"Assistant selected: {assistant_name}, {assistant_type}, {thread_name}, listening keyword...")
         if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-            self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+            if self.has_keyword_detection_model(assistant_name):
+                self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
     def on_disconnected(self, assistant_name, assistant_type):
         logger.info(f"Assistant unselected: {assistant_name}, {assistant_type}")
         if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-            # if this is last assistant unselected, stop listening keyword
+            # stop listening keyword if no realtime assistants that require keyword detection are selected
             selected_assistants = self.conversation_sidebar.get_selected_assistants()
-            if not selected_assistants:
+            if not any(self.has_keyword_detection_model(assistant) for assistant in selected_assistants):
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
-
+    
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
 

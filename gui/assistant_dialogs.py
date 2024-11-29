@@ -64,6 +64,7 @@ class AssistantConfigDialog(QDialog):
         self.checkBoxes = {}  # To keep track of all function checkboxes
         self.assistant_id = ''
         self.default_output_folder_path = os.path.join(os.getcwd(), 'output')
+        self.default_keyword_model_file_path = os.path.join(os.getcwd(), 'assets', 'kws.table')
         # make sure the output folder path exists and create it if it doesn't
         if not os.path.exists(self.default_output_folder_path):
             os.makedirs(self.default_output_folder_path)
@@ -350,7 +351,7 @@ class AssistantConfigDialog(QDialog):
         # Keyword Detection Model File Path
         self.keywordFilePathLabel = QLabel('Keyword Model File Path:')
         self.keywordFilePathEdit = QLineEdit()
-        self.keywordFilePathEdit.setText("")
+        self.keywordFilePathEdit.setText(self.default_keyword_model_file_path)
         self.keywordFilePathButton = QPushButton('Select File...')
         self.keywordFilePathButton.clicked.connect(self.select_keyword_file_path)
 
