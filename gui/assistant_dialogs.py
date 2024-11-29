@@ -352,6 +352,7 @@ class AssistantConfigDialog(QDialog):
         self.keywordFilePathLabel = QLabel('Keyword Model File Path:')
         self.keywordFilePathEdit = QLineEdit()
         self.keywordFilePathEdit.setText(self.default_keyword_model_file_path)
+        self.keywordFilePathEdit.setToolTip("The path to the keyword model file. If left empty or invalid, the keyword detection will be disabled.")
         self.keywordFilePathButton = QPushButton('Select File...')
         self.keywordFilePathButton.clicked.connect(self.select_keyword_file_path)
 

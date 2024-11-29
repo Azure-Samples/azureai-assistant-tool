@@ -401,6 +401,3 @@ class AudioCapture:
         """
         self.stop(terminate=True)
         logger.info("AudioCapture resources have been released.")
-
-    def __del__(self):
-        self.close()

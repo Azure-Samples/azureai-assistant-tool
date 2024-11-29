@@ -280,7 +280,3 @@ class AudioPlayer:
             except Exception as e:
                 logger.error(f"Error terminating PyAudio instance: {e}")
         logger.info("AudioPlayer resources have been released.")
-
-    def __del__(self):
-        """Ensures that resources are released upon deletion."""
-        self.close()
