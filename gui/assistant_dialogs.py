@@ -374,7 +374,7 @@ class AssistantConfigDialog(QDialog):
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
         self.turnDetectionComboBox = QComboBox()
-        self.turnDetectionComboBox.addItems(['local_vad', 'server_vad'])
+        self.turnDetectionComboBox.addItems(['local_vad']) # 'server_vad' is not enabled currently
         self.turnDetectionComboBox.currentIndexChanged.connect(self.update_vad_settings)
         self.audioLayout.addWidget(self.turnDetectionLabel)
         self.audioLayout.addWidget(self.turnDetectionComboBox)

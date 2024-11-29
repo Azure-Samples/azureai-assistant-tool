@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.assistant_config import AssistantConfig, AssistantType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.base_assistant_client import BaseAssistantClient
@@ -768,7 +768,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 self._realtime_client.start()
 
             self._start_audio()
-            self.callbacks.on_connected(assistant_name=self.name, assistant_type="realtime_assistant", thread_name=thread_name)
+            self.callbacks.on_connected(assistant_name=self.name, assistant_type=AssistantType.REALTIME_ASSISTANT.value, thread_name=thread_name)
         except Exception as e:
             logger.error(f"Failed to start realtime assistant: {e}")
             raise EngineError(f"Failed to start realtime assistant: {e}")
@@ -791,7 +791,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 logger.info(f"Stopping realtime assistant with name: {self.name}")
                 self._realtime_client.stop()
             self._stop_audio()
-            self.callbacks.on_disconnected(assistant_name=self.name, assistant_type="realtime_assistant")
+            self.callbacks.on_disconnected(assistant_name=self.name, assistant_type=AssistantType.REALTIME_ASSISTANT.value)
         except Exception as e:
             logger.error(f"Failed to stop realtime assistant: {e}")
             raise EngineError(f"Failed to stop realtime assistant: {e}")
