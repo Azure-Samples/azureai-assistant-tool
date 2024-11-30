@@ -58,7 +58,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.connection_timeout : float = 90.0
         self.use_system_assistant_for_thread_name : bool = False
         self.use_streaming_for_assistant : bool = True
-        self.user_text_summarization_in_synthesis : bool = False
         self.active_ai_client_type = None
         self.in_background = False
         self.initialize_singletons()

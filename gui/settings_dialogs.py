@@ -35,10 +35,6 @@ class GeneralSettingsDialog(QDialog):
         self.useSystemAssistantForThreadsCheckbox = QCheckBox("Enable system assistant to generate friendly conversation thread names", self)
         self.useSystemAssistantForThreadsCheckbox.setChecked(self.main_window.use_system_assistant_for_thread_name)
 
-        # Text summarization checkbox for long messages for speech synthesis
-        self.useTextSummarizationCheckbox = QCheckBox("Enable system assistant to summarize long messages for speech synthesis", self)
-        self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
-
         # Streaming for assistant
         self.useStreamingForAssistantCheckbox = QCheckBox("Use streaming for assistant", self)
         self.useStreamingForAssistantCheckbox.setChecked(self.main_window.use_streaming_for_assistant)
@@ -54,7 +50,6 @@ class GeneralSettingsDialog(QDialog):
         self.layout.addLayout(self.connectionTimeoutLayout)
         self.layout.addWidget(self.useStreamingForAssistantCheckbox)
         self.layout.addWidget(self.useSystemAssistantForThreadsCheckbox)
-        self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
 
         # Connect signals
@@ -66,7 +61,6 @@ class GeneralSettingsDialog(QDialog):
             connection_timeout = float(self.connectionTimeoutEdit.text())
             self.main_window.connection_timeout = connection_timeout
             self.main_window.use_system_assistant_for_thread_name = self.useSystemAssistantForThreadsCheckbox.isChecked()
-            self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
             self.main_window.use_streaming_for_assistant = self.useStreamingForAssistantCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
             super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
