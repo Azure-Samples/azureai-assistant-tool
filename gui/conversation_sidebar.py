@@ -428,6 +428,15 @@ class ConversationSidebar(QWidget):
                 selected_assistants.append(widget.label.text())
         return selected_assistants
 
+    def is_assistant_selected(self, assistant_name):
+        """Check if the given assistant name is selected."""
+        for i in range(self.assistantList.count()):
+            item = self.assistantList.item(i)
+            widget = self.assistantList.itemWidget(item)
+            if isinstance(widget, AssistantItemWidget) and widget.label.text() == assistant_name:
+                return widget.checkbox.isChecked()
+        return False
+
     def get_ai_client_type(self):
         """Return the AI client type selected in the combo box."""
         return self._ai_client_type
@@ -537,13 +546,17 @@ class ConversationSidebar(QWidget):
         self._select_threadlist_item(unique_thread_name)
         try:
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            #TODO separate threads per ai_client_type in the json file
             threads_client.set_current_conversation_thread(unique_thread_name)
             self.main_window.conversation_view.conversationView.clear()
             # Retrieve the messages for the selected thread
             conversation = threads_client.retrieve_conversation(unique_thread_name, timeout=self.main_window.connection_timeout)
             if conversation.messages is not None:
                 self.main_window.conversation_view.append_conversation_messages(conversation.messages)
+            selected_assistants = self.get_selected_assistants()
+            for assistant_name in selected_assistants:
+                assistant_client = self.assistant_client_manager.get_client(assistant_name)
+                if assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                    assistant_client.set_active_thread(unique_thread_name)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while selecting the thread: {e}")
 

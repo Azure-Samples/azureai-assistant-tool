@@ -161,6 +161,9 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def on_error(self, event: ErrorEvent):
         logger.error(f"Error occurred: {event.error.message}")
 
+    def is_run_active(self) -> bool:
+        return self._keyword_run_identifier or self._text_run_identifier
+
     def on_keyword_armed(self, armed: bool):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
@@ -895,6 +898,37 @@ class RealtimeAssistantClient(BaseAssistantClient):
             logger.error(f"Error occurred during generating response: {e}")
             raise EngineError(f"Error occurred during generating response: {e}")
 
+    def set_active_thread(
+            self,
+            thread_name: str
+    ) -> None:
+        """
+        Sets the active thread for the realtime assistant.
+
+        :param thread_name: The name of the thread to set as active.
+        :type thread_name: str
+
+        :return: None
+        :rtype: None
+        """
+        if self._event_handler:
+            self._event_handler.set_thread_name(thread_name)
+        else:
+            raise EngineError("Active thread cannot be set, check if the event handler is set in initialization.")
+
+    def is_active_run(
+            self
+    ) -> bool:
+        """
+        Checks if the realtime assistant has an active run.
+
+        :return: True if the assistant has an active run, False otherwise.
+        :rtype: bool
+        """
+        if self._event_handler:
+            return self._event_handler.is_run_active()
+        return False
+
     def purge(
             self,
             timeout: Optional[float] = None
@@ -940,7 +974,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to send conversation history: {e}")
             raise EngineError(f"Failed to send conversation history: {e}")
-        
 
     def __del__(self):
         self.disconnect()
