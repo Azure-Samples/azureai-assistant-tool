@@ -5,7 +5,7 @@ from enum import Enum, auto
 from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
 
 import os
-from typing import Union
+from typing import Union, Optional
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.exceptions import EngineError
 
@@ -37,6 +37,7 @@ class AsyncAIClientType(Enum):
 class AIClientFactory:
     _instance = None
     _clients = {}
+    _current_client_type: Optional[Union[AIClientType, AsyncAIClientType]] = None
 
     """
     A factory class for creating AI clients.
@@ -59,6 +60,11 @@ class AIClientFactory:
             cls._instance = AIClientFactory()
         return cls._instance
 
+    @property
+    def current_client_type(self) -> Optional[Union[AIClientType, AsyncAIClientType]]:
+        """Get the currently active client type."""
+        return self._current_client_type
+    
     def get_client(
             self, 
             client_type: Union[AIClientType, AsyncAIClientType],
@@ -86,6 +92,8 @@ class AIClientFactory:
                 logger.info(f"Recreating client for {client_key}")
                 del self._clients[client_key]
             else:
+                # Set the current client type
+                self._current_client_type = client_type
                 return self._clients[client_key]
 
         if isinstance(client_type, AIClientType):
@@ -102,4 +110,6 @@ class AIClientFactory:
         else:
             raise ValueError(f"Invalid client type: {client_type}")
 
+        # Set the current client type
+        self._current_client_type = client_type
         return self._clients[client_key]

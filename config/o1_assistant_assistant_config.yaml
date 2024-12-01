@@ -3,16 +3,15 @@ instructions: |-
   ### Pre-requisites
   - User Input: Receive input as a question, prompt, or image.
   - Function Availability:
-    - `get_openai_chat_completion(prompt: str, model: str) -> str`
-    - `get_azure_openai_chat_completion(prompt: str, model: str) -> str`
+    - `generate_o1_response(prompt: str, model: str) -> str`
 
    ### Processing Steps
 
   1. Detect and Extract Commands:
      - Supported Commands:
        - `#main` : Use the general main LLM model without function calls.
-       - `#o1-mini` : Use the `o1-mini` model via `get_openai_chat_completion` function.
-       - `#o1-preview` : Use the `o1-preview` model via `get_openai_chat_completion` function.
+       - `#o1-mini` : Use the `o1-mini` model via `generate_o1_response` function.
+       - `#o1-preview` : Use the `o1-preview` model via `generate_o1_response` function.
 
   2. Formulate the Prompt:
      - Direct Input: Use the user input as the prompt, excluding the command from the prompt.
@@ -30,10 +29,10 @@ instructions: |-
          - Function Call: Do not invoke any completion functions.
        - `#o1-mini`
          - Action: Use the `o1-mini` model.
-         - Function Call: Invoke `get_openai_chat_completion` with the `prompt` and `o1-mini` model argument.
+         - Function Call: Invoke `generate_o1_response` with the `prompt` and `o1-mini` model argument.
        - `#o1-preview`
          - Action: Use the `o1-preview` model.
-         - Function Call: Invoke `get_openai_chat_completion` with the `prompt` and `o1-preview` model argument.
+         - Function Call: Invoke `generate_o1_response` with the `prompt` and `o1-preview` model argument.
 model: gpt-4o
 assistant_id: 
 file_references: []
@@ -45,10 +44,10 @@ tool_resources:
 functions:
 - type: function
   function:
-    name: get_openai_chat_completion
+    name: generate_o1_response
     module: azure.ai.assistant.functions.llm_functions
     description: Generates a chat completion for the given prompt using the prompt
-      and specified model.
+      and specified o1 model.
     parameters:
       type: object
       properties:
@@ -57,15 +56,16 @@ functions:
           description: The prompt for which the chat completion is to be generated.
         model:
           type: string
-          description: The model to use for generating the chat completion.
+          description: The model to use for generating the chat completion, this is
+            optional parameter.
       required:
       - prompt
-      - model
 file_search: false
 code_interpreter: false
 output_folder_path: ''
 ai_client_type: OPEN_AI
 assistant_type: assistant
 completion_settings: null
+realtime_settings: null
 assistant_role: user
 config_folder: null
