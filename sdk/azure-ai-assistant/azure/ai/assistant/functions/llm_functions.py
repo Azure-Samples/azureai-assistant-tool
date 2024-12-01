@@ -140,10 +140,18 @@ def take_screenshot() -> str:
     :return: The path to the saved screenshot.
     :rtype: str
     """
+     # Attempt to dynamically import required modules
     try:
         from PIL import Image
-        import mss
+    except ImportError:
+        return json.dumps({"function_error": "Missing module 'Pillow'. Please install it using `pip install Pillow`."})
 
+    try:
+        import mss
+    except ImportError:
+        return json.dumps({"function_error": "Missing module 'mss'. Please install it using `pip install mss`."})
+    
+    try:
         current_client_type = AIClientFactory.get_instance().current_client_type
         ai_client, thread_client = _initialize_clients(current_client_type)
         if not ai_client or not thread_client:
@@ -151,22 +159,35 @@ def take_screenshot() -> str:
 
         # capture a screenshot
         with mss.mss() as sct:
-            monitor = sct.monitors[0]  # 0 is the first monitor; adjust if multiple monitors are used
+            monitor = sct.monitors[0]
             screenshot = sct.grab(monitor)
             img = Image.frombytes('RGB', screenshot.size, screenshot.bgra, 'raw', 'BGRX')
 
         # Create the output folder if it does not exist
-        os.makedirs("output", exist_ok=True)
+        output_dir = os.path.abspath("output")
+        os.makedirs(output_dir, exist_ok=True)
+
         # Save the screenshot to the output folder
         file_name = f"{_create_identifier('screenshot')}.png"
-        img_path = os.path.join("output", file_name)
+        img_path = os.path.join(output_dir, file_name)
         img.save(img_path)
+
         attachment = Attachment(file_path=img_path, attachment_type=AttachmentType.IMAGE_FILE)
         current_thread_id = thread_client.get_config().get_current_thread_id()
         thread_name = thread_client.get_config().get_thread_name_by_id(current_thread_id)
-        thread_client.create_conversation_thread_message(message="Captured screenshot", thread_name=thread_name, attachments=[attachment], metadata={"chat_assistant": "function"})
+        thread_client.create_conversation_thread_message(
+            message="Captured screenshot",
+            thread_name=thread_name,
+            attachments=[attachment],
+            metadata={"chat_assistant": "function"}
+        )
 
         return json.dumps({"result": "Screenshot captured and displayed."})
+    
+    except mss.exception.ScreenShotError as e:
+        error_message = "Failed to capture screenshot due to a screen capture error."
+        logger.error(f"{error_message} Details: {e}")
+        return json.dumps({"function_error": error_message})
     
     except Exception as e:
         error_message = f"Failed to capture screenshot: {str(e)}"
