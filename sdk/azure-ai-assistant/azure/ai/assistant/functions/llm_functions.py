@@ -8,7 +8,7 @@ from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.logger_module import logger
 
 from typing import Dict, Any, List
-import json, copy, os, uuid
+import json, copy, os, uuid, base64, io
 
 
 def _initialize_clients(client_type):
@@ -100,6 +100,116 @@ def _parse_text_messages(messages: List['ConversationMessage']) -> List[Dict[str
     return parsed_messages
 
 
+def _analyze_image(img_base64: str, system_input: str, user_input: str) -> str:
+    """
+    Analyzes the given image and returns the analysis result.
+
+    :param img_base64 (str): Base64 encoded image data.
+    :param system_input (str): System input for the analysis.
+    :param user_input (str): User input for the analysis.
+    :return: The analysis result.
+    :rtype: str
+    """
+
+    try:
+        current_client_type = AIClientFactory.get_instance().current_client_type
+        ai_client, thread_client = _initialize_clients(current_client_type)
+    except Exception as e:
+        error_message = f"Failed to initialize AI or thread client: {str(e)}"
+        print(error_message)
+        return json.dumps({"function_error": error_message})
+    
+    messages = [
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": system_input
+                }
+            ],
+            "role": "user",
+            "content": [
+                {
+                    "type": "text", 
+                    "text": user_input
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}",
+                        "detail": "high"
+                    }
+                },
+            ],
+        }
+    ]
+
+    try:
+        response = ai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0.5,
+            max_tokens=2000
+        )
+        
+        # Extract the analysis result from the response
+        analysis = response.choices[0].message.content
+        current_thread_id = thread_client.get_config().get_current_thread_id()
+        thread_name = thread_client.get_config().get_thread_name_by_id(current_thread_id)
+        thread_client.create_conversation_thread_message(
+            message=analysis,
+            thread_name=thread_name,
+            metadata={"chat_assistant": "function"}
+        )
+        return json.dumps({"result": "The image has been successfully analyzed and the result has been provided into conversation window. You will not see directly the result."})
+    
+    except Exception as e:
+        error_message = f"An error occurred: {e}"
+        print(error_message)
+        return json.dumps({"function_error": error_message})
+
+
+def _screenshot_to_bytes() -> bytes:
+    """
+    Captures a screenshot and returns it as binary data.
+
+    :return: The screenshot as binary data.
+    :rtype: bytes
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return json.dumps({"function_error": "Missing module 'Pillow'. Please install it using `pip install Pillow`."})
+
+    try:
+        import mss
+    except ImportError:
+        return json.dumps({"function_error": "Missing module 'mss'. Please install it using `pip install mss`."})
+
+    try:
+        with mss.mss() as sct:
+            monitor = sct.monitors[0]
+            screenshot = sct.grab(monitor)
+            img = Image.frombytes('RGB', screenshot.size, screenshot.bgra, 'raw', 'BGRX')
+        
+        # Convert the image to binary data
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        img_bytes = img_byte_arr.read()
+        return img_bytes
+
+    except mss.exception.ScreenShotError as e:
+        error_message = "Failed to capture screenshot due to a screen capture error."
+        logger.error(f"{error_message} Details: {e}")
+        return json.dumps({"function_error": error_message})
+    except Exception as e:
+        error_message = f"Failed to capture screenshot: {str(e)}"
+        logger.exception(error_message)
+        return json.dumps({"function_error": error_message})
+
+
 def _create_identifier(prefix: str) -> str:
     short_id = uuid.uuid4().hex[:8]
     return f"{prefix}_{short_id}"
@@ -131,6 +241,22 @@ def generate_o1_response(prompt: str, model: str = "o1-mini") -> str:
 
     messages = _update_messages_with_prompt(messages, prompt)
     return _generate_chat_completion(ai_client, model, messages)
+
+
+def review_highlighted_code() -> str:
+    """
+    Captures a screenshot, sends it to the specified OpenAI model for analysis,
+    and returns the analysis result.
+
+    :return: The analysis result as a JSON string.
+    :rtype: str
+    """    
+    # Capture a screenshot and convert it to base64
+    img_bytes = _screenshot_to_bytes()
+    img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+    return _analyze_image(img_base64=img_base64, 
+                          system_input="You are expert in analyzing images which contains code to text. If the image contains highlighted part, focus on that.", 
+                          user_input="Review the highlighted code and provide detailed feedback.")
 
 
 def take_screenshot() -> str:

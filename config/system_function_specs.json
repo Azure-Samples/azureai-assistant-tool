@@ -271,5 +271,18 @@
                 "required": []
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "review_highlighted_code",
+            "module": "azure.ai.assistant.functions.llm_functions",
+            "description": "Review the highlighted code and provide feedback.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    }    
 ]
