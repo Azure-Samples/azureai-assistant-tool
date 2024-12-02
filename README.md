@@ -14,7 +14,7 @@
 ## Table of Contents
 
 - 🤖🛠️ Azure AI Assistants Tool
-- 📰 Latest News
+- 🆕 Latest News
 - 🧱 What is Assistants from Azure OpenAI Service?
 - 🚀 How does this Tool help?
 - 🆕 OpenAI Realtime Support
@@ -32,7 +32,7 @@ In addition to the OpenAI Assistants API, the tool also provides a similar inter
 > [!IMPORTANT]
 > **The Azure AI Assistant Tool is experimental**, created to support ideation and experimentation for AI assistant development or your daily prompt engineering. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
 
-## Latest News
+## 🆕 Latest News
 
 - **December 03, 2024:** Released **OpenAI Realtime Support**, with real-time audio interaction capabilities. For detailed information, refer to the OpenAI Realtime Support section below.
 
@@ -46,7 +46,7 @@ In addition to the OpenAI Assistants API, the tool also provides a similar inter
 💬 Inbuilt thread and memory management <br>
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
-📚 Retrieval Augmented Generation with **File Search** tool (coming soon to Azure OpenAI Assistants)<br>
+📚 Retrieval Augmented Generation with **File Search** tool<br>
 
 **Learn more** about Assistants on Azure OpenAI Service:
 
@@ -71,12 +71,10 @@ This support enables assistants experimentation using OpenAI's Realtime WebSocke
 
 - **Real-time Audio and Text Interaction**: Enable seamless conversations with both speech and text.
 - **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities.
-- **Keyword Detection**: Trigger interactions with specific trigger words.
-- **Modular Design**: Customize with your own functions and event handlers.
+- **Keyword Detection**: Trigger interactions with specific trigger words to optimize e.g. cost and reliability.
+- **Function Calling**: Customize the realtime assistant with your own functions and event handlers.
 - **Multi-Modal Interaction**: Supports both audio and text modalities.
-- **Configurable AI Options**: Fine-tune assistant responses and behaviors.
-
-### Getting Started
+- **Configurable AI Options**: Fine-tune realtime assistant responses and behaviors.
 
 ### Resources
 
