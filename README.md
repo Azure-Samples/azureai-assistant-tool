@@ -17,14 +17,14 @@
 - 🆕 Latest News
 - 🧱 What is Assistants from Azure OpenAI Service?
 - 🚀 How does this Tool help?
-- 🆕 OpenAI Realtime Support
+- 🔊🎤 OpenAI Realtime Support
 - ✨ Quick Start: Getting Started with the Tool
 - 📖 License
 - Contributing
 - Code of Conduct
 - Getting Help
 
-## Azure AI Assistants tool 
+## 🤖🛠️ Azure AI Assistants tool 
 Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
 
 In addition to the OpenAI Assistants API, the tool also provides a similar interface for OpenAI's Chat Completion and Realtime API-based assistants.
@@ -34,7 +34,7 @@ In addition to the OpenAI Assistants API, the tool also provides a similar inter
 
 ## 🆕 Latest News
 
-- **December 03, 2024:** Released 0.5.0 version of the tool containing **OpenAI Realtime Support**, with real-time audio interaction capabilities. The earlier support using Azure Cognitive Services for speech
+- **December 03, 2024:** Released 0.5.0 version of the tool containing **OpenAI Realtime Support**, with real-time audio interaction capabilities. The earlier support using Azure Cognitive Services for speech input and ouput
 has been removed from the tool, however that library is still used with OpenAI Realtime using keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
@@ -46,8 +46,8 @@ has been removed from the tool, however that library is still used with OpenAI R
 
 💬 Inbuilt thread and memory management <br>
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
-🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **File Search** tool<br>
+🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 
 **Learn more** about Assistants on Azure OpenAI Service:
 
@@ -64,18 +64,24 @@ has been removed from the tool, however that library is still used with OpenAI R
 
 ✔️**Optimize your copilot development workflow:** Get a reliable and scalable framework to test new Copilot use cases and dynamic AI applications with Assistants API without the need to build out manual tooling and configurations
 
-## 🆕 OpenAI Realtime Support
+## 🔊🎤 OpenAI Realtime Support
 
-This support enables assistants experimentation using OpenAI's Realtime WebSocket APIs.
+This support enables assistants using OpenAI's Realtime APIs with speech and text input/output via WebSocket.
 
 ### Key Features
 
-- **Real-time Audio and Text Interaction**: Enable seamless conversations with both speech and text.
-- **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities.
-- **Keyword Detection**: Trigger interactions with specific trigger words to optimize e.g. cost and reliability.
-- **Function Calling**: Customize the realtime assistant with your own functions and event handlers.
-- **Multi-Modal Interaction**: Supports both audio and text modalities.
-- **Configurable AI Options**: Fine-tune realtime assistant responses and behaviors.
+- **Real-time Audio Interaction**: Use the Realtime API with speech input using predefined keyword `Computer` to trigger the conversation.
+- **Real-time Text Interaction**: Use the Realtime API with text input. The assistant can respond back with audio or text.
+- **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities by using local voice activity detection.
+- **Keyword Detection**: Trigger interactions with predefined keyword word `Computer` to optimize e.g. cost and reliability. Create your own keywords visit [Creating the Custom Keyword](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/custom-keyword-basics?pivots=programming-language-python).
+- **Function Calling**: Customize the realtime assistant with your own functions which runs asynchronously in the background.
+- **Configurable AI Options**: Fine-tune realtime assistant responses and behaviors with different options in Realtime API.
+
+### Demo Video
+
+Check out the [demo video on YouTube](https://www.youtube.com/watch?v=VIDEO_ID) to see the OpenAI Realtime Support in action!
+
+[![Watch the video](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
 
 ### Resources
 
