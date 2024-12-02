@@ -34,7 +34,8 @@ In addition to the OpenAI Assistants API, the tool also provides a similar inter
 
 ## 🆕 Latest News
 
-- **December 03, 2024:** Released **OpenAI Realtime Support**, with real-time audio interaction capabilities. For detailed information, refer to the OpenAI Realtime Support section below.
+- **December 03, 2024:** Released 0.5.0 version of the tool containing **OpenAI Realtime Support**, with real-time audio interaction capabilities. The earlier support using Azure Cognitive Services for speech
+has been removed from the tool, however that library is still used with OpenAI Realtime using keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
 ## 🧱 What is Assistants from Azure OpenAI service?
