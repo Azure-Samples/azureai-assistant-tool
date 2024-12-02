@@ -11,15 +11,35 @@
 </div>
 <br>
 
-  **Azure AI Assistants tool** is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
+## Table of Contents
+
+- 🤖🛠️ Azure AI Assistants Tool
+- 📰 Latest News
+- 🧱 What is Assistants from Azure OpenAI Service?
+- 🚀 How does this Tool help?
+- 🆕 OpenAI Realtime Support
+- ✨ Quick Start: Getting Started with the Tool
+- 📖 License
+- Contributing
+- Code of Conduct
+- Getting Help
+
+## Azure AI Assistants tool 
+Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
+
+In addition to the OpenAI Assistants API, the tool also provides a similar interface for OpenAI's Chat Completion and Realtime API-based assistants.
 
 > [!IMPORTANT]
-> **The Azure AI Assistant Tool is currently in Alpha**. This early stage of development means the project is actively evolving, with significant updates and improvements expected. Users should anticipate changes as we work towards refining features, enhancing functionality, and expanding capabilities. We welcome feedback and contributions during this phase to help shape the future of the tool.
+> **The Azure AI Assistant Tool is experimental**, created to support ideation and experimentation for AI assistant development or your daily prompt engineering. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
+
+## Latest News
+
+- **December 03, 2024:** Released **OpenAI Realtime Support**, with real-time audio interaction capabilities. For detailed information, refer to the OpenAI Realtime Support section below.
 
 
 ## 🧱 What is Assistants from Azure OpenAI service?
 
-🌟**Assistants**, a new API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and Retrieval. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
+🌟**Assistants**, API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and File Search. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
 
 **Features** include:
 
@@ -27,8 +47,6 @@
 📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
 🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
 📚 Retrieval Augmented Generation with **File Search** tool (coming soon to Azure OpenAI Assistants)<br>
-🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
-📤 Exporting the assistant configuration into simple CLI application
 
 **Learn more** about Assistants on Azure OpenAI Service:
 
@@ -45,17 +63,29 @@
 
 ✔️**Optimize your copilot development workflow:** Get a reliable and scalable framework to test new Copilot use cases and dynamic AI applications with Assistants API without the need to build out manual tooling and configurations
 
+## 🆕 OpenAI Realtime Support
+
+This support enables assistants experimentation using OpenAI's Realtime WebSocket APIs.
+
+### Key Features
+
+- **Real-time Audio and Text Interaction**: Enable seamless conversations with both speech and text.
+- **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities.
+- **Keyword Detection**: Trigger interactions with specific trigger words.
+- **Modular Design**: Customize with your own functions and event handlers.
+- **Multi-Modal Interaction**: Supports both audio and text modalities.
+- **Configurable AI Options**: Fine-tune assistant responses and behaviors.
+
+### Getting Started
+
+### Resources
+
+- [Realtime AI GitHub Repository](https://github.com/jhakulin/realtime-ai)
+- [OpenAI Realtime WebSocket API Documentation](https://platform.openai.com/docs/guides/realtime)
+- [Azure Speech Services Documentation](https://azure.microsoft.com/en-us/services/cognitive-services/speech-services/)
 
 
-## 💥 Highlights
-
-- **Easy Configuration**: Set up your assistant with the model, custom instructions, files, and tools
-- **Tool Integration**: Incorporate knowledge retrieval, code interpreters, and built-in system and dynamic user functions to enhance assistant skills and capabilities.
-- **Dynamic User Functions**: Quickly create and apply user-defined functions to assistants.
-- **Task Management**: Efficiently manage and schedule tasks, including batch and multi-step operations, for parallel execution.
-
-
-## ✨ Quick Start
+## ✨ Quick Start: Getting Started with the Tool
 
 ### Step 1: Complete Azure prerequisities
 
