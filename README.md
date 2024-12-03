@@ -81,8 +81,9 @@ This support enables assistants using OpenAI's Realtime APIs with speech and tex
 
 Check out the demo video to see the OpenAI Realtime Support in action!
 
-[Watch the Demo Video](https://raw.githubusercontent.com/jhakulin/azureai-assistant-tool/jhakulin/realtime-debug/assets/RealtimeAssistant.mp4)
+https://github.com/user-attachments/assets/19dd4053-dbd5-4ffe-93e6-353c3052bbad
 
+   
 
 ### Resources
 
