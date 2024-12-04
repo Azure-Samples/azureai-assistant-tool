@@ -25,12 +25,10 @@
 - Getting Help
 
 ## 🤖🛠️ Azure AI Assistants tool 
-Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI agents within your application with Azure OpenAI Assistants API.
-
-In addition to the OpenAI Assistants API, the tool also provides a similar interface for OpenAI's Chat Completion and Realtime API-based AI agents.
+Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with Azure OpenAI Assistants, Chat Completion and/or Realtime API based technologies. Use this powerful, easy-to-setup low-code playground tool to quickly experiment and build AI agents within your application.
 
 > [!IMPORTANT]
-> **The Azure AI Assistant Tool is experimental**, created to support mainly product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
+> **The Azure AI Assistant Tool is experimental**, created to support your product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
 
 ## 🆕 Latest News
 
