@@ -25,12 +25,12 @@
 - Getting Help
 
 ## 🤖🛠️ Azure AI Assistants tool 
-Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
+Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI agents within your application with Azure OpenAI Assistants API.
 
-In addition to the OpenAI Assistants API, the tool also provides a similar interface for OpenAI's Chat Completion and Realtime API-based assistants.
+In addition to the OpenAI Assistants API, the tool also provides a similar interface for OpenAI's Chat Completion and Realtime API-based AI agents.
 
 > [!IMPORTANT]
-> **The Azure AI Assistant Tool is experimental**, created to support ideation and experimentation for AI assistant development or your daily prompt engineering. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
+> **The Azure AI Assistant Tool is experimental**, created to support mainly product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
 
 ## 🆕 Latest News
 
@@ -56,34 +56,31 @@ has been removed from the tool, however that library is still used with OpenAI R
   📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
 
 
-## 🚀 How does this Tool help?
+## 🚀 How Does This Tool Help?
 
-✔️ **Enhance Developer Productivity:** Streamline the assistant development process with Azure OpenAI Assistans through built-in middleware libraries and tools that making it easy to integrate AI capabilities into your copilot applications
+✔️ **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using OpenAI's technologies, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
 
-✔️ **Enable rapid prototyping:** Create amazing demos with AOAI Assistants and develop end-to-end assistant solutions with a robust set of features, including built-in system functions, dynamic generation of user functions specification and implementation, assistant task creation and scheduling, and much more. 
+✔️ **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
 
-✔️**Optimize your copilot development workflow:** Get a reliable and scalable framework to test new Copilot use cases and dynamic AI applications with Assistants API without the need to build out manual tooling and configurations
 
 ## 🔊🎤 OpenAI Realtime Support
 
-This support enables assistants using OpenAI's Realtime APIs with speech and text input/output via WebSocket.
+This support enables agents prototyping using OpenAI's Realtime APIs with speech and text input/output via real-time WebSocket communication.
 
 ### Key Features
 
-- **Real-time Audio Interaction**: Use the Realtime API with speech input using predefined keyword `Computer` to trigger the conversation.
-- **Real-time Text Interaction**: Use the Realtime API with text input. The assistant can respond back with audio or text.
+- **Real-time Audio Interaction**: Use the Realtime API with speech input using predefined and integrated keyword `Computer` to trigger the conversation.
+- **Real-time Text Interaction**: Use the Realtime API with text input. The agent can respond back with audio or text.
 - **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities by using local voice activity detection.
 - **Keyword Detection**: Trigger interactions with predefined keyword word `Computer` to optimize e.g. cost and reliability. Create your own keywords visit [Creating the Custom Keyword](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/custom-keyword-basics?pivots=programming-language-python).
-- **Function Calling**: Customize the realtime assistant with your own functions which runs asynchronously in the background.
-- **Configurable AI Options**: Fine-tune realtime assistant responses and behaviors with different options in Realtime API.
+- **Function Calling**: Customize the realtime agent with your own functions which runs asynchronously in the background.
+- **Configurable AI Options**: Fine-tune realtime agent responses and behaviors with different options in Realtime API.
 
 ### Demo Video
 
 Check out the demo video to see the OpenAI Realtime Support in action!
 
 https://github.com/user-attachments/assets/19dd4053-dbd5-4ffe-93e6-353c3052bbad
-
-   
 
 ### Resources
 
