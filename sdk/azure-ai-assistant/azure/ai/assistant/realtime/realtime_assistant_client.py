@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
 from azure.ai.assistant.management.assistant_config import AssistantConfig, AssistantType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
@@ -581,6 +582,11 @@ class RealtimeAssistantClient(BaseAssistantClient):
             self._load_selected_functions(assistant_config)
             self._assistant_config = assistant_config
 
+            if self.ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+                azure_openai_api_version, azure_openai_endpoint = AIClientFactory.get_instance().get_azure_client_info()
+            else:
+                azure_openai_api_version, azure_openai_endpoint = None, None
+
             realtime_options = RealtimeAIOptions(
                 api_key=self.ai_client.api_key,
                 model=assistant_config.model,
@@ -595,7 +601,9 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 tools=tools,
                 tool_choice="auto",
                 temperature=0.8 if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
-                max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens
+                max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens,
+                azure_openai_api_version=azure_openai_api_version,
+                azure_openai_endpoint=azure_openai_endpoint
             )
 
             # Check if the _realtime_client attribute exists and is set
@@ -717,7 +725,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
             if self._audio_capture:
                 self._audio_capture.close()
                 self._audio_capture = None
-            
+
             if assistant_config.realtime_config.keyword_detection_model:
                 self._audio_capture = AudioCapture(
                     event_handler=self._audio_capture_event_handler, 
@@ -743,7 +751,13 @@ class RealtimeAssistantClient(BaseAssistantClient):
                     raise EngineError("Event handler is not set and cannot be updated.")
             
             if self._realtime_client:
-                self._realtime_client.update_session(options=realtime_options)
+                if self._realtime_client.is_running:
+                    # Restart the realtime client to apply the new options
+                    self._realtime_client.stop()
+                    self._realtime_client.update_session(options=realtime_options)
+                    self._realtime_client.start()
+                else:
+                    self._realtime_client.update_session(options=realtime_options)
             else:
                 raise EngineError("Realtime client is not set and cannot be updated.")
 

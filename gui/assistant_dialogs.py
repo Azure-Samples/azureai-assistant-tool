@@ -145,12 +145,11 @@ class AssistantConfigDialog(QDialog):
         if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             # Only add OPEN_AI_REALTIME for Realtime Assistants
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI_REALTIME.name)
-            self.aiClientComboBox.setEnabled(False)  # Optional: Disabling to prevent user change
+            self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI_REALTIME.name)
+            #self.aiClientComboBox.setEnabled(False)  # Optional: Disabling to prevent user change
         else:
-            # Add all AIClientType options for other assistant types
-            for client_type in AIClientType:
-                if client_type != AIClientType.OPEN_AI_REALTIME:
-                    self.aiClientComboBox.addItem(client_type.name)
+            self.aiClientComboBox.addItem(AIClientType.OPEN_AI.name)
+            self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI.name)
             self.aiClientComboBox.setEnabled(True)  # Allow user selection for non-realtime
 
         active_ai_client_type = self.main_window.active_ai_client_type
@@ -802,7 +801,7 @@ class AssistantConfigDialog(QDialog):
         finally:
             if self.ai_client_type == AIClientType.OPEN_AI or self.ai_client_type == AIClientType.OPEN_AI_REALTIME:
                 self.modelComboBox.setToolTip("Select a model ID supported for assistant from the list")
-            elif self.ai_client_type == AIClientType.AZURE_OPEN_AI:
+            elif self.ai_client_type == AIClientType.AZURE_OPEN_AI or self.ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
                 self.modelComboBox.setToolTip("Select a model deployment name from the Azure OpenAI resource")
 
     def assistant_selection_changed(self):

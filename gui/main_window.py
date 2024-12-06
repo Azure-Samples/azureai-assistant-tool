@@ -132,6 +132,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.system_client = AIClientFactory.get_instance().get_client(
                 AIClientType.OPEN_AI_REALTIME
             )
+        elif self.system_client_type == AIClientType.AZURE_OPEN_AI_REALTIME.name:
+            self.system_client = AIClientFactory.get_instance().get_client(
+                AIClientType.AZURE_OPEN_AI_REALTIME,
+                api_version=self.system_api_version
+            )
 
     def initialize_ui(self):
         self.initialize_ui_components()
@@ -232,9 +237,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if not hasattr(self, 'conversation_thread_clients'):
             return
         
-        # Disconnect realtime clients if switching from OPEN_AI_REALTIME to a different type
-        if (self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME and
-            new_client_type != AIClientType.OPEN_AI_REALTIME):
+        # Disconnect realtime clients if switching from OPEN_AI_REALTIME or from AZURE_OPEN_AI_REALTIME to other than realtime type
+        if self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME or self.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+
+            # if new client type is the same as the current client type, do nothing
+            if new_client_type == self.active_ai_client_type:
+                return
 
             # Disconnect all realtime assistants
             assistant_clients = self.assistant_client_manager.get_all_clients()
@@ -272,6 +280,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.OPEN_AI_REALTIME
+                )
+            elif self.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+                client = AIClientFactory.get_instance().get_client(
+                    AIClientType.AZURE_OPEN_AI_REALTIME
                 )
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")

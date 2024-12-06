@@ -34,7 +34,7 @@ class AssistantsMenu:
 
     def create_assistants_menu(self):
         self.assistants_menu.clear()  # Clear existing menu actions
-        if self.client_type == AIClientType.OPEN_AI_REALTIME:
+        if self.client_type == AIClientType.OPEN_AI_REALTIME or self.client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
             # Only add Realtime Assistant action
             createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
             createRealtimeAssistantAction.triggered.connect(self.create_new_edit_realtime_assistant)
