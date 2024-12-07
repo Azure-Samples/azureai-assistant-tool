@@ -42,23 +42,23 @@ has been removed from the tool, however that library is still used with OpenAI R
 
 **Features** include:
 
-💬 Inbuilt thread and memory management <br>
-📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
-📚 Retrieval Augmented Generation with **File Search** tool<br>
-🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
+- Inbuilt thread and memory management <br>
+- Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
+- Retrieval Augmented Generation with **File Search** tool<br>
+- Build your own tools or call external tools and APIs with **Function Calling**<br>
 
 **Learn more** about Assistants on Azure OpenAI Service:
 
-  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
-  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
-  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
+  - Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
+  - Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
+  - Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
 
 
 ## 🚀 How Does This Tool Help?
 
-✔️ **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using OpenAI's technologies, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
+- **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using OpenAI's technologies, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
 
-✔️ **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
+- **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
 
 
 ## 🔊🎤 OpenAI Realtime Support
