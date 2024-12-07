@@ -988,7 +988,3 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to send conversation history: {e}")
             raise EngineError(f"Failed to send conversation history: {e}")
-
-    def __del__(self):
-        self.disconnect()
-        self._clear_variables()

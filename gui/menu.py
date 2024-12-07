@@ -224,6 +224,10 @@ class TasksMenu:
         dialog.show()
 
     def schedule_task(self):
+        if self.main_window.active_ai_client_type == AIClientType.OPEN_AI_REALTIME or self.main_window.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+            QMessageBox.information(self.main_window, "Not Implemented", "This feature is not implemented for Realtime Assistants.")
+            return
+
         dialog = ScheduleTaskDialog(self.main_window, self.main_window.task_manager)
         dialog.show()
 

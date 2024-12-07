@@ -68,9 +68,9 @@ This support enables agents prototyping using OpenAI's Realtime APIs with speech
 ### Key Features
 
 - **Real-time Audio Interaction**: Use the Realtime API with speech input using predefined and integrated keyword `Computer` to trigger the conversation.
+  - Using keyword can be helpful to optimize cost and reliability of your application. To create your own keywords, visit [Creating the Custom Keyword](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/custom-keyword-basics?pivots=programming-language-python). Currently only 1 keyword is supported.
 - **Real-time Text Interaction**: Use the Realtime API with text input. The agent can respond back with audio or text.
 - **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities by using local voice activity detection.
-- **Keyword Detection**: Trigger interactions with predefined keyword word `Computer` to optimize e.g. cost and reliability. Create your own keywords visit [Creating the Custom Keyword](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/custom-keyword-basics?pivots=programming-language-python).
 - **Function Calling**: Customize the realtime agent with your own functions which runs asynchronously in the background.
 - **Configurable AI Options**: Fine-tune realtime agent responses and behaviors with different options in Realtime API.
 

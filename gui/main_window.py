@@ -332,6 +332,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 assistant_client.stop()
                 assistant_client.start(self.conversation_sidebar.threadList.get_current_text())
 
+        # enable assistant list if it is disabled
+        self.conversation_sidebar.assistantList.setDisabled(False)
         # enable input field if it is disabled
         self.conversation_view.inputField.setReadOnly(False)
 
@@ -567,6 +569,23 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             return True
         return False
 
+    def handle_realtime_run_start(self, assistant_name, run_identifier):
+        if self.is_realtime_assistant(assistant_name):
+            self.conversation_sidebar.assistantList.setDisabled(True)
+            if "keyword" in run_identifier:
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+				# TODO not thread safe
+                if self.is_assistant_selected(assistant_name):
+                    self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
+
+    def handle_realtime_run_end(self, assistant_name, run_identifier):
+        if self.is_realtime_assistant(assistant_name):
+            self.conversation_sidebar.assistantList.setDisabled(False)
+            if "keyword" in run_identifier:
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
+                if self.is_assistant_selected(assistant_name):
+                    self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+
     # Callbacks for AssistantManagerCallbacks
     def on_connected(self, assistant_name, assistant_type, thread_name):
         logger.info(f"Assistant connected: {assistant_name}, {assistant_type}, {thread_name}")
@@ -580,17 +599,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             # stop listening keyword if no realtime assistants that require keyword detection are selected
             selected_assistants = self.conversation_sidebar.get_selected_assistants()
             if not any(self.has_keyword_detection_model(assistant) for assistant in selected_assistants):
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
     
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)
-
-        if self.is_realtime_assistant(assistant_name):
-            if "keyword" in run_identifier:
-                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
-				# TODO not thread safe
-                if self.is_assistant_selected(assistant_name):
-                    self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
+        self.handle_realtime_run_start(assistant_name, run_identifier)
 
     def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         self.diagnostics_sidebar.function_call_signal.call_signal.emit(
@@ -625,6 +639,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         logger.warning(error_string)
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, error_string)
 
+        self.handle_realtime_run_end(assistant_name, run_identifier)
+
         # failed state is terminal state, so update all messages in conversation view after the run has ended
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         self.update_conversation_messages(conversation)
@@ -648,11 +664,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
 
-        if self.is_realtime_assistant(assistant_name):
-            if "keyword" in run_identifier:
-                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
-                if self.is_assistant_selected(assistant_name):
-                    self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+        self.handle_realtime_run_end(assistant_name, run_identifier)
 
         # copy files from conversation to output folder at the end of the run
         for message in conversation.messages:

@@ -162,6 +162,7 @@ class ClientSettingsDialog(QDialog):
         self.set_key_input_value(self.openai_api_key_input, "OPENAI_API_KEY")
         self.set_key_input_value(self.azure_api_key_input, "AZURE_OPENAI_API_KEY")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        endpoint = AIClientFactory.get_instance()._get_http_endpoint(endpoint)
         self.azure_endpoint_input.setText(endpoint)
 
     def fill_client_model_selection(self, ai_client_type, api_version=None):
