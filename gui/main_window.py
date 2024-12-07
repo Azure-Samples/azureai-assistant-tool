@@ -652,21 +652,21 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
         logger.info(f"Run end for assistant {assistant_name} with run identifier {run_identifier} and thread name {thread_name}")
 
+        self.handle_realtime_run_end(assistant_name, run_identifier)
+
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         last_assistant_message = conversation.get_last_text_message(assistant_name)
         if last_assistant_message is None:
             logger.error(
                 f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'. Aborting run end process."
             )
-            raise ValueError("No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
                              "Please check Diagnostics for more detailed information and troubleshooting steps.")
-
-        self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
-        assistant_config = self.assistant_config_manager.get_config(assistant_name)
-
-        self.handle_realtime_run_end(assistant_name, run_identifier)
+        else:
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
 
         # copy files from conversation to output folder at the end of the run
+        assistant_config = self.assistant_config_manager.get_config(assistant_name)
         for message in conversation.messages:
             if len(message.file_messages) > 0:
                 for file_message in message.file_messages:
