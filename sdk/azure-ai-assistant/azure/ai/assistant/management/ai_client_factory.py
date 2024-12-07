@@ -105,7 +105,7 @@ class AIClientFactory:
     def _get_http_endpoint(self, endpoint: str) -> str:
         http_endpoint = endpoint
 
-        if "wss://" in endpoint:
+        if endpoint is not None and "wss://" in endpoint:
             http_endpoint = endpoint.replace("wss://", "https://").replace("/openai/realtime", "")
 
         logger.info(f"HTTP endpoint: {http_endpoint}")
