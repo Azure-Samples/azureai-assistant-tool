@@ -16,14 +16,14 @@ from realtime_ai.realtime_ai_client import RealtimeAIClient, RealtimeAIOptions, 
 from realtime_ai.models.realtime_ai_events import *
 
 from typing import Optional
-from enum import auto
+from enum import auto, Enum
 import json, uuid, yaml
 from datetime import datetime
 import threading, base64
 import copy
 
 
-class ConversationState():
+class ConversationState(Enum):
     IDLE = auto()
     KEYWORD_DETECTED = auto()
     CONVERSATION_ACTIVE = auto()
@@ -59,7 +59,7 @@ class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
         logger.info("Local VAD: User speech started")
         logger.info(f"on_speech_start: Current state: {self._state}")
 
-        if self._state == ConversationState.KEYWORD_DETECTED:
+        if self._state == ConversationState.KEYWORD_DETECTED or self._state == ConversationState.CONVERSATION_ACTIVE:
             self._set_state(ConversationState.CONVERSATION_ACTIVE)
             self._cancel_silence_timer()
 

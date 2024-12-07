@@ -146,7 +146,6 @@ class AssistantConfigDialog(QDialog):
             # Only add OPEN_AI_REALTIME for Realtime Assistants
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI_REALTIME.name)
             self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI_REALTIME.name)
-            #self.aiClientComboBox.setEnabled(False)  # Optional: Disabling to prevent user change
         else:
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI.name)
             self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI.name)
@@ -312,10 +311,19 @@ class AssistantConfigDialog(QDialog):
         audioTab = QWidget()
         self.audioLayout = QVBoxLayout(audioTab)
 
+        self.voices_dict = {
+            AIClientType.OPEN_AI_REALTIME.name: ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'],
+            AIClientType.AZURE_OPEN_AI_REALTIME.name: [
+                'amuch', 'dan', 'elan', 'marilyn', 'meadow',
+                'breeze', 'cove', 'ember', 'jupiter',
+                'alloy', 'echo', 'shimmer'
+            ]
+        }
+
         # Voice selection
         self.voiceLabel = QLabel('Voice:')
         self.voiceComboBox = QComboBox()
-        self.voiceComboBox.addItems(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'])
+        self.update_voice_combo_box()
         self.audioLayout.addWidget(self.voiceLabel)
         self.audioLayout.addWidget(self.voiceComboBox)
 
@@ -384,6 +392,15 @@ class AssistantConfigDialog(QDialog):
         self.update_vad_settings()
 
         return audioTab
+
+    def update_voice_combo_box(self):
+        current_client_type = self.aiClientComboBox.currentText()
+        voices = self.voices_dict.get(current_client_type, [])
+
+        self.voiceComboBox.blockSignals(True)  # Prevent recursive signals
+        self.voiceComboBox.clear()
+        self.voiceComboBox.addItems(voices)
+        self.voiceComboBox.blockSignals(False)
 
     def select_keyword_file_path(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Keyword Model File", "", "Keyword Model Files (*.table)")
@@ -759,6 +776,7 @@ class AssistantConfigDialog(QDialog):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
         self.update_assistant_combobox()
         self.update_model_combobox()
+        self.update_voice_combo_box()
 
     def update_assistant_combobox(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
