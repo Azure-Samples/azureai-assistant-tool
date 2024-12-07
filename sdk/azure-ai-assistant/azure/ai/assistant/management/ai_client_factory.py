@@ -38,7 +38,6 @@ class AsyncAIClientType(Enum):
     """OpenAI async client used with Realtime API"""
 
 
-
 class AIClientFactory:
     _instance = None
     _clients = {}
