@@ -891,26 +891,30 @@ class RealtimeAssistantClient(BaseAssistantClient):
             raise EngineError(f"Failed to stop audio: {e}")
 
     def generate_response(
-            self, 
-            user_input : str
-    ) -> None:
-        """
-        Generates a realtime assistant response using the user's text input in the specified thread.
-
-        :param user_input: The user's text input.
-        :type user_input: str
-        """
-        try:
-            if not self._realtime_client.is_running:
-                logger.info(f"Starting realtime assistant with name: {self.name}")
-                self._realtime_client.start()
-
-            logger.info(f"Sending text message: {user_input}")
-            self._realtime_client.send_text(user_input)
-
-        except Exception as e:
-            logger.error(f"Error occurred during generating response: {e}")
-            raise EngineError(f"Error occurred during generating response: {e}")
+                self,
+                user_input : str
+        ) -> None:
+            """
+            Generates a realtime assistant response using the user's text input in the specified thread.
+    
+            :param user_input: The user's text input.
+            :type user_input: str
+            """
+            try:
+                if not self._realtime_client.is_running:
+                    logger.info(f"Starting realtime assistant with name: {self.name}")
+                    self._realtime_client.start()
+    
+                if self._event_handler.is_run_active():
+                    self._realtime_client.cancel_response()
+                    self._audio_player.drain_and_restart()
+    
+                logger.info(f"Sending text message: {user_input}")
+                self._realtime_client.send_text(user_input)
+    
+            except Exception as e:
+                logger.error(f"Error occurred during generating response: {e}")
+                raise EngineError(f"Error occurred during generating response: {e}")
 
     def set_active_thread(
             self,
