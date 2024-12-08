@@ -807,10 +807,10 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :rtype: None
         """
         try:
+            self._stop_audio()
             if self._realtime_client.is_running:
                 logger.info(f"Stopping realtime assistant with name: {self.name}")
                 self._realtime_client.stop()
-            self._stop_audio()
             self.callbacks.on_disconnected(assistant_name=self.name, assistant_type=AssistantType.REALTIME_ASSISTANT.value)
         except Exception as e:
             logger.error(f"Failed to stop realtime assistant: {e}")
