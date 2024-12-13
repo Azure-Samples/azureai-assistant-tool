@@ -83,7 +83,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def init_system_assistants(self):
         init_system_assistant(self, "ConversationTitleCreator")
-        init_system_assistant(self, "SpeechTranscriptionSummarizer")
         init_system_assistant(self, "FunctionSpecCreator")
         init_system_assistant(self, "FunctionImplCreator")
         init_system_assistant(self, "TaskRequestsCreator")
