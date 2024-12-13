@@ -74,11 +74,15 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         try:
             self.initialize_variables()
             self.set_active_ai_client_type(AIClientType.AZURE_OPEN_AI)
-            self.init_system_assistant_settings()
-            self.init_system_assistants()
         except Exception as e:
             error_message = f"An error occurred while initializing the application: {e}"
             self.error_signal.error_signal.emit(error_message)
+            logger.error(error_message)
+        try:
+            self.init_system_assistant_settings()
+            self.init_system_assistants()
+        except Exception as e:
+            error_message = f"An error occurred while initializing the system assistants: {e}"
             logger.error(error_message)
 
     def init_system_assistants(self):
@@ -118,24 +122,29 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.system_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
         self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
-        if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
-            self.system_client = AIClientFactory.get_instance().get_client(
-                AIClientType.AZURE_OPEN_AI,
-                api_version=self.system_api_version
-            )
-        elif self.system_client_type == AIClientType.OPEN_AI.name:
-            self.system_client = AIClientFactory.get_instance().get_client(
-                AIClientType.OPEN_AI
-            )
-        elif self.system_client_type == AIClientType.OPEN_AI_REALTIME.name:
-            self.system_client = AIClientFactory.get_instance().get_client(
-                AIClientType.OPEN_AI_REALTIME
-            )
-        elif self.system_client_type == AIClientType.AZURE_OPEN_AI_REALTIME.name:
-            self.system_client = AIClientFactory.get_instance().get_client(
-                AIClientType.AZURE_OPEN_AI_REALTIME,
-                api_version=self.system_api_version
-            )
+
+        try:
+            if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
+                self.system_client = AIClientFactory.get_instance().get_client(
+                    AIClientType.AZURE_OPEN_AI,
+                    api_version=self.system_api_version
+                )
+            elif self.system_client_type == AIClientType.OPEN_AI.name:
+                self.system_client = AIClientFactory.get_instance().get_client(
+                    AIClientType.OPEN_AI
+                )
+            elif self.system_client_type == AIClientType.OPEN_AI_REALTIME.name:
+                self.system_client = AIClientFactory.get_instance().get_client(
+                    AIClientType.OPEN_AI_REALTIME
+                )
+            elif self.system_client_type == AIClientType.AZURE_OPEN_AI_REALTIME.name:
+                self.system_client = AIClientFactory.get_instance().get_client(
+                    AIClientType.AZURE_OPEN_AI_REALTIME,
+                    api_version=self.system_api_version
+                )
+        except Exception as e:
+            logger.error(f"Error initializing system assistant client {self.system_client_type}: {e}")
+            raise ValueError(f"Error initializing system assistant client {self.system_client_type}: {e}")
 
     def initialize_ui(self):
         self.initialize_ui_components()

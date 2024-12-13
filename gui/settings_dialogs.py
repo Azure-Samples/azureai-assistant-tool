@@ -201,7 +201,7 @@ class ClientSettingsDialog(QDialog):
                 self.model_selection.setCurrentText(default_model)
 
         except Exception as e:
-            QMessageBox.warning(self, "Warning", f"Failed to fill model selection: {e}")
+            QMessageBox.warning(self, "Warning", f"System assistant client initialization error: {e}")
 
     def update_model_selection(self):
         # Get the current AI client type
