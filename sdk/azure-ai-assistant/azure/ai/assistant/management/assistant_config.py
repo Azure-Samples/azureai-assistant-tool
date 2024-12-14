@@ -608,18 +608,23 @@ class RealtimeCompletionConfig:
 
     :param temperature: The temperature.
     :type temperature: float
+    :param max_text_messages: The maximum number of text messages.
+    :type max_text_messages: int
     :param max_output_tokens: The maximum number of output tokens. A number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model
     :type max_output_tokens: str
     """
     def __init__(self, 
                  temperature: float, 
-                 max_output_tokens: int,
+                 max_text_messages: int,
+                 max_output_tokens: str,
     ) -> None:
         self._temperature = temperature
+        self._max_text_messages = max_text_messages
         self._max_output_tokens = max_output_tokens
 
     def to_dict(self):
         return {'temperature': self.temperature,
+                'max_text_messages': self.max_text_messages,
                 'max_output_tokens': self.max_output_tokens,
                 }
 
@@ -642,6 +647,26 @@ class RealtimeCompletionConfig:
         :type value: float
         """
         self._temperature = value
+
+    @property
+    def max_text_messages(self) -> int:
+        """
+        Get the maximum number of text messages.
+
+        :return: The maximum number of text messages.
+        :rtype: int
+        """
+        return self._max_text_messages
+    
+    @max_text_messages.setter
+    def max_text_messages(self, value) -> None:
+        """
+        Set the maximum number of text messages.
+
+        :param value: The maximum number of text messages.
+        :type value: int
+        """
+        self._max_text_messages = value
 
     @property
     def max_output_tokens(self) -> str:

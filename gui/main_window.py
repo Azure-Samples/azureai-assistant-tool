@@ -599,6 +599,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         logger.info(f"Assistant connected: {assistant_name}, {assistant_type}, {thread_name}")
         if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             if self.has_keyword_detection_model(assistant_name) and self.is_assistant_selected(assistant_name):
+                logger.info(f"Assistant connected: {assistant_name}, {assistant_type}, {thread_name}, start listening keyword")
+                self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
 
     def on_disconnected(self, assistant_name, assistant_type):
@@ -607,6 +609,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             # stop listening keyword if no realtime assistants that require keyword detection are selected
             selected_assistants = self.conversation_sidebar.get_selected_assistants()
             if not any(self.has_keyword_detection_model(assistant) for assistant in selected_assistants):
+                logger.info(f"Assistant disconnected: {assistant_name}, {assistant_type}, stop listening speech and keyword")
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
     

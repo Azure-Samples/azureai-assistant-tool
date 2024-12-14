@@ -174,10 +174,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             self._realtime_client.send_text("Hello")
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="keyword input")
         else:
-            self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+            if self._keyword_run_identifier:
+                self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
+            self._keyword_run_identifier = None
             if self._audio_capture:
                 self._audio_capture.start_keyword_recognition()
-            self._keyword_run_identifier = None
 
     def on_input_audio_buffer_speech_stopped(self, event: InputAudioBufferSpeechStopped):
         logger.info(f"Server VAD: Speech stopped at {event.audio_end_ms}ms, Item ID: {event.item_id}")
@@ -884,6 +885,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
         try:
             if self._audio_capture:
                 self._audio_capture.stop()
+                self._audio_capture_event_handler._set_state(ConversationState.IDLE)
             if self._audio_player:
                 self._audio_player.stop()
         except Exception as e:

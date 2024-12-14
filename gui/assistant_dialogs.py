@@ -690,7 +690,8 @@ class AssistantConfigDialog(QDialog):
         self.init_max_messages_edit(completionLayout)
 
     def init_realtime_assistant_completion_settings(self, completionLayout):
-        self.init_temperature_slider(completionLayout)
+        # For realtime assistant Sampling temperature for the model, limited to [0.6, 1.2]. Defaults to 0.8.
+        self.init_temperature_slider(completionLayout, min_value=60, max_value=120, default_value=80)
         self.init_max_messages_edit(completionLayout)
 
         self.maxResponseOutputTokensLayout = QHBoxLayout()
@@ -703,14 +704,14 @@ class AssistantConfigDialog(QDialog):
         self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensEdit)
         completionLayout.addLayout(self.maxResponseOutputTokensLayout)
 
-    def init_temperature_slider(self, completionLayout):
+    def init_temperature_slider(self, completionLayout, min_value=0, max_value=200, default_value=100):
         self.temperatureLabel = QLabel('Temperature:')
         self.temperatureSlider = QSlider(Qt.Horizontal)
         self.temperatureSlider.setToolTip("Controls the randomness of the generated text. Lower values make the text more deterministic, while higher values make it more random.")
-        self.temperatureSlider.setMinimum(0)
-        self.temperatureSlider.setMaximum(200)
-        self.temperatureSlider.setValue(100)
-        self.temperatureValueLabel = QLabel('1.0')
+        self.temperatureSlider.setMinimum(min_value)
+        self.temperatureSlider.setMaximum(max_value)
+        self.temperatureSlider.setValue(default_value)
+        self.temperatureValueLabel = QLabel(f"{default_value / 100:.1f}")
         self.temperatureSlider.valueChanged.connect(lambda: self.temperatureValueLabel.setText(f"{self.temperatureSlider.value() / 100:.1f}"))
         completionLayout.addWidget(self.temperatureLabel)
         completionLayout.addWidget(self.temperatureSlider)
