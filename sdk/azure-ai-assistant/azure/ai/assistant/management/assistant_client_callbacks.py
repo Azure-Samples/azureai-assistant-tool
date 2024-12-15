@@ -147,3 +147,18 @@ class AssistantClientCallbacks:
         :rtype: None
         """
         pass
+
+    def on_run_audio_data(self, assistant_name, run_identifier, audio_data: bytes):
+        """Callback for when audio data is received.
+        
+        :param assistant_name: The name of the assistant.
+        :type assistant_name: str
+        :param run_identifier: The identifier for the run.
+        :type run_identifier: str
+        :param audio_data: The audio data.
+        :type audio_data: bytes
+
+        :return: None
+        :rtype: None
+        """
+        pass

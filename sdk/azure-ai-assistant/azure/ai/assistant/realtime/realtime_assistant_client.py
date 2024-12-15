@@ -10,128 +10,23 @@ from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.text_message import TextMessage
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-from azure.ai.assistant.realtime.audio_capture import AudioCapture, AudioCaptureEventHandler
-from azure.ai.assistant.realtime.audio_playback import AudioPlayer
 from realtime_ai.realtime_ai_client import RealtimeAIClient, RealtimeAIOptions, RealtimeAIEventHandler, AudioStreamOptions
 from realtime_ai.models.realtime_ai_events import *
 
 from typing import Optional
-from enum import auto, Enum
 import json, uuid, yaml
 from datetime import datetime
 import threading, base64
 import copy
 
 
-class ConversationState(Enum):
-    IDLE = auto()
-    KEYWORD_DETECTED = auto()
-    CONVERSATION_ACTIVE = auto()
+class RealtimeAssistantEventHandler(RealtimeAIEventHandler):
 
-
-class MyAudioCaptureEventHandler(AudioCaptureEventHandler):
-    def __init__(self, client: "RealtimeAssistantClient"):
-        """
-        Initializes the event handler.
-        
-        :param client: Instance of RealtimeAssistantClient.
-        :type client: RealtimeAssistantClient
-        """
-        self._client = client
-        self._event_handler = client._event_handler
-        self._state = ConversationState.IDLE
-        self._silence_timer = None
-
-    def send_audio_data(self, audio_data: bytes):
-        """
-        Sends audio data to the RealtimeClient.
-
-        :param audio_data: Raw audio data in bytes.
-        """
-        if self._state == ConversationState.CONVERSATION_ACTIVE:
-            logger.debug("Sending audio data to the client.")
-            self._client._realtime_client.send_audio(audio_data)
-
-    def on_speech_start(self):
-        """
-        Handles actions to perform when speech starts.
-        """
-        logger.info("Local VAD: User speech started")
-        logger.info(f"on_speech_start: Current state: {self._state}")
-
-        if self._state == ConversationState.KEYWORD_DETECTED or self._state == ConversationState.CONVERSATION_ACTIVE:
-            self._set_state(ConversationState.CONVERSATION_ACTIVE)
-            self._cancel_silence_timer()
-
-        if (self._client._realtime_client.options.turn_detection is None and
-            self._event_handler.is_audio_playing() and
-            self._state == ConversationState.CONVERSATION_ACTIVE):
-            logger.info("User started speaking while assistant is responding; interrupting the assistant's response.")
-            self._client._realtime_client.clear_input_audio_buffer()
-            self._client._realtime_client.cancel_response()
-            self._event_handler.audio_player.drain_and_restart()
-
-    def on_speech_end(self):
-        """
-        Handles actions to perform when speech ends.
-        """
-        logger.info("Local VAD: User speech ended")
-        logger.info(f"on_speech_end: Current state: {self._state}")
-
-        if self._state == ConversationState.CONVERSATION_ACTIVE and self._client._realtime_client.options.turn_detection is None:
-            logger.debug("Using local VAD; requesting the client to generate a response after speech ends.")
-            self._client._realtime_client.generate_response()
-            logger.debug("Conversation is active. Starting silence timer.")
-            self._start_silence_timer()
-
-    def on_keyword_detected(self, result):
-        """
-        Called when a keyword is detected.
-
-        :param result: The recognition result containing details about the detected keyword.
-        """
-        logger.info(f"Local Keyword: User keyword detected: {result}")
-        self._event_handler.on_keyword_armed(False)
-        self._set_state(ConversationState.KEYWORD_DETECTED)
-        self._start_silence_timer()
-
-    def _start_silence_timer(self):
-        self._cancel_silence_timer()
-        self._silence_timer = threading.Timer(self._client.assistant_config.realtime_config.keyword_rearm_silence_timeout, self._reset_state_due_to_silence)
-        self._silence_timer.start()
-
-    def _cancel_silence_timer(self):
-        if self._silence_timer:
-            self._silence_timer.cancel()
-            self._silence_timer = None
-
-    def _reset_state_due_to_silence(self):
-        if self._event_handler.is_audio_playing() or self._event_handler.is_function_processing():
-            logger.info("Assistant is responding or processing a function. Waiting to reset keyword detection.")
-            self._start_silence_timer()
-            return
-
-        logger.info("Silence timeout reached. Rearming keyword detection.")
-        self._event_handler.on_keyword_armed(True)
-        logger.debug("Clearing input audio buffer.")
-        self._client._realtime_client.clear_input_audio_buffer()
-        self._set_state(ConversationState.IDLE)
-
-    def _set_state(self, new_state: ConversationState):
-        logger.debug(f"Transitioning from {self._state} to {new_state}")
-        self._state = new_state
-        if new_state != ConversationState.CONVERSATION_ACTIVE:
-            self._cancel_silence_timer()
-
-
-class MyRealtimeEventHandler(RealtimeAIEventHandler):
-    def __init__(self, audio_player: AudioPlayer, ai_client: "RealtimeAssistantClient"):
+    def __init__(self, ai_client: "RealtimeAssistantClient"):
         super().__init__()
-        self._audio_player = audio_player
         self._call_id_to_function_name = {}
         self._lock = threading.Lock()
         self._realtime_client = None
-        self._audio_capture = None
         self._function_processing = False
         self._ai_client = ai_client
         self._is_first_message = True
@@ -139,22 +34,12 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         self._thread_name = None
         self._keyword_run_identifier = None
         self._text_run_identifier = None
-
-    @property
-    def audio_player(self):
-        return self._audio_player
   
-    def is_audio_playing(self):
-        return self._audio_player.is_audio_playing()
-
     def is_function_processing(self):
         return self._function_processing
 
     def set_realtime_client(self, client: RealtimeAIClient):
         self._realtime_client = client
-
-    def set_capture_client(self, client: AudioCapture):
-        self._audio_capture = client
 
     def set_thread_name(self, thread_name: str):
         self._thread_name = thread_name
@@ -168,8 +53,6 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
     def on_keyword_armed(self, armed: bool):
         logger.info(f"Keyword detection armed: {armed}")
         if armed is False:
-            if self._audio_capture:
-                self._audio_capture.stop_keyword_recognition()
             self._keyword_run_identifier = self._create_identifier("keyword")
             self._realtime_client.send_text("Hello")
             self._ai_client.callbacks.on_run_start(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_start_time=str(datetime.now()), user_input="keyword input")
@@ -177,11 +60,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
             if self._keyword_run_identifier:
                 self._ai_client.callbacks.on_run_end(assistant_name=self._ai_client.name, run_identifier=self._keyword_run_identifier, run_end_time=str(datetime.now()), thread_name=self._thread_name)
             self._keyword_run_identifier = None
-            if self._audio_capture:
-                self._audio_capture.start_keyword_recognition()
 
     def on_input_audio_buffer_speech_stopped(self, event: InputAudioBufferSpeechStopped):
         logger.info(f"Server VAD: Speech stopped at {event.audio_end_ms}ms, Item ID: {event.item_id}")
+        # If server VAD is enabled, notify the end of speech via callback
+        #self._ai_client.callbacks._on_speech_end_detected()
 
     def on_input_audio_buffer_committed(self, event: InputAudioBufferCommitted):
         logger.debug(f"Audio Buffer Committed: {event.item_id}")
@@ -362,7 +245,8 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if self._realtime_client.options.turn_detection is not None:
             self._realtime_client.clear_input_audio_buffer()
             self._realtime_client.cancel_response()
-            self._audio_player.drain_and_restart()
+            # If server VAD is enabled, interrupt the audio playback via callback via notification
+            #self._ai_client.callbacks._on_speech_start_detected()
 
     def on_response_output_item_added(self, event: ResponseOutputItemAdded):
         logger.debug(f"Output item added for response ID {event.response_id} with item: {event.item}")
@@ -416,7 +300,11 @@ class MyRealtimeEventHandler(RealtimeAIEventHandler):
         if delta_audio:
             try:
                 audio_bytes = base64.b64decode(delta_audio)
-                self._audio_player.enqueue_audio_data(audio_bytes)
+                self._ai_client.callbacks.on_run_audio_data(
+                    assistant_name=self._ai_client.name, 
+                    run_identifier=self._text_run_identifier if not self._keyword_run_identifier else self._keyword_run_identifier, 
+                    audio_data=audio_bytes
+                )
             except base64.binascii.Error as e:
                 logger.error(f"Failed to decode audio delta: {e}")
         else:
@@ -612,9 +500,9 @@ class RealtimeAssistantClient(BaseAssistantClient):
 
             if is_create or not client_exists:
                 assistant_config.assistant_id = str(uuid.uuid4())
-                self._create_realtime_client(assistant_config, realtime_options=realtime_options, timeout=timeout)
+                self._create_realtime_client(realtime_options=realtime_options, timeout=timeout)
             else:
-                self._update_realtime_client(assistant_config, realtime_options=realtime_options, timeout=timeout)
+                self._update_realtime_client(realtime_options=realtime_options, timeout=timeout)
 
             # Update the local configuration using AssistantConfigManager
             # TODO make optional to save the assistant_config in the config manager
@@ -652,23 +540,19 @@ class RealtimeAssistantClient(BaseAssistantClient):
     
     def _create_realtime_client(
             self,
-            assistant_config: AssistantConfig,
             realtime_options: RealtimeAIOptions,
             timeout: Optional[float] = None
     ) -> None:
         """
         Creates a realtime assistant client.
 
-        :param assistant_config: The assistant configuration.
-        :type assistant_config: AssistantConfig
         :param realtime_options: The realtime AI options.
         :type realtime_options: RealtimeAIOptions
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
         """
         try:
-            self._audio_player = AudioPlayer()
-            self._event_handler = MyRealtimeEventHandler(audio_player=self._audio_player, ai_client=self)
+            self._event_handler = RealtimeAssistantEventHandler(ai_client=self)
             audio_stream_options = AudioStreamOptions(
                 sample_rate=24000,
                 channels=1,
@@ -677,80 +561,24 @@ class RealtimeAssistantClient(BaseAssistantClient):
             self._realtime_client = RealtimeAIClient(options=realtime_options, stream_options=audio_stream_options, event_handler=self._event_handler)
             self._event_handler.set_realtime_client(self._realtime_client)
 
-            self._audio_capture = None
-            self._audio_capture_event_handler = MyAudioCaptureEventHandler(client=self)
-
-            if assistant_config.realtime_config.keyword_detection_model:
-                self._audio_capture = AudioCapture(
-                    event_handler=self._audio_capture_event_handler, 
-                    sample_rate=24000,
-                    channels=1,
-                    frames_per_buffer=1024,
-                    buffer_duration_sec=1.0,
-                    cross_fade_duration_ms=20,
-                    vad_parameters={
-                        "sample_rate": 24000,
-                        "chunk_size": 1024,
-                        "window_duration": 1.5,
-                        "silence_ratio": 1.5,
-                        "min_speech_duration": 0.3,
-                        "min_silence_duration": 1.0
-                    },
-                    enable_wave_capture=False,
-                    keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
-
-                self._event_handler.set_capture_client(self._audio_capture)
-
         except Exception as e:
             logger.error(f"Failed to create realtime client: {e}")
             raise EngineError(f"Failed to create realtime client: {e}")
 
     def _update_realtime_client(
             self,
-            assistant_config: AssistantConfig,
             realtime_options: RealtimeAIOptions,
             timeout: Optional[float] = None
     ) -> None:
         """
         Updates the realtime assistant client. Currently, only the audio capture and realtime options are updated.
 
-        :param assistant_config: The assistant configuration.
-        :type assistant_config: AssistantConfig
         :param realtime_options: The realtime AI options.
         :type realtime_options: RealtimeAIOptions
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
         """
         try:
-            # Update the audio capture by closing the existing instance and creating a new one
-            if self._audio_capture:
-                self._audio_capture.close()
-                self._audio_capture = None
-
-            if assistant_config.realtime_config.keyword_detection_model:
-                self._audio_capture = AudioCapture(
-                    event_handler=self._audio_capture_event_handler, 
-                    sample_rate=24000,
-                    channels=1,
-                    frames_per_buffer=1024,
-                    buffer_duration_sec=1.0,
-                    cross_fade_duration_ms=20,
-                    vad_parameters={
-                        "sample_rate": 24000,
-                        "chunk_size": 1024,
-                        "window_duration": 1.5,
-                        "silence_ratio": 1.5,
-                        "min_speech_duration": 0.3,
-                        "min_silence_duration": 1.0
-                    },
-                    enable_wave_capture=False,
-                    keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
-
-                if self._event_handler:
-                    self._event_handler.set_capture_client(self._audio_capture)
-                else:
-                    raise EngineError("Event handler is not set and cannot be updated.")
-            
             if self._realtime_client:
                 if self._realtime_client.is_running:
                     # Restart the realtime client to apply the new options
@@ -787,8 +615,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
             if not self._realtime_client.is_running:
                 logger.info(f"Starting realtime assistant with name: {self.name}")
                 self._realtime_client.start()
-
-            self._start_audio()
             self.callbacks.on_connected(assistant_name=self.name, assistant_type=AssistantType.REALTIME_ASSISTANT.value, thread_name=thread_name)
         except Exception as e:
             logger.error(f"Failed to start realtime assistant: {e}")
@@ -808,7 +634,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
         :rtype: None
         """
         try:
-            self._stop_audio()
             if self._realtime_client.is_running:
                 logger.info(f"Stopping realtime assistant with name: {self.name}")
                 self._realtime_client.stop()
@@ -851,46 +676,9 @@ class RealtimeAssistantClient(BaseAssistantClient):
         """
         try:
             self._realtime_client.stop()
-            if self._audio_capture:
-                self._audio_capture.close()
-            if self._audio_player:
-                self._audio_player.close()
         except Exception as e:
             logger.error(f"Failed to disconnect realtime assistant: {e}")
             raise EngineError(f"Failed to disconnect realtime assistant: {e}")
-
-    def _start_audio(self) -> None:
-        """
-        Starts the audio capture and playback.
-
-        :return: None
-        :rtype: None
-        """
-        try:
-            if self._audio_player:
-                self._audio_player.start()
-            if self._audio_capture:
-                self._audio_capture.start()
-        except Exception as e:
-            logger.error(f"Failed to start audio: {e}")
-            raise EngineError(f"Failed to start audio: {e}")
-
-    def _stop_audio(self) -> None:
-        """
-        Stops the audio capture and playback.
-
-        :return: None
-        :rtype: None
-        """
-        try:
-            if self._audio_capture:
-                self._audio_capture.stop()
-                self._audio_capture_event_handler._set_state(ConversationState.IDLE)
-            if self._audio_player:
-                self._audio_player.stop()
-        except Exception as e:
-            logger.error(f"Failed to stop audio: {e}")
-            raise EngineError(f"Failed to stop audio: {e}")
 
     def generate_response(
                 self,
@@ -994,3 +782,13 @@ class RealtimeAssistantClient(BaseAssistantClient):
         except Exception as e:
             logger.error(f"Failed to send conversation history: {e}")
             raise EngineError(f"Failed to send conversation history: {e}")
+        
+    @property
+    def event_handler(self) -> RealtimeAssistantEventHandler:
+        """
+        Get the event handler for the realtime assistant client.
+
+        :return: The event handler for the realtime assistant client.
+        :rtype: RealtimeAssistantEventHandler
+        """
+        return self._event_handler

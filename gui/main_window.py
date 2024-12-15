@@ -257,6 +257,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             for assistant_client in assistant_clients:
                 if self.is_realtime_assistant(assistant_client.name):
                     assistant_client.disconnect()
+                    realtime_audio = self.assistant_client_manager.get_audio(assistant_client.name)
+                    if realtime_audio:
+                        realtime_audio.stop()
 
             # Stop showing listening keyword and speech animations when switching from OPEN_AI_REALTIME
             self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
@@ -338,9 +341,14 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         for assistant_name in selected_assistants:
             assistant_client = self.assistant_client_manager.get_client(assistant_name)
             if assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value and assistant_client.is_active_run():
+                realtime_audio = self.assistant_client_manager.get_audio(assistant_name)
                 # cancel the run for selected realtime assistant by stopping the assistant and starting it again
                 assistant_client.stop()
+                if realtime_audio:
+                    realtime_audio.stop()
                 assistant_client.start(self.conversation_sidebar.threadList.get_current_text())
+                if realtime_audio:
+                    realtime_audio.start()
 
         # enable assistant list if it is disabled
         self.conversation_sidebar.assistantList.setDisabled(False)
@@ -410,6 +418,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def handle_assistant_checkbox_toggled(self, assistant_name, is_checked):
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
+        realtime_audio = self.assistant_client_manager.get_audio(assistant_name)
         if is_checked:
             if self.is_realtime_assistant(assistant_name):
                 threads_client = self.conversation_thread_clients[self.active_ai_client_type]
@@ -424,9 +433,13 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                         thread_name = self.conversation_sidebar.threadList.get_last_thread_name()
                 self.conversation_sidebar.select_conversation_thread_by_name(thread_name)
                 assistant_client.start(thread_name=thread_name)
+                if realtime_audio:
+                    realtime_audio.start()
         else:
             if self.is_realtime_assistant(assistant_name):
                 assistant_client.stop()
+                if realtime_audio:
+                    realtime_audio.stop()
 
     def setup_conversation_thread(self, is_scheduled_task=False):
         threads_client = self.conversation_thread_clients[self.active_ai_client_type]
@@ -597,7 +610,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                     self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
             self.stop_animation_signal.stop_signal.emit(ActivityStatus.PROCESSING_USER_INPUT)
 
-    # Callbacks for AssistantManagerCallbacks
+    # Callbacks for AssistantClientCallbacks
     def on_connected(self, assistant_name, assistant_type, thread_name):
         logger.info(f"Assistant connected: {assistant_name}, {assistant_type}, {thread_name}")
         if assistant_type == AssistantType.REALTIME_ASSISTANT.value:
@@ -688,6 +701,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                     file_path = file_message.retrieve_file(assistant_config.output_folder_path)
                     logger.debug(f"File downloaded to {file_path} on run end")
 
+    def on_run_audio_data(self, assistant_name, run_identifier, audio_data):
+        if self.is_realtime_assistant(assistant_name):
+            realtime_audio = self.assistant_client_manager.get_audio(assistant_name)
+            if realtime_audio:
+                realtime_audio.audio_player.enqueue_audio_data(audio_data)
+    
     # Callbacks for TaskManagerCallbacks
     def on_task_started(self, task: Task, schedule_id):
         with self.thread_lock:  # Ensure thread-safe access
@@ -769,6 +788,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             for assistant_client in assistant_clients:
                 if self.is_realtime_assistant(assistant_client.name):
                     assistant_client.disconnect()
+                    realtime_audio = self.assistant_client_manager.get_audio(assistant_client.name)
+                    if realtime_audio:
+                        realtime_audio.stop()
 
             self.executor.shutdown(wait=True)
             logger.info("Application closed successfully")

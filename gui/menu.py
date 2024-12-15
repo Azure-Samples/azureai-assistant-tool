@@ -21,6 +21,7 @@ from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog
 from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
+from gui.realtime_audio import RealtimeAudio
 
 
 class AssistantsMenu:
@@ -89,6 +90,7 @@ class AssistantsMenu:
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
+            realtime_audio = None
             if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
 
@@ -97,11 +99,14 @@ class AssistantsMenu:
 
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
-                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT:
+                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
+                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                     assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
+                    realtime_audio.update(assistant_client.assistant_config)
                 else:
                     assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+                    realtime_audio = RealtimeAudio(assistant_client)
+            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
             self.dialog.update_assistant_combobox()

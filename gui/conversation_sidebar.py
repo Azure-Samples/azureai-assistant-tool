@@ -21,6 +21,7 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
 from gui.assistant_dialogs import AssistantConfigDialog
+from gui.realtime_audio import RealtimeAudio
 from gui.utils import resource_path
 
 
@@ -353,17 +354,23 @@ class ConversationSidebar(QWidget):
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
+            realtime_audio = None
             if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+
+            elif assistant_type == AssistantType.ASSISTANT.value:
+                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
+                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
                 if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                     assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
+                    realtime_audio.update(assistant_client.assistant_config)
                 else:
                     assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            else:
-                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+                    realtime_audio = RealtimeAudio(assistant_client)
+            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
             self.dialog.update_assistant_combobox()
@@ -449,7 +456,7 @@ class ConversationSidebar(QWidget):
                 if not self.assistant_client_manager.get_client(name):
                     assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
                     assistant_config.config_folder = "config"
-
+                    realtime_audio = None
                     if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
 
@@ -458,8 +465,9 @@ class ConversationSidebar(QWidget):
 
                     elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                         assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                        realtime_audio = RealtimeAudio(assistant_client)
 
-                    self.assistant_client_manager.register_client(name, assistant_client)
+                    self.assistant_client_manager.register_client(name=name, assistant_client=assistant_client, realtime_audio=realtime_audio)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")
         finally:
