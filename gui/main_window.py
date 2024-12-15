@@ -261,6 +261,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             # Stop showing listening keyword and speech animations when switching from OPEN_AI_REALTIME
             self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
             self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.PROCESSING_USER_INPUT)
 
         # Save the conversation threads for the current active assistant
         if self.conversation_thread_clients[self.active_ai_client_type] is not None:
@@ -270,6 +271,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.assistant_config_manager.save_configs()
 
         self.conversation_view.conversationView.clear()
+        self.conversation_sidebar.assistantList.setDisabled(False)
 
         self.active_ai_client_type = new_client_type
         if self.assistants_menu is not None:
@@ -468,6 +470,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def process_realtime_text_input(self, user_input, assistants, thread_name):
         try:
+            self.start_animation_signal.start_signal.emit(ActivityStatus.PROCESSING_USER_INPUT)
             thread_client = self.conversation_thread_clients[self.active_ai_client_type]
             self.create_thread_message(thread_client, user_input, thread_name)
 
@@ -582,7 +585,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.conversation_sidebar.assistantList.setDisabled(True)
             if "keyword" in run_identifier:
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
-				# TODO not thread safe
                 if self.is_assistant_selected(assistant_name):
                     self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_SPEECH)
 
@@ -593,6 +595,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 if self.is_assistant_selected(assistant_name):
                     self.start_animation_signal.start_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.PROCESSING_USER_INPUT)
 
     # Callbacks for AssistantManagerCallbacks
     def on_connected(self, assistant_name, assistant_type, thread_name):
@@ -612,6 +615,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 logger.info(f"Assistant disconnected: {assistant_name}, {assistant_type}, stop listening speech and keyword")
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_SPEECH)
                 self.stop_animation_signal.stop_signal.emit(ActivityStatus.LISTENING_KEYWORD)
+            self.stop_animation_signal.stop_signal.emit(ActivityStatus.PROCESSING_USER_INPUT)
     
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         self.diagnostics_sidebar.start_run_signal.start_signal.emit(assistant_name, run_identifier, run_start_time, user_input)

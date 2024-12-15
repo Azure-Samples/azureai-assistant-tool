@@ -602,7 +602,7 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 tools=tools,
                 tool_choice="auto",
                 temperature=0.8 if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
-                max_output_tokens=None if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens,
+                max_output_tokens="inf" if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens,
                 azure_openai_api_version=azure_openai_api_version,
                 azure_openai_endpoint=azure_openai_endpoint
             )

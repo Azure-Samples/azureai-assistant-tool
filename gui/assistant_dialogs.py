@@ -1217,10 +1217,27 @@ class AssistantConfigDialog(QDialog):
 
         elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
+                # validate max_output_tokens
+                max_output_tokens_input = self.maxResponseOutputTokensEdit.text().strip()
+                if max_output_tokens_input.lower() != "inf":
+                    try:
+                        max_output_tokens = int(max_output_tokens_input)
+                        if not (1 <= max_output_tokens <= 4096):
+                            raise ValueError
+                    except ValueError:
+                        QMessageBox.information(
+                            self,
+                            "Invalid Input",
+                            "max_output_tokens must be an integer between 1 and 4096 or 'inf'."
+                        )
+                        return
+                else:
+                    max_output_tokens = "inf"
+
                 completion_settings = {
                     'temperature': self.temperatureSlider.value() / 100,
                     'max_text_messages': self.maxMessagesEdit.value(),
-                    'max_output_tokens': self.maxResponseOutputTokensEdit.text()
+                    'max_output_tokens': max_output_tokens
                 }
 
         config = {
