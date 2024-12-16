@@ -10,6 +10,7 @@ from PySide6.QtGui import QFont, QIcon, QAction
 
 import os, time
 
+from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
@@ -21,7 +22,6 @@ from azure.ai.assistant.management.conversation_thread_client import Conversatio
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
 from gui.assistant_dialogs import AssistantConfigDialog
-from gui.realtime_audio import RealtimeAudio
 from gui.utils import resource_path
 
 

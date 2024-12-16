@@ -2,7 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from typing import Dict, Optional
-from gui.realtime_audio import RealtimeAudio
+from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 
 
 class AssistantClientManager:

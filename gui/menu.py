@@ -7,6 +7,7 @@
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 
+from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
@@ -21,7 +22,6 @@ from gui.task_dialogs import CreateTaskDialog, ScheduleTaskDialog
 from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
-from gui.realtime_audio import RealtimeAudio
 
 
 class AssistantsMenu:

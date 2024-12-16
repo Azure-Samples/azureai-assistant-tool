@@ -6,9 +6,9 @@ from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.exceptions import EngineError
 
-from gui.audio_capture import AudioCaptureEventHandler
-from gui.audio_capture import AudioCapture
-from gui.audio_playback import AudioPlayer
+from azure.ai.assistant.audio.audio_capture import AudioCaptureEventHandler
+from azure.ai.assistant.audio.audio_capture import AudioCapture
+from azure.ai.assistant.audio.audio_playback import AudioPlayer
 
 from enum import auto, Enum
 import threading
