@@ -1,4 +1,7 @@
-from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
+
+from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.exceptions import EngineError

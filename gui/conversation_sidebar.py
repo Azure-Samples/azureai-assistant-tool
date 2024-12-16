@@ -16,7 +16,7 @@ from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
-from azure.ai.assistant.realtime.realtime_assistant_client import RealtimeAssistantClient
+from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
