@@ -697,7 +697,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
     
                 if self._event_handler.is_run_active():
                     self._realtime_client.cancel_response()
-                    self._audio_player.drain_and_restart()
     
                 logger.info(f"Sending text message: {user_input}")
                 self._realtime_client.send_text(user_input)
