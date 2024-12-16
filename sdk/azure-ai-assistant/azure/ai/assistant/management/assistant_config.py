@@ -611,12 +611,12 @@ class RealtimeCompletionConfig:
     :param max_text_messages: The maximum number of text messages.
     :type max_text_messages: int
     :param max_output_tokens: The maximum number of output tokens. A number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model
-    :type max_output_tokens: str
+    :type max_output_tokens: Union[int, str]
     """
     def __init__(self, 
                  temperature: float, 
                  max_text_messages: int,
-                 max_output_tokens: str,
+                 max_output_tokens: Union[int, str] = "inf"
     ) -> None:
         self._temperature = temperature
         self._max_text_messages = max_text_messages
@@ -669,12 +669,13 @@ class RealtimeCompletionConfig:
         self._max_text_messages = value
 
     @property
-    def max_output_tokens(self) -> str:
+    def max_output_tokens(self) -> Union[int, str]:
         """
-        Get the maximum number of output tokens.
+        Get the maximum number of output tokens, which can be a number between 1 and 4096 to limit output tokens, 
+        or 'inf' for the maximum available tokens for a given model.
 
         :return: The maximum number of output tokens.
-        :rtype: str
+        :rtype: Union[int, str]
         """
         return self._max_output_tokens
     

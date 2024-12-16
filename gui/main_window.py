@@ -489,6 +489,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             for assistant_name in assistants:
                 assistant_client = self.assistant_client_manager.get_client(assistant_name)
+                realtime_audio = self.assistant_client_manager.get_audio(assistant_name)
+                if realtime_audio:
+                    realtime_audio.audio_player.drain_and_restart()
                 if assistant_client is not None:
                     assistant_client.generate_response(user_input)
 

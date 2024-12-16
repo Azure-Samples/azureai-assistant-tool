@@ -98,7 +98,7 @@ class RealtimeAudioCaptureEventHandler(AudioCaptureEventHandler):
             self._silence_timer = None
 
     def _reset_state_due_to_silence(self):
-        if self._audio_player.is_audio_playing() or self._client.is_function_processing():
+        if self._audio_player.is_audio_playing() or self._client.event_handler.is_function_processing():
             logger.info("Assistant is responding or processing a function. Waiting to reset keyword detection.")
             self._start_silence_timer()
             return
