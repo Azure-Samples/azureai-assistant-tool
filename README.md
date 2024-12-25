@@ -17,7 +17,7 @@
 - 🆕 Latest News
 - 🧱 What is Assistants from Azure OpenAI Service?
 - 🚀 How does this Tool help?
-- 🔊🎤 OpenAI Realtime Support
+- 🔊🎤 OpenAI Realtime Support (Experimental)
 - ✨ Quick Start: Getting Started with the Tool
 - 📖 License
 - Contributing
@@ -61,7 +61,7 @@ has been removed from the tool, however that library is still used with OpenAI R
 - **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
 
 
-## 🔊🎤 OpenAI Realtime Support
+## 🔊🎤 OpenAI Realtime Support (Experimental)
 
 This support enables agents prototyping using OpenAI's Realtime APIs with speech and text input/output via real-time WebSocket communication.
 

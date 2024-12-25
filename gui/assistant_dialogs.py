@@ -585,7 +585,7 @@ class AssistantConfigDialog(QDialog):
         completionLayout = QVBoxLayout(completionTab)
 
         # Use Default Settings Checkbox
-        self.useDefaultSettingsCheckBox = QCheckBox("Use Default Settings (when checked, the following settings will be ignored)")
+        self.useDefaultSettingsCheckBox = QCheckBox("Use Default Settings (Note: The o1 models may not support custom settings)")
         self.useDefaultSettingsCheckBox.setChecked(True)
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
