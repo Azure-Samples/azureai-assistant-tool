@@ -18,16 +18,15 @@ class RealtimeAssistantEventHandler(AssistantClientCallbacks):
         self._realtime_audio = realtime_audio
 
     def on_connected(self, assistant_name, assistant_type, thread_name):
-        print(f"Assistant {assistant_name} connected to thread {thread_name}.")
+        pass
 
     def on_disconnected(self, assistant_name, assistant_type):
-        print(f"Assistant {assistant_name} disconnected.")
+        pass
 
     def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
-        print(f"Run {run_identifier} started at {run_start_time} with input: {user_input}")
+        pass
 
     def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : ConversationMessage = None):
-        print(f"Run {run_identifier} updated with status: {run_status}")
         if run_status == "streaming":
             if is_first_message:
                 print(f"{assistant_name}: {message.text_message.content}", end="")
@@ -35,14 +34,12 @@ class RealtimeAssistantEventHandler(AssistantClientCallbacks):
                 print(message.text_message.content, end="", flush=True)
 
     def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
-        print(f"Run {run_identifier} ended at {run_end_time} with response: {response}")
         self._response_event.set()
 
     def on_run_failed(self, assistant_name, run_identifier, run_end_time, error_code, error_message, thread_name):
         print(f"Run {run_identifier} failed at {run_end_time} with error: {error_code} - {error_message}")
     
     def on_run_audio_data(self, assistant_name, run_identifier, audio_data):
-        print(f"Run {run_identifier} received audio data.")
         self._realtime_audio.audio_player.enqueue_audio_data(audio_data)
 
 
@@ -64,12 +61,14 @@ assistant_client : RealtimeAssistantClient = RealtimeAssistantClient.from_yaml(c
 # create a new conversation thread client
 conversation_thread_client = ConversationThreadClient.get_instance(ai_client_type=assistant_client.ai_client_type)
 thread_name = conversation_thread_client.create_conversation_thread()
-assistant_client.set_active_thread(thread_name)
 
 # create realtime audio instance
 realtime_audio = RealtimeAudio(realtime_client=assistant_client)
 realtime_event_handler.set_realtime_audio(realtime_audio)
+
+# start realtime audio and assistant client
 realtime_audio.start()
+assistant_client.start(thread_name=thread_name)
 
 while True:
     # Accept user input
@@ -78,9 +77,6 @@ while True:
         print("Exiting chat.")
         break
 
-    # Add the user message to the conversation thread
-    conversation_thread_client.create_conversation_thread_message(message=user_message, thread_name=thread_name)
-
     # Process the user messages
     assistant_client.generate_response(user_input=user_message)
 
@@ -88,15 +84,9 @@ while True:
     response_event.wait()
     response_event.clear()
 
-    # Retrieve the conversation
-    conversation = conversation_thread_client.retrieve_conversation(thread_name)
-
-    # Print the last assistant response from the conversation
-    assistant_message = conversation.get_last_text_message(assistant_client.name)
-    print(f"{assistant_client.name}: {assistant_message.content}")
-
     # add new line for better readability
     print()
 
-# stop realtime audio
+# stop realtime audio and assistant client
 realtime_audio.stop()
+assistant_client.stop()
