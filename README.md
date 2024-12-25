@@ -63,7 +63,10 @@ has been removed from the tool, however that library is still used with OpenAI R
 
 ## 🔊🎤 OpenAI Realtime Support (Experimental)
 
-This support enables agents prototyping using OpenAI's Realtime APIs with speech and text input/output via real-time WebSocket communication.
+This section covers the Realtime capabilities for AI agent prototyping with OpenAI's Realtime APIs, focusing on speech and text input/output through real-time WebSocket communication.
+
+Please note that these capabilities are offered as an experimental feature. They are still under active development and are intended primarily for exploration, demos, or proof-of-concept usage. 
+We do not recommend using these features in production or business-critical applications until further notice.
 
 ### Key Features
 
