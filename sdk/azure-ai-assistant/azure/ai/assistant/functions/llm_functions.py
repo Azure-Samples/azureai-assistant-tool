@@ -155,14 +155,7 @@ def _analyze_image(img_base64: str, system_input: str, user_input: str) -> str:
         
         # Extract the analysis result from the response
         analysis = response.choices[0].message.content
-        current_thread_id = thread_client.get_config().get_current_thread_id()
-        thread_name = thread_client.get_config().get_thread_name_by_id(current_thread_id)
-        thread_client.create_conversation_thread_message(
-            message=analysis,
-            thread_name=thread_name,
-            metadata={"chat_assistant": "function"}
-        )
-        return json.dumps({"result": "The image has been successfully analyzed and the result has been provided into conversation window. You will not see directly the result."})
+        return json.dumps({"result": analysis})
     
     except Exception as e:
         error_message = f"An error occurred: {e}"
@@ -243,10 +236,9 @@ def generate_o1_response(prompt: str, model: str = "o1-mini") -> str:
     return _generate_chat_completion(ai_client, model, messages)
 
 
-def review_highlighted_code() -> str:
+def look_at_screen() -> str:
     """
-    Captures a screenshot, sends it to the specified OpenAI model for analysis,
-    and returns the analysis result.
+    Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.
 
     :return: The analysis result as a JSON string.
     :rtype: str
@@ -254,9 +246,16 @@ def review_highlighted_code() -> str:
     # Capture a screenshot and convert it to base64
     img_bytes = _screenshot_to_bytes()
     img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+     # Save the screenshot to the output folder
+    #file_name = f"{_create_identifier('screenshot')}.png"
+    #img_path = os.path.join("output", file_name)
+    #with open(img_path, "wb") as img_file:
+    #    img_file.write(img_bytes)
+
     return _analyze_image(img_base64=img_base64, 
-                          system_input="You are expert in analyzing images which contains code to text. If the image contains highlighted part, focus on that.", 
-                          user_input="Review the highlighted code and provide detailed feedback.")
+                          system_input="You are an AI assistant analyzing a screenshot. Some portions may be highlighted. If a highlight is described or detected, focus your analysis primarily on that portion, ignoring the rest unless it is needed for context. If no highlights are described, provide a general overview of what’s in the image.", 
+                          user_input="Analyze the screenshot, focusing on any highlighted areas.")
 
 
 def take_screenshot() -> str:

@@ -20,7 +20,7 @@ from azure.ai.assistant.functions.file_functions import (
 from azure.ai.assistant.functions.llm_functions import (
     generate_o1_response,
     take_screenshot,
-    review_highlighted_code,
+    look_at_screen,
 )
 
 # Statically defined system functions for fast reference
@@ -39,5 +39,5 @@ system_functions = {
     "find_files_by_extension_in_directory": find_files_by_extension_in_directory,
     "generate_o1_response": generate_o1_response,
     "take_screenshot": take_screenshot,
-    "review_highlighted_code": review_highlighted_code,
+    "look_at_screen": look_at_screen,
 }

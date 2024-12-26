@@ -275,9 +275,9 @@
     {
         "type": "function",
         "function": {
-            "name": "review_highlighted_code",
+            "name": "look_at_screen",
             "module": "azure.ai.assistant.functions.llm_functions",
-            "description": "Review the highlighted code and provide feedback.",
+            "description": " Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.",
             "parameters": {
                 "type": "object",
                 "properties": {},
