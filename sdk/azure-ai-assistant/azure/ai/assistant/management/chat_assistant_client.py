@@ -242,7 +242,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                         tools=self._tools,
                         tool_choice=None if self._tools is None else "auto",
                         response_format=response_format,
-                            timeout=timeout
+                        timeout=timeout
                     )
 
                 if response and stream:
