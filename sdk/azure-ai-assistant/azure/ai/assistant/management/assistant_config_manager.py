@@ -245,12 +245,13 @@ class AssistantConfigManager:
     def get_all_assistant_names(self) -> list:
         """
         Gets the names of all assistants in local configuration.
+        NOTE: Currently does not apply for real-time assistants.
 
         :return: A list of all assistant names.
         :rtype: list
         """
-        # Return the names of all assistant configurations and where "assistant_role" is not "system"
-        return [assistant_name for assistant_name, assistant_config in self._configs.items()]
+        # Return the names of all assistant configurations and where assistant_role is not "system" and asssistant_type is not "realtime_assistant"
+        return [assistant_name for assistant_name, assistant_config in self._configs.items() if assistant_config.assistant_role != "system" and assistant_config.assistant_type != "realtime_assistant"]
 
     def get_assistant_names_by_client_type(
             self,

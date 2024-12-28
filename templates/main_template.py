@@ -1,5 +1,4 @@
 from azure.ai.assistant.management.assistant_client import AssistantClient
-from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 
 
@@ -17,8 +16,7 @@ except FileNotFoundError:
 assistant_client = AssistantClient.from_yaml(config)
 
 # create a new conversation thread client
-ai_client_type = AIClientType[assistant_client.assistant_config.ai_client_type]
-conversation_thread_client = ConversationThreadClient.get_instance(ai_client_type)
+conversation_thread_client = ConversationThreadClient.get_instance(assistant_client.ai_client_type)
 
 # create a new conversation thread
 thread_name = conversation_thread_client.create_conversation_thread()

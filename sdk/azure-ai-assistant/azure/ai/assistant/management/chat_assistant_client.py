@@ -180,7 +180,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
             logger.info(f"Process messages for chat assistant")
 
             if additional_instructions:
-                self._messages.append({"role": "system", "content": additional_instructions})
+                self._messages.append({"role": "developer", "content": additional_instructions})
 
             if thread_name:
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
@@ -213,26 +213,37 @@ class ChatAssistantClient(BaseChatAssistantClient):
                 temperature = None if text_completion_config is None else text_completion_config.temperature
                 seed = None if text_completion_config is None else text_completion_config.seed
                 frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
-                max_tokens = 1000 if text_completion_config is None else text_completion_config.max_tokens
+                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
                 presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
                 top_p = None if text_completion_config is None else text_completion_config.top_p
                 response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
 
-                response = self._ai_client.chat.completions.create(
-                    model=self._assistant_config.model,
-                    messages=self._messages,
-                    tools=self._tools,
-                    tool_choice=None if self._tools is None else "auto",
-                    stream=stream,
-                    temperature=temperature,
-                    seed=seed,
-                    frequency_penalty=frequency_penalty,
-                    max_tokens=max_tokens,
-                    presence_penalty=presence_penalty,
-                    response_format=response_format,
-                    top_p=top_p,
-                    timeout=timeout
-                )
+                if not self._assistant_config.model.startswith("o1"):
+                    response = self._ai_client.chat.completions.create(
+                        model=self._assistant_config.model,
+                        messages=self._messages,
+                        tools=self._tools,
+                        tool_choice=None if self._tools is None else "auto",
+                        stream=stream,
+                        temperature=temperature,
+                        seed=seed,
+                        frequency_penalty=frequency_penalty,
+                        max_tokens=max_tokens,
+                        presence_penalty=presence_penalty,
+                        response_format=response_format,
+                        top_p=top_p,
+                        timeout=timeout
+                    )
+                else:
+                    stream = False
+                    response = self._ai_client.chat.completions.create(
+                        model=self._assistant_config.model,
+                        messages=self._messages,
+                        tools=self._tools,
+                        tool_choice=None if self._tools is None else "auto",
+                        response_format=response_format,
+                        timeout=timeout
+                    )
 
                 if response and stream:
                     continue_processing = self._handle_streaming_response(response, thread_name, run_id)

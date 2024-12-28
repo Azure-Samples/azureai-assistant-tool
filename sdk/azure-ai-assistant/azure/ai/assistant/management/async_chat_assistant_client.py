@@ -231,26 +231,37 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                 temperature = None if text_completion_config is None else text_completion_config.temperature
                 seed = None if text_completion_config is None else text_completion_config.seed
                 frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
-                max_tokens = 1000 if text_completion_config is None else text_completion_config.max_tokens
+                max_tokens = None if text_completion_config is None else text_completion_config.max_tokens
                 presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
                 top_p = None if text_completion_config is None else text_completion_config.top_p
                 response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
 
-                response = await self._async_client.chat.completions.create(
-                    model=self._assistant_config.model,
-                    messages=self._messages,
-                    tools=self._tools,
-                    tool_choice=None if self._tools is None else "auto",
-                    stream=stream,
-                    temperature=temperature,
-                    seed=seed,
-                    frequency_penalty=frequency_penalty,
-                    max_tokens=max_tokens,
-                    presence_penalty=presence_penalty,
-                    response_format=response_format,
-                    top_p=top_p,
-                    timeout=timeout
-                )
+                if not self._assistant_config.model.startswith("o1"):
+                    response = await self._async_client.chat.completions.create(
+                        model=self._assistant_config.model,
+                        messages=self._messages,
+                        tools=self._tools,
+                        tool_choice=None if self._tools is None else "auto",
+                        stream=stream,
+                        temperature=temperature,
+                        seed=seed,
+                        frequency_penalty=frequency_penalty,
+                        max_tokens=max_tokens,
+                        presence_penalty=presence_penalty,
+                        response_format=response_format,
+                        top_p=top_p,
+                        timeout=timeout
+                    )
+                else:
+                    stream = False
+                    response = await self._async_client.chat.completions.create(
+                        model=self._assistant_config.model,
+                        messages=self._messages,
+                        tools=self._tools,
+                        tool_choice=None if self._tools is None else "auto",
+                        response_format=response_format,
+                        timeout=timeout
+                    )
 
                 if response and stream:
                     continue_processing = await self._handle_streaming_response(response, thread_name, run_id)

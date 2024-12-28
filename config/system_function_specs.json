@@ -238,9 +238,9 @@
     {
         "type": "function",
         "function": {
-            "name": "get_openai_chat_completion",
+            "name": "generate_o1_response",
             "module": "azure.ai.assistant.functions.llm_functions",
-            "description": "Generates a chat completion for the given prompt using the prompt and specified model.",
+            "description": "Generates a chat completion for the given prompt using the prompt and specified o1 model.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -250,12 +250,11 @@
                     },
                     "model": {
                         "type": "string",
-                        "description": "The model to use for generating the chat completion."
+                        "description": "The model to use for generating the chat completion, this is optional parameter."
                     }
                 },
                 "required": [
-                    "prompt",
-                    "model"
+                    "prompt"
                 ]
             }
         }
@@ -263,26 +262,27 @@
     {
         "type": "function",
         "function": {
-            "name": "get_azure_openai_chat_completion",
+            "name": "take_screenshot",
             "module": "azure.ai.assistant.functions.llm_functions",
-            "description": "Generates a chat completion for the given prompt using the prompt and specified model.",
+            "description": "Captures a screenshot and displays it to the user.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "The prompt for which the chat completion is to be generated."
-                    },
-                    "model": {
-                        "type": "string",
-                        "description": "The model to use for generating the chat completion."
-                    }
-                },
-                "required": [
-                    "prompt",
-                    "model"
-                ]
+                "properties": {},
+                "required": []
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "look_at_screen",
+            "module": "azure.ai.assistant.functions.llm_functions",
+            "description": " Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    }    
 ]

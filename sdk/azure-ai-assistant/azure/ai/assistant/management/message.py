@@ -160,6 +160,16 @@ class ConversationMessage:
         :rtype: str
         """
         return self._role
+    
+    @role.setter
+    def role(self, value: str):
+        """
+        Sets the role of the sender.
+
+        :param value: The role of the sender.
+        :type value: str
+        """
+        self._role = value
 
     @property
     def sender(self) -> str:
@@ -170,6 +180,16 @@ class ConversationMessage:
         :rtype: str
         """
         return self._sender
+    
+    @sender.setter
+    def sender(self, value: str):
+        """
+        Sets the sender of the message.
+
+        :param value: The sender of the message.
+        :type value: str
+        """
+        self._sender = value
     
     @property
     def original_message(self) -> Message:
