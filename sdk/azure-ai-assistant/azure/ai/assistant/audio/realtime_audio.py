@@ -180,7 +180,8 @@ class RealtimeAudio:
                         "window_duration": 1.5,
                         "silence_ratio": 1.5,
                         "min_speech_duration": 0.3,
-                        "min_silence_duration": 1.0
+                        "min_silence_duration": 1.0,
+                        "model_path": assistant_config.realtime_config.voice_activity_detection_model
                     },
                     enable_wave_capture=False,
                     keyword_model_file=assistant_config.realtime_config.keyword_detection_model)

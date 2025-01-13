@@ -149,7 +149,7 @@ def _analyze_image(img_base64: str, system_input: str, user_input: str) -> str:
         response = ai_client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
-            temperature=0.5,
+            temperature=0.1,
             max_tokens=2000
         )
         
@@ -236,10 +236,12 @@ def generate_o1_response(prompt: str, model: str = "o1-mini") -> str:
     return _generate_chat_completion(ai_client, model, messages)
 
 
-def look_at_screen() -> str:
+def look_at_screen(focus_topic: str) -> str:
     """
     Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.
 
+    :param focus_topic: The topic to focus on in the analysis.
+    :type focus_topic: str
     :return: The analysis result as a JSON string.
     :rtype: str
     """    
@@ -252,10 +254,10 @@ def look_at_screen() -> str:
     #img_path = os.path.join("output", file_name)
     #with open(img_path, "wb") as img_file:
     #    img_file.write(img_bytes)
-
+    print(f"look_at_screen, focus_topic: {focus_topic}")
     return _analyze_image(img_base64=img_base64, 
                           system_input="You are an AI assistant analyzing a screenshot. Some portions may be highlighted. If a highlight is described or detected, focus your analysis primarily on that portion, ignoring the rest unless it is needed for context. If no highlights are described, provide a general overview of what’s in the image.", 
-                          user_input="Analyze the screenshot, focusing on any highlighted areas.")
+                          user_input=f"Analyze the screenshot, focusing on all highlighted areas in {focus_topic}.")
 
 
 def take_screenshot() -> str:

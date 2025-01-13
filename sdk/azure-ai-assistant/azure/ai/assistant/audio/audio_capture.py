@@ -8,7 +8,7 @@ import pyaudio
 import numpy as np
 from typing import Optional
 from abc import ABC, abstractmethod
-from .vad import VoiceActivityDetector
+from .vad import VoiceActivityDetector, SileroVoiceActivityDetector
 from .azure_keyword_recognizer import AzureKeywordRecognizer
 import wave
 
@@ -106,15 +106,18 @@ class AudioCapture:
 
         if vad_parameters is not None:
             try:
-                self.vad = VoiceActivityDetector(**vad_parameters)
-                logger.info(f"VoiceActivityDetector initialized with parameters: {vad_parameters}")
+                if "model_path" in vad_parameters and isinstance(vad_parameters["model_path"], str) and vad_parameters["model_path"].strip():
+                    self.vad = SileroVoiceActivityDetector(**vad_parameters)
+                else:
+                    self.vad = VoiceActivityDetector(**vad_parameters)
+                logger.info(f"VAD module initialized with parameters: {vad_parameters}")
                 self.buffer_duration_sec = buffer_duration_sec
                 self.buffer_size = int(self.buffer_duration_sec * self.sample_rate)
                 self.audio_buffer = np.zeros(self.buffer_size, dtype=np.int16)
                 self.buffer_pointer = 0
                 self.cross_fade_samples = int((self.cross_fade_duration_ms / 1000) * self.sample_rate)
             except Exception as e:
-                logger.error(f"Failed to initialize VoiceActivityDetector: {e}")
+                logger.error(f"Failed to initialize VAD module: {e}")
                 self.vad = None
 
         self.keyword_recognizer = None
