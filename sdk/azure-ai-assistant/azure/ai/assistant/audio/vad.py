@@ -13,6 +13,7 @@ import numpy as np
 import logging
 import onnxruntime
 import resampy  # silero-vad only supports 8000 Hz and 16000 Hz sampling rates, use a lightweight resample lib to handle, https://github.com/snakers4/silero-vad
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
