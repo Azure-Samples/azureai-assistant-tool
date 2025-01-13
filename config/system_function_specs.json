@@ -280,8 +280,15 @@
             "description": " Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.",
             "parameters": {
                 "type": "object",
-                "properties": {},
-                "required": []
+                "properties": {
+                    "focus_topic": {
+                        "type": "string",
+                        "description": "The topic to focus on in the screen analysis."
+                    }
+                },
+                "required": [
+                    "focus_topic"
+                ]
             }
         }
     }    

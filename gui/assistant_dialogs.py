@@ -65,6 +65,7 @@ class AssistantConfigDialog(QDialog):
         self.assistant_id = ''
         self.default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self.default_keyword_model_file_path = os.path.join(os.getcwd(), 'assets', 'kws.table')
+        self.default_voice_activity_detection_model_path = os.path.join(os.getcwd(), 'assets', 'silero_vad.onnx')
         # make sure the output folder path exists and create it if it doesn't
         if not os.path.exists(self.default_output_folder_path):
             os.makedirs(self.default_output_folder_path)
@@ -379,6 +380,12 @@ class AssistantConfigDialog(QDialog):
         self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutLabel)
         self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutSpinBox)
 
+        # add checkbox for enabling auto reconnect
+        self.autoReconnectCheckBox = QCheckBox("Enable Automatic Reconnection to Server")
+        self.autoReconnectCheckBox.setChecked(False)
+        self.autoReconnectCheckBox.setToolTip("Automatically reconnect to the server if the websocket connection is closed by server.")
+        self.audioLayout.addWidget(self.autoReconnectCheckBox)
+
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
         self.turnDetectionComboBox = QComboBox()
@@ -406,6 +413,11 @@ class AssistantConfigDialog(QDialog):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Keyword Model File", "", "Keyword Model Files (*.table)")
         if file_path:
             self.keywordFilePathEdit.setText(file_path)
+
+    def select_vad_model_path(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select VAD Model File", "", "VAD Model Files (*.onnx)")
+        if file_path:
+            self.vadModelPathEdit.setText(file_path)
 
     def update_vad_settings(self):
         """ Updates the UI based on the selected VAD option (server or local). """
@@ -524,12 +536,22 @@ class AssistantConfigDialog(QDialog):
         self.minSilenceDurationLayout.addWidget(self.minSilenceDurationLabel)
         self.minSilenceDurationLayout.addWidget(self.minSilenceDurationSpinBox)
 
+        # Voice Activity Detection model path
+        self.vadModelPathLabel = QLabel('VAD Model Path:')
+        self.vadModelPathEdit = QLineEdit()
+        self.vadModelPathEdit.setText(self.default_voice_activity_detection_model_path)
+        self.vadModelPathEdit.setToolTip("The path to the VAD model file. If left empty or invalid, the default RMS based VAD will be used.")
+        self.vadModelPathButton = QPushButton('Select File...')
+        self.vadModelPathButton.clicked.connect(self.select_vad_model_path)
+
         # Add layouts to settings
         self.localVadSettings.addLayout(self.chunkSizeLayout)
         self.localVadSettings.addLayout(self.windowDurationLayout)
         self.localVadSettings.addLayout(self.silenceRatioLayout)
         self.localVadSettings.addLayout(self.minSpeechDurationLayout)
         self.localVadSettings.addLayout(self.minSilenceDurationLayout)
+        self.localVadSettings.addWidget(self.vadModelPathLabel)
+        self.localVadSettings.addWidget(self.vadModelPathEdit)
 
         # Add local VAD settings to main layout
         layout.addLayout(self.localVadSettings)
@@ -1034,7 +1056,9 @@ class AssistantConfigDialog(QDialog):
             self.outputAudioFormatComboBox.setCurrentText(realtime_config.output_audio_format)
             self.inputAudioTranscriptionModelComboBox.setCurrentText(realtime_config.input_audio_transcription_model)
             self.keywordFilePathEdit.setText(realtime_config.keyword_detection_model)
+            self.vadModelPathEdit.setText(realtime_config.voice_activity_detection_model)
             self.keywordRearmSilenceTimeoutSpinBox.setValue(realtime_config.keyword_rearm_silence_timeout)
+            self.autoReconnectCheckBox.setChecked(realtime_config.auto_reconnect)
 
             turn_detection_type = realtime_config.turn_detection.get('type', 'local_vad')
             self.turnDetectionComboBox.setCurrentText(turn_detection_type)
@@ -1147,7 +1171,9 @@ class AssistantConfigDialog(QDialog):
             'output_audio_format': self.outputAudioFormatComboBox.currentText(),
             'input_audio_transcription_model': self.inputAudioTranscriptionModelComboBox.currentText(),
             'keyword_detection_model': self.keywordFilePathEdit.text(),
+            'voice_activity_detection_model': self.vadModelPathEdit.text(),
             'keyword_rearm_silence_timeout': self.keywordRearmSilenceTimeoutSpinBox.value(),
+            'auto_reconnect': self.autoReconnectCheckBox.isChecked(),
             'turn_detection': turn_detection
         }
 

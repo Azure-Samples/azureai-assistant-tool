@@ -492,7 +492,8 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 temperature=0.8 if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
                 max_output_tokens="inf" if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens,
                 azure_openai_api_version=azure_openai_api_version,
-                azure_openai_endpoint=azure_openai_endpoint
+                azure_openai_endpoint=azure_openai_endpoint,
+                enable_auto_reconnect=assistant_config.realtime_config.auto_reconnect
             )
 
             # Check if the _realtime_client attribute exists and is set

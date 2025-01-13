@@ -31,6 +31,8 @@ class RealtimeConfig:
     :type input_audio_transcription_model: str
     :param keyword_detection_model: The keyword detection model.
     :type keyword_detection_model: str
+    :param voice_activity_detection_model: The voice activity detection model.
+    :type voice_activity_detection_model: str
     :param keyword_rearm_silence_timeout: The keyword rearm silence timeout.
     :type keyword_rearm_silence_timeout: int
     :param turn_detection: The turn detection.
@@ -43,8 +45,10 @@ class RealtimeConfig:
                  output_audio_format: str,
                  input_audio_transcription_model: str,
                  keyword_detection_model: str,
+                 voice_activity_detection_model: str,
                  keyword_rearm_silence_timeout: int,
-                 turn_detection: dict
+                 turn_detection: dict,
+                 auto_reconnect: bool = False
     ) -> None:
         self._voice = voice
         self._modalities = modalities
@@ -52,8 +56,10 @@ class RealtimeConfig:
         self._output_audio_format = output_audio_format
         self._input_audio_transcription_model = input_audio_transcription_model
         self._keyword_detection_model = keyword_detection_model
+        self._voice_activity_detection_model = voice_activity_detection_model
         self._keyword_rearm_silence_timeout = keyword_rearm_silence_timeout
         self._turn_detection = turn_detection
+        self._auto_reconnect = auto_reconnect
 
     @property
     def voice(self) -> str:
@@ -168,6 +174,27 @@ class RealtimeConfig:
         """
         self._keyword_detection_model = value
 
+
+    @property
+    def voice_activity_detection_model(self) -> str:
+        """
+        Get the voice activity detection model.
+
+        :return: The voice activity detection model.
+        :rtype: str
+        """
+        return self._voice_activity_detection_model
+    
+    @voice_activity_detection_model.setter
+    def voice_activity_detection_model(self, value) -> None:
+        """
+        Set the voice activity detection model.
+
+        :param value: The voice activity detection model.
+        :type value: str
+        """
+        self._voice_activity_detection_model = value
+
     @property
     def keyword_rearm_silence_timeout(self) -> int:
         """
@@ -208,6 +235,26 @@ class RealtimeConfig:
         """
         self._turn_detection = value
 
+    @property
+    def auto_reconnect(self) -> bool:
+        """
+        Get the auto reconnect.
+
+        :return: The auto reconnect.
+        :rtype: bool
+        """
+        return self._auto_reconnect
+    
+    @auto_reconnect.setter
+    def auto_reconnect(self, value) -> None:
+        """
+        Set the auto reconnect.
+
+        :param value: The auto reconnect.
+        :type value: bool
+        """
+        self._auto_reconnect = value
+
     def to_dict(self) -> dict:
         """
         Convert the audio configuration to a dictionary.
@@ -222,7 +269,9 @@ class RealtimeConfig:
             'output_audio_format': self.output_audio_format,
             'input_audio_transcription_model': self.input_audio_transcription_model,
             'keyword_detection_model': self.keyword_detection_model,
+            'voice_activity_detection_model': self.voice_activity_detection_model,
             'keyword_rearm_silence_timeout': self.keyword_rearm_silence_timeout,
+            'auto_reconnect': self.auto_reconnect,
             'turn_detection': self.turn_detection
         }
 
@@ -1034,6 +1083,7 @@ class AssistantConfig:
                 'output_audio_format': 'pcm16',
                 'input_audio_transcription': 'whisper-1',
                 'keyword_detection_model': '',
+                'voice_activity_detection_model': '',
                 'keyword_rearm_silence_timeout': 10,
                 'turn_detection': {
                     'type': 'local_vad',
@@ -1042,7 +1092,8 @@ class AssistantConfig:
                     'silence_ratio': 1500,
                     'min_speech_duration': 300,
                     'min_silence_duration': 1000
-                }
+                },
+                'auto_reconnect': False
             })
             return RealtimeConfig(
                 voice=realtime_data['voice'],
@@ -1051,8 +1102,10 @@ class AssistantConfig:
                 output_audio_format=realtime_data['output_audio_format'],
                 input_audio_transcription_model=realtime_data['input_audio_transcription_model'],
                 keyword_detection_model=realtime_data['keyword_detection_model'],
+                voice_activity_detection_model=realtime_data['voice_activity_detection_model'] if 'voice_activity_detection_model' in realtime_data else '',
                 keyword_rearm_silence_timeout=realtime_data['keyword_rearm_silence_timeout'],
-                turn_detection=realtime_data['turn_detection']
+                turn_detection=realtime_data['turn_detection'],
+                auto_reconnect=realtime_data.get('auto_reconnect', False)
             )
         else:
             return None
