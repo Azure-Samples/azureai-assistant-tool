@@ -551,7 +551,12 @@ class AssistantConfigDialog(QDialog):
         self.localVadSettings.addLayout(self.minSpeechDurationLayout)
         self.localVadSettings.addLayout(self.minSilenceDurationLayout)
         self.localVadSettings.addWidget(self.vadModelPathLabel)
-        self.localVadSettings.addWidget(self.vadModelPathEdit)
+
+        vadFilePathLayout = QHBoxLayout()
+        vadFilePathLayout.addWidget(self.vadModelPathEdit)
+        vadFilePathLayout.addWidget(self.vadModelPathButton)
+
+        self.localVadSettings.addLayout(vadFilePathLayout)
 
         # Add local VAD settings to main layout
         layout.addLayout(self.localVadSettings)
