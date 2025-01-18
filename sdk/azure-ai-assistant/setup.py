@@ -71,6 +71,8 @@ setup(
         "pyaudio",
         "numpy",
         "scipy",
+        "onnxruntime",
+        "resampy",
     ],
     python_requires=">=3.8",
     project_urls={
