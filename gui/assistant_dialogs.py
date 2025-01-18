@@ -4,7 +4,7 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
+from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QDoubleSpinBox, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QTextOption
 
@@ -490,35 +490,39 @@ class AssistantConfigDialog(QDialog):
 
     def setup_local_vad(self, layout):
         self.localVadSettings = QVBoxLayout()
-
-        # Chunk Size
+        
+        # 1) Chunk size (in samples)
         self.chunkSizeLayout = QHBoxLayout()
-        self.chunkSizeLabel = QLabel('Chunk Size (bytes):')
+        self.chunkSizeLabel = QLabel('Chunk Size (samples):')
         self.chunkSizeSpinBox = QSpinBox()
-        self.chunkSizeSpinBox.setRange(0, 10000)
-        self.chunkSizeSpinBox.setValue(1024)
+        self.chunkSizeSpinBox.setRange(64, 65536)
+        self.chunkSizeSpinBox.setValue(512)
         self.chunkSizeLayout.addWidget(self.chunkSizeLabel)
         self.chunkSizeLayout.addWidget(self.chunkSizeSpinBox)
+        self.localVadSettings.addLayout(self.chunkSizeLayout)
 
-        # Window Duration
-        self.windowDurationLayout = QHBoxLayout()
-        self.windowDurationLabel = QLabel('Window Duration (ms):')
-        self.windowDurationSpinBox = QSpinBox()
-        self.windowDurationSpinBox.setRange(0, 10000)
-        self.windowDurationSpinBox.setValue(1500)
-        self.windowDurationLayout.addWidget(self.windowDurationLabel)
-        self.windowDurationLayout.addWidget(self.windowDurationSpinBox)
+        # 2) Window size (in samples) corresponds to "window_size_samples" in Silero
+        self.windowSizeLayout = QHBoxLayout()
+        self.windowSizeLabel = QLabel('Window Size (samples):')
+        self.windowSizeSpinBox = QSpinBox()
+        self.windowSizeSpinBox.setRange(64, 65536)
+        self.windowSizeSpinBox.setValue(512)
+        self.windowSizeLayout.addWidget(self.windowSizeLabel)
+        self.windowSizeLayout.addWidget(self.windowSizeSpinBox)
+        self.localVadSettings.addLayout(self.windowSizeLayout)
 
-        # Silence Ratio
-        self.silenceRatioLayout = QHBoxLayout()
-        self.silenceRatioLabel = QLabel('Silence Ratio (0.0 to 10.0):')
-        self.silenceRatioSpinBox = QSpinBox()
-        self.silenceRatioSpinBox.setRange(0, 10000)
-        self.silenceRatioSpinBox.setValue(1500)
-        self.silenceRatioLayout.addWidget(self.silenceRatioLabel)
-        self.silenceRatioLayout.addWidget(self.silenceRatioSpinBox)
+        # 3) Threshold (0.0 - 1.0)
+        self.thresholdLayout = QHBoxLayout()
+        self.thresholdLabel = QLabel('Threshold (0.0 - 1.0):')
+        self.thresholdSpinBox = QDoubleSpinBox()
+        self.thresholdSpinBox.setRange(0.0, 1.0)
+        self.thresholdSpinBox.setSingleStep(0.05)
+        self.thresholdSpinBox.setValue(0.5)
+        self.thresholdLayout.addWidget(self.thresholdLabel)
+        self.thresholdLayout.addWidget(self.thresholdSpinBox)
+        self.localVadSettings.addLayout(self.thresholdLayout)
 
-        # Minimum Speech Duration
+        # 4) Minimum Speech Duration (ms) -> will convert to seconds later
         self.minSpeechDurationLayout = QHBoxLayout()
         self.minSpeechDurationLabel = QLabel('Minimum Speech Duration (ms):')
         self.minSpeechDurationSpinBox = QSpinBox()
@@ -526,8 +530,9 @@ class AssistantConfigDialog(QDialog):
         self.minSpeechDurationSpinBox.setValue(300)
         self.minSpeechDurationLayout.addWidget(self.minSpeechDurationLabel)
         self.minSpeechDurationLayout.addWidget(self.minSpeechDurationSpinBox)
+        self.localVadSettings.addLayout(self.minSpeechDurationLayout)
 
-        # Minimum Silence Duration
+        # 5) Minimum Silence Duration (ms) -> will convert to seconds later
         self.minSilenceDurationLayout = QHBoxLayout()
         self.minSilenceDurationLabel = QLabel('Minimum Silence Duration (ms):')
         self.minSilenceDurationSpinBox = QSpinBox()
@@ -535,30 +540,23 @@ class AssistantConfigDialog(QDialog):
         self.minSilenceDurationSpinBox.setValue(1000)
         self.minSilenceDurationLayout.addWidget(self.minSilenceDurationLabel)
         self.minSilenceDurationLayout.addWidget(self.minSilenceDurationSpinBox)
+        self.localVadSettings.addLayout(self.minSilenceDurationLayout)
 
-        # Voice Activity Detection model path
+        # 6) VAD Model Path
         self.vadModelPathLabel = QLabel('VAD Model Path:')
         self.vadModelPathEdit = QLineEdit()
         self.vadModelPathEdit.setText(self.default_voice_activity_detection_model_path)
         self.vadModelPathEdit.setToolTip("The path to the VAD model file. If left empty or invalid, the default RMS based VAD will be used.")
         self.vadModelPathButton = QPushButton('Select File...')
         self.vadModelPathButton.clicked.connect(self.select_vad_model_path)
-
-        # Add layouts to settings
-        self.localVadSettings.addLayout(self.chunkSizeLayout)
-        self.localVadSettings.addLayout(self.windowDurationLayout)
-        self.localVadSettings.addLayout(self.silenceRatioLayout)
-        self.localVadSettings.addLayout(self.minSpeechDurationLayout)
-        self.localVadSettings.addLayout(self.minSilenceDurationLayout)
+        
         self.localVadSettings.addWidget(self.vadModelPathLabel)
-
         vadFilePathLayout = QHBoxLayout()
         vadFilePathLayout.addWidget(self.vadModelPathEdit)
         vadFilePathLayout.addWidget(self.vadModelPathButton)
-
         self.localVadSettings.addLayout(vadFilePathLayout)
-
-        # Add local VAD settings to main layout
+        
+        # Finally, add local VAD settings to the main layout
         layout.addLayout(self.localVadSettings)
 
     def setup_code_interpreter_files(self, layout):
@@ -1068,15 +1066,35 @@ class AssistantConfigDialog(QDialog):
             turn_detection_type = realtime_config.turn_detection.get('type', 'local_vad')
             self.turnDetectionComboBox.setCurrentText(turn_detection_type)
             if turn_detection_type == "server_vad":
-                self.serverVadThresholdSlider.setValue(realtime_config.turn_detection.get('server_vad_threshold', 0.5) * 100)
-                self.prefixPaddingMsSpinBox.setValue(realtime_config.turn_detection.get('prefix_padding_ms', 300))
-                self.silenceDurationMsSpinBox.setValue(realtime_config.turn_detection.get('silence_duration_ms', 500))
+                self.serverVadThresholdSlider.setValue(
+                    realtime_config.turn_detection.get('server_vad_threshold', 0.5) * 100
+                )
+                self.prefixPaddingMsSpinBox.setValue(
+                    realtime_config.turn_detection.get('prefix_padding_ms', 300)
+                )
+                self.silenceDurationMsSpinBox.setValue(
+                    realtime_config.turn_detection.get('silence_duration_ms', 500)
+                )
             elif turn_detection_type == "local_vad":
-                self.chunkSizeSpinBox.setValue(realtime_config.turn_detection.get('chunk_size', 1024))
-                self.windowDurationSpinBox.setValue(realtime_config.turn_detection.get('window_duration', 1500))
-                self.silenceRatioSpinBox.setValue(realtime_config.turn_detection.get('silence_ratio', 1500))
-                self.minSpeechDurationSpinBox.setValue(realtime_config.turn_detection.get('min_speech_duration', 300))
-                self.minSilenceDurationSpinBox.setValue(realtime_config.turn_detection.get('min_silence_duration', 1000))
+                # Here map the config keys to Silero VAD parameters
+                self.chunkSizeSpinBox.setValue(
+                    realtime_config.turn_detection.get('chunk_size', 512)
+                )
+                self.windowSizeSpinBox.setValue(
+                    realtime_config.turn_detection.get('window_size_samples', 512)
+                )
+                # Threshold is stored as (float in 0.0–1.0), so set directly
+                self.thresholdSpinBox.setValue(
+                    realtime_config.turn_detection.get('threshold', 0.5)
+                )
+                # min_speech_duration & min_silence_duration are in seconds in Silero;
+                # your spin boxes are in ms, so multiply by 1000 for display
+                self.minSpeechDurationSpinBox.setValue(
+                    int(realtime_config.turn_detection.get('min_speech_duration', 0.3) * 1000)
+                )
+                self.minSilenceDurationSpinBox.setValue(
+                    int(realtime_config.turn_detection.get('min_silence_duration', 1.0) * 1000)
+                )
 
     def pre_select_functions(self):
         # Iterate over all selected functions
@@ -1156,19 +1174,22 @@ class AssistantConfigDialog(QDialog):
         if self.turnDetectionComboBox.currentText() == "server_vad":
             turn_detection = {
                 'type': 'server_vad',
-                'server_vad_threshold': self.serverVadThresholdSlider.value() / 100,
+                'threshold': self.serverVadThresholdSlider.value() / 100,
                 'prefix_padding_ms': self.prefixPaddingMsSpinBox.value(),
                 'silence_duration_ms': self.silenceDurationMsSpinBox.value()
             }
         elif self.turnDetectionComboBox.currentText() == "local_vad":
+            # For Silero VAD
             turn_detection = {
                 'type': 'local_vad',
                 'chunk_size': self.chunkSizeSpinBox.value(),
-                'window_duration': self.windowDurationSpinBox.value(),
-                'silence_ratio': self.silenceRatioSpinBox.value(),
-                'min_speech_duration': self.minSpeechDurationSpinBox.value(),
-                'min_silence_duration': self.minSilenceDurationSpinBox.value()
+                'window_size_samples': self.windowSizeSpinBox.value(),
+                'threshold': self.thresholdSpinBox.value(),
+                # Convert ms back to seconds for Silero
+                'min_speech_duration': self.minSpeechDurationSpinBox.value() / 1000.0,
+                'min_silence_duration': self.minSilenceDurationSpinBox.value() / 1000.0
             }
+
         realtime_config = {
             'voice': self.voiceComboBox.currentText(),
             'modalities': self.modalityComboBox.currentText(),
@@ -1181,7 +1202,6 @@ class AssistantConfigDialog(QDialog):
             'auto_reconnect': self.autoReconnectCheckBox.isChecked(),
             'turn_detection': turn_detection
         }
-
         return realtime_config
 
     def save_configuration(self):

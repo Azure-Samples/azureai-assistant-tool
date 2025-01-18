@@ -457,10 +457,10 @@ class RealtimeAssistantClient(BaseAssistantClient):
             raise InvalidJSONError(f"Invalid JSON format: {e}")
 
     def _init_realtime_assistant_client(
-            self, 
-            config_data: dict,
-            is_create: bool = True,
-            timeout: Optional[float] = None
+        self, 
+        config_data: dict,
+        is_create: bool = True,
+        timeout: Optional[float] = None
     ):
         try:
             # Create or update the assistant
@@ -476,6 +476,19 @@ class RealtimeAssistantClient(BaseAssistantClient):
             else:
                 azure_openai_api_version, azure_openai_endpoint = None, None
 
+            # Prepare turn_detection config to pass to RealtimeAIOptions
+            turn_detection_dict = None
+            turn_detection = assistant_config.realtime_config.turn_detection
+            if turn_detection and turn_detection.get("type") == "local_vad":
+                turn_detection_dict = None
+            elif turn_detection and turn_detection.get("type") == "server_vad":
+                turn_detection_dict = {
+                    "type": "server_vad",
+                    "threshold": turn_detection.get("threshold", 0.5),
+                    "prefix_padding_ms": turn_detection.get("prefix_padding_ms", 300),
+                    "silence_duration_ms": turn_detection.get("silence_duration_ms", 500),
+                }
+
             realtime_options = RealtimeAIOptions(
                 api_key=self.ai_client.api_key,
                 model=assistant_config.model,
@@ -486,11 +499,19 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 output_audio_format=assistant_config.realtime_config.output_audio_format,
                 input_audio_transcription_enabled=True,
                 input_audio_transcription_model=assistant_config.realtime_config.input_audio_transcription_model,
-                turn_detection=None, #if assistant_config.realtime_config.turn_detection.get("type") == "local_vad" else assistant_config.realtime_config.turn_detection,
+                turn_detection=turn_detection_dict,
                 tools=tools,
                 tool_choice="auto",
-                temperature=0.8 if not assistant_config.text_completion_config else assistant_config.text_completion_config.temperature,
-                max_output_tokens="inf" if not assistant_config.text_completion_config else assistant_config.text_completion_config.max_output_tokens,
+                temperature=(
+                    0.8
+                    if not assistant_config.text_completion_config
+                    else assistant_config.text_completion_config.temperature
+                ),
+                max_output_tokens=(
+                    "inf"
+                    if not assistant_config.text_completion_config
+                    else assistant_config.text_completion_config.max_output_tokens
+                ),
                 azure_openai_api_version=azure_openai_api_version,
                 azure_openai_endpoint=azure_openai_endpoint,
                 enable_auto_reconnect=assistant_config.realtime_config.auto_reconnect
@@ -506,7 +527,6 @@ class RealtimeAssistantClient(BaseAssistantClient):
                 self._update_realtime_client(realtime_options=realtime_options, timeout=timeout)
 
             # Update the local configuration using AssistantConfigManager
-            # TODO make optional to save the assistant_config in the config manager
             config_manager = AssistantConfigManager.get_instance()
             config_manager.update_config(self._name, assistant_config.to_json())
 

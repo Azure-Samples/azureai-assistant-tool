@@ -163,9 +163,15 @@ class RealtimeAudio:
         try:
             self._audio_player = AudioPlayer()
             self._audio_capture = None
-            self._audio_capture_event_handler = RealtimeAudioCaptureEventHandler(realtime_client=realtime_client, audio_player=self._audio_player)
-            
+            self._audio_capture_event_handler = RealtimeAudioCaptureEventHandler(
+                realtime_client=realtime_client,
+                audio_player=self._audio_player
+            )
+
             assistant_config = realtime_client.assistant_config
+                        
+            # Only create the AudioCapture if a keyword model is provided;
+            # you can adapt this logic if you want local VAD regardless of keyword detection.
             if assistant_config.realtime_config.keyword_detection_model:
                 self._audio_capture = AudioCapture(
                     event_handler=self._audio_capture_event_handler, 
@@ -174,18 +180,10 @@ class RealtimeAudio:
                     frames_per_buffer=1024,
                     buffer_duration_sec=1.0,
                     cross_fade_duration_ms=20,
-                    vad_parameters={
-                        "sample_rate": 24000,
-                        "chunk_size": 1024,
-                        "window_duration": 1.5,
-                        "silence_ratio": 1.5,
-                        "min_speech_duration": 0.3,
-                        "min_silence_duration": 1.0,
-                        "model_path": assistant_config.realtime_config.voice_activity_detection_model
-                    },
+                    vad_parameters=self._get_vad_parameters(assistant_config),
                     enable_wave_capture=False,
-                    keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
-
+                    keyword_model_file=assistant_config.realtime_config.keyword_detection_model
+                )
                 self._audio_capture_event_handler.set_capture_client(self._audio_capture)
 
         except Exception as e:
@@ -216,14 +214,7 @@ class RealtimeAudio:
                     frames_per_buffer=1024,
                     buffer_duration_sec=1.0,
                     cross_fade_duration_ms=20,
-                    vad_parameters={
-                        "sample_rate": 24000,
-                        "chunk_size": 1024,
-                        "window_duration": 1.5,
-                        "silence_ratio": 1.5,
-                        "min_speech_duration": 0.3,
-                        "min_silence_duration": 1.0
-                    },
+                    vad_parameters=self._get_vad_parameters(assistant_config),
                     enable_wave_capture=False,
                     keyword_model_file=assistant_config.realtime_config.keyword_detection_model)
 
@@ -235,6 +226,41 @@ class RealtimeAudio:
         except Exception as e:
             logger.error(f"Failed to update realtime client: {e}")
             raise EngineError(f"Failed to update realtime client: {e}")
+
+    def _get_vad_parameters(
+            self,
+            assistant_config: AssistantConfig,
+    ) -> dict:
+
+        # Default VAD parameters for RMS based VAD
+        vad_parameters = {
+            "sample_rate": 24000,
+            "chunk_size": 1024,
+            "window_duration": 1.5,
+            "silence_ratio": 1.5,
+            "min_speech_duration": 0.3,
+            "min_silence_duration": 1.0,
+        }
+
+        # If a VAD model is provided, use it for VAD
+        if assistant_config.realtime_config.voice_activity_detection_model:
+            turn_detection = assistant_config.realtime_config.turn_detection or {}
+            chunk_size = turn_detection.get("chunk_size", 1024)
+            window_size_samples = turn_detection.get("window_size_samples", 512)
+            threshold = turn_detection.get("threshold", 0.5)
+            min_speech_duration = turn_detection.get("min_speech_duration", 0.3)
+            min_silence_duration = turn_detection.get("min_silence_duration", 1.0)
+            vad_parameters = {
+                "sample_rate": 24000,
+                "chunk_size": chunk_size,
+                "window_size_samples": window_size_samples,
+                "threshold": threshold,
+                "min_speech_duration": min_speech_duration,
+                "min_silence_duration": min_silence_duration,
+                "model_path": assistant_config.realtime_config.voice_activity_detection_model
+            }
+
+        return vad_parameters
 
     def start(
             self,

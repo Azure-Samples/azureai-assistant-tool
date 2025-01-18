@@ -31,12 +31,20 @@ class RealtimeConfig:
     :type input_audio_transcription_model: str
     :param keyword_detection_model: The keyword detection model.
     :type keyword_detection_model: str
-    :param voice_activity_detection_model: The voice activity detection model.
+    :param voice_activity_detection_model: The voice activity detection model. If empty, the default RMS VAD is used and turn detection parameters are ignored.
     :type voice_activity_detection_model: str
     :param keyword_rearm_silence_timeout: The keyword rearm silence timeout.
     :type keyword_rearm_silence_timeout: int
-    :param turn_detection: The turn detection.
+    :param turn_detection: The turn detection dictionary. For local_vad, it may include:
+        - type: "local_vad"
+        - chunk_size: int
+        - window_size_samples: int
+        - threshold: float (0–1)
+        - min_speech_duration: float (seconds)
+        - min_silence_duration: float (seconds)
     :type turn_detection: dict
+    :param auto_reconnect: The auto reconnect.
+    :type auto_reconnect: bool
     """
     def __init__(self,
                  voice: str,
@@ -1079,22 +1087,25 @@ class AssistantConfig:
         if config_data.get('realtime_settings', None) is not None:
             realtime_data = config_data.get('realtime_settings', {
                 'voice': 'alloy',
+                'modalities': 'text_and_audio',
                 'input_audio_format': 'pcm16',
                 'output_audio_format': 'pcm16',
-                'input_audio_transcription': 'whisper-1',
+                'input_audio_transcription_model': 'whisper-1',
                 'keyword_detection_model': '',
                 'voice_activity_detection_model': '',
                 'keyword_rearm_silence_timeout': 10,
                 'turn_detection': {
                     'type': 'local_vad',
-                    'chunk_size': 1024,
-                    'window_duration': 1500,
-                    'silence_ratio': 1500,
-                    'min_speech_duration': 300,
-                    'min_silence_duration': 1000
+                    # Defaults below map to Silero VAD parameters:
+                    'chunk_size': 512,
+                    'window_size_samples': 512,
+                    'threshold': 0.5,
+                    'min_speech_duration': 0.3,
+                    'min_silence_duration': 1.0
                 },
                 'auto_reconnect': False
             })
+
             return RealtimeConfig(
                 voice=realtime_data['voice'],
                 modalities=realtime_data['modalities'],
@@ -1102,7 +1113,7 @@ class AssistantConfig:
                 output_audio_format=realtime_data['output_audio_format'],
                 input_audio_transcription_model=realtime_data['input_audio_transcription_model'],
                 keyword_detection_model=realtime_data['keyword_detection_model'],
-                voice_activity_detection_model=realtime_data['voice_activity_detection_model'] if 'voice_activity_detection_model' in realtime_data else '',
+                voice_activity_detection_model=realtime_data.get('voice_activity_detection_model', ''),
                 keyword_rearm_silence_timeout=realtime_data['keyword_rearm_silence_timeout'],
                 turn_detection=realtime_data['turn_detection'],
                 auto_reconnect=realtime_data.get('auto_reconnect', False)
