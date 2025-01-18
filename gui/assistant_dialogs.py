@@ -1298,9 +1298,14 @@ class AssistantConfigDialog(QDialog):
 
 
 class ExportAssistantDialog(QDialog):
-    def __init__(self):
+    def __init__(self, main_window):
+        """
+        :param main_window: The main window instance (used to access active_ai_client_type).
+        """
         super().__init__()
+        self.main_window = main_window
         self.assistant_config_manager = AssistantConfigManager.get_instance()
+
         self.setWindowTitle("Export Assistant")
         self.setLayout(QVBoxLayout())
 
@@ -1318,51 +1323,88 @@ class ExportAssistantDialog(QDialog):
         self.resize(400, 100)
 
     def get_assistant_names(self):
-        assistant_names = self.assistant_config_manager.get_all_assistant_names()
-        return assistant_names
+        """
+        Return assistant names matching the main_window's active AI client type.
+        """
+        client_type_name = self.main_window.active_ai_client_type.name
+        return self.assistant_config_manager.get_assistant_names_by_client_type(
+            client_type_name, include_system_assistants=False
+        )
 
     def export_assistant(self):
+        """
+        Copy configuration and generate main.py using the appropriate template
+        for real-time (text/audio) or standard exports, depending on the 
+        assistant type and AI client type.
+        """
         assistant_name = self.assistant_combo.currentText()
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
+
         export_path = os.path.join("export", assistant_name)
         config_path = os.path.join(export_path, "config")
         functions_path = os.path.join(export_path, "functions")
 
-        # Ensure the directories exist
+        # Ensure directories exist
         os.makedirs(config_path, exist_ok=True)
         os.makedirs(functions_path, exist_ok=True)
 
-        # Copy the required JSON files
+        # Copy required config files
         try:
-            shutil.copyfile(f"config/{assistant_name}_assistant_config.yaml", os.path.join(config_path, f"{assistant_name}_assistant_config.yaml"))
-            shutil.copyfile("config/function_error_specs.json", os.path.join(config_path, "function_error_specs.json"))
+            shutil.copyfile(
+                f"config/{assistant_name}_assistant_config.yaml",
+                os.path.join(config_path, f"{assistant_name}_assistant_config.yaml")
+            )
+            shutil.copyfile(
+                "config/function_error_specs.json",
+                os.path.join(config_path, "function_error_specs.json")
+            )
         except FileNotFoundError as e:
             QMessageBox.critical(self, "Export Failed", f"Failed to copy configuration files: {e}")
             return
 
-        # Check and copy user_functions.py if exists
+        # Copy user_functions.py if present
         user_functions_src = os.path.join("functions", "user_functions.py")
         if os.path.exists(user_functions_src):
             shutil.copyfile(user_functions_src, os.path.join(functions_path, "user_functions.py"))
 
-        # Read template, replace placeholder, and create main.py
+        # Determine template path
         template_path = os.path.join("templates", "async_stream_template.py")
+
+        # If the assistant/config is real-time and the client type is real-time, pick text/audio
+        if (
+            assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value
+            and self.main_window.active_ai_client_type in [AIClientType.OPEN_AI_REALTIME, AIClientType.AZURE_OPEN_AI_REALTIME]
+        ):
+            selected_mode = assistant_config.realtime_config.modalities
+            if selected_mode == ["text", "audio"]:
+                template_path = os.path.join("templates", "realtime_audio_template.py")
+            else:
+                template_path = os.path.join("templates", "realtime_text_template.py")
+
+        # Generate main.py from the determined template
         try:
             with open(template_path, "r") as template_file:
                 template_content = template_file.read()
 
             main_content = template_content.replace("ASSISTANT_NAME", assistant_name)
+
+            # Example: if chat assistant, rename references
             if assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 main_content = main_content.replace("assistant_client", "chat_assistant_client")
                 main_content = main_content.replace("AssistantClient", "ChatAssistantClient")
 
             with open(os.path.join(export_path, "main.py"), "w") as main_file:
                 main_file.write(main_content)
+
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Failed to create main.py: {e}")
             return
 
-        QMessageBox.information(self, "Export Successful", f"Assistant '{assistant_name}' exported successfully to '{export_path}'.")
+        QMessageBox.information(
+            self,
+            "Export Successful",
+            f"Assistant '{assistant_name}' exported successfully to '{export_path}'."
+        )
         self.accept()
 
 

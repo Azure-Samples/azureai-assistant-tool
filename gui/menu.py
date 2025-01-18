@@ -114,7 +114,7 @@ class AssistantsMenu:
             QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
 
     def export_assistant(self):
-        dialog = ExportAssistantDialog()
+        dialog = ExportAssistantDialog(main_window=self.main_window)
         dialog.exec_()
 
 
