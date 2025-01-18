@@ -32,7 +32,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 ## 🆕 Latest News
 
-- **December 25, 2024:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The earlier Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
+- **January 18, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
 ## 🧱 What is Assistants from Azure OpenAI service?
@@ -64,7 +64,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 This section covers the Realtime capabilities for AI agent prototyping with OpenAI's Realtime APIs, focusing on speech and text input/output through real-time WebSocket communication.
 
-Please note that these capabilities are offered as an experimental feature. They are still under active development and are intended primarily for exploration, demos, or proof-of-concept usage. 
+Please note that these capabilities are offered as an experimental feature. They are intended primarily for exploration, demos, or proof-of-concept usage. 
 We do not recommend using these features in production or business-critical applications until further notice.
 
 ### Key Features
@@ -175,20 +175,6 @@ export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
 export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
 export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
 export OPENAI_API_KEY="Your OpenAI Key"
-```
-
-2. Set Cognitive Services Speech key (this is optional and if you want to use speech input & output).
-
-**Windows:**
-```
-setx AZURE_AI_SPEECH_KEY "Your Speech Key"
-setx AZURE_AI_SPEECH_REGION "Your Speech Region"
-```
-
-**Linux/Mac**
-``` 
-export AZURE_AI_SPEECH_KEY="Your Speech Key"
-export AZURE_AI_SPEECH_REGION="Your Speech Region"
 ```
 
 ### Step 7: Launch the application
