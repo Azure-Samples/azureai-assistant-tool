@@ -1271,7 +1271,8 @@ class AssistantConfigDialog(QDialog):
         return realtime_config
 
     def save_configuration(self):
-        if self.tabWidget.currentIndex() == 3:
+        if ((self.tabWidget.currentIndex() == 3 and self.assistant_type != AssistantType.REALTIME_ASSISTANT.value) 
+        or (self.tabWidget.currentIndex() == 4 and self.assistant_type == AssistantType.REALTIME_ASSISTANT.value)):
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
         self.assistant_name = self.get_name()
