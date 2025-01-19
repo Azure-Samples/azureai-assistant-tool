@@ -558,6 +558,10 @@ class AssistantConfigDialog(QDialog):
         self.chunkSizeSpinBox = QSpinBox()
         self.chunkSizeSpinBox.setRange(64, 65536)
         self.chunkSizeSpinBox.setValue(512)
+        self.chunkSizeSpinBox.setToolTip(
+            "Number of audio samples in each chunk that VAD processes. "
+            "Recommended to keep this a power of two (e.g. 512)."
+        )
         self.localVadSettings.addRow(self.chunkSizeLabel, self.chunkSizeSpinBox)
 
         # Window Size
@@ -565,6 +569,9 @@ class AssistantConfigDialog(QDialog):
         self.windowSizeSpinBox = QSpinBox()
         self.windowSizeSpinBox.setRange(64, 65536)
         self.windowSizeSpinBox.setValue(512)
+        self.windowSizeSpinBox.setToolTip(
+            "Size of the analysis window (in samples) that VAD uses for speech detection."
+        )
         self.localVadSettings.addRow(self.windowSizeLabel, self.windowSizeSpinBox)
 
         # Threshold
@@ -573,6 +580,10 @@ class AssistantConfigDialog(QDialog):
         self.thresholdSpinBox.setRange(0.0, 1.0)
         self.thresholdSpinBox.setSingleStep(0.05)
         self.thresholdSpinBox.setValue(0.5)
+        self.thresholdSpinBox.setToolTip(
+            "Detection threshold for VAD in the 0.0 to 1.0 range. "
+            "Lower values make it more sensitive; higher values make it more selective."
+        )
         self.localVadSettings.addRow(self.thresholdLabel, self.thresholdSpinBox)
 
         # Minimum Speech Duration
@@ -580,6 +591,9 @@ class AssistantConfigDialog(QDialog):
         self.minSpeechDurationSpinBox = QSpinBox()
         self.minSpeechDurationSpinBox.setRange(0, 10000)
         self.minSpeechDurationSpinBox.setValue(300)
+        self.minSpeechDurationSpinBox.setToolTip(
+            "Minimum duration (milliseconds) of continuous speech required for VAD to trigger."
+        )
         self.localVadSettings.addRow(self.minSpeechDurationLabel, self.minSpeechDurationSpinBox)
 
         # Minimum Silence Duration
@@ -587,6 +601,9 @@ class AssistantConfigDialog(QDialog):
         self.minSilenceDurationSpinBox = QSpinBox()
         self.minSilenceDurationSpinBox.setRange(0, 10000)
         self.minSilenceDurationSpinBox.setValue(1000)
+        self.minSilenceDurationSpinBox.setToolTip(
+            "Minimum duration (milliseconds) of silence required for VAD to treat speech as ended."
+        )
         self.localVadSettings.addRow(self.minSilenceDurationLabel, self.minSilenceDurationSpinBox)
 
         # VAD Model Path
@@ -594,7 +611,8 @@ class AssistantConfigDialog(QDialog):
         self.vadModelPathEdit = QLineEdit()
         self.vadModelPathEdit.setText(self.default_voice_activity_detection_model_path)
         self.vadModelPathEdit.setToolTip(
-            "The path to the VAD model file. If left empty or invalid, the default RMS-based VAD will be used."
+            "The path to the Silero VAD model file. If left empty or invalid, "
+            "the default RMS-based VAD is used."
         )
         self.vadModelPathButton = QPushButton('Select File...')
         self.vadModelPathButton.clicked.connect(self.select_vad_model_path)
@@ -602,7 +620,6 @@ class AssistantConfigDialog(QDialog):
         vadFilePathLayout = QHBoxLayout()
         vadFilePathLayout.addWidget(self.vadModelPathEdit)
         vadFilePathLayout.addWidget(self.vadModelPathButton)
-
         self.localVadSettings.addRow(self.vadModelPathLabel, vadFilePathLayout)
 
         # Finally, add the form to the parent layout
