@@ -4,8 +4,30 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QDialog, QGroupBox, QSplitter, QDoubleSpinBox, QComboBox, QSpinBox, QListWidgetItem, QTabWidget, QHBoxLayout, QWidget, QFileDialog, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QCheckBox, QTextEdit, QMessageBox, QSlider
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QSplitter,
+    QTabWidget,
+    QTextEdit,
+    QLineEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from PySide6.QtGui import QTextOption
 
 import json, os, shutil, threading
@@ -71,11 +93,16 @@ class AssistantConfigDialog(QDialog):
             os.makedirs(self.default_output_folder_path)
 
     def on_tab_changed(self, index):
-        # If the Instructions Editor tab is selected, copy the instructions from the Configuration tab
-        if index == 3:
+        # If the Instructions Editor tab is selected, copy instructions from the Configuration tab.
+        # For non-realtime assistants, the editor is tab 3;
+        # for realtime assistants, it's tab 4.
+        if ((index == 3 and self.assistant_type != AssistantType.REALTIME_ASSISTANT.value)
+            or (index == 4 and self.assistant_type == AssistantType.REALTIME_ASSISTANT.value)):
             self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
-        # If the Configuration tab is selected, copy the instructions from the Instructions Editor tab
-        elif index == 0 and hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText() != "":
+
+        # If the Configuration tab (#0) is selected, copy instructions back,
+        # as long as newInstructionsEdit has text.
+        elif index == 0 and hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText():
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
     def closeEvent(self, event):
@@ -134,7 +161,10 @@ class AssistantConfigDialog(QDialog):
         self.update_assistant_combobox()
 
         # Set the initial size of the dialog to make it wider
-        self.resize(600, 600)
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+            self.resize(800, 400)
+        else:
+            self.resize(600, 600)
 
     def create_config_tab(self):
         configTab = QWidget()  # Configuration tab
@@ -197,29 +227,34 @@ class AssistantConfigDialog(QDialog):
         configLayout.addWidget(self.instructionsEdit)
 
         # File references, Add File, and Remove File buttons
-        self.fileReferenceLabel = QLabel('File References for Instructions:')
-        self.fileReferenceList = QListWidget()
-        self.fileReferenceList.setMaximumHeight(100)
-        self.fileReferenceList.setToolTip("Select files to be used as references in the assistant instructions, example: {file_reference:0}, where 0 is the index of the file in the list")
-        self.fileReferenceList.setStyleSheet(
-            "QListWidget {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
-            "}"
-        )
-        self.fileReferenceAddButton = QPushButton('Add File...')
-        self.fileReferenceAddButton.clicked.connect(self.add_reference_file)
-        self.fileReferenceRemoveButton = QPushButton('Remove File')
-        self.fileReferenceRemoveButton.clicked.connect(self.remove_reference_file)
+        if self.assistant_type != AssistantType.REALTIME_ASSISTANT.value:
+            # File references, Add File, and Remove File buttons
+            self.fileReferenceLabel = QLabel('File References for Instructions:')
+            self.fileReferenceList = QListWidget()
+            self.fileReferenceList.setMaximumHeight(100)
+            self.fileReferenceList.setToolTip(
+                "Select files to be used as references in the assistant instructions, "
+                "example: {file_reference:0}, where 0 is the index of the file in the list"
+            )
+            self.fileReferenceList.setStyleSheet(
+                "QListWidget {"
+                "  border-style: solid;"
+                "  border-width: 1px;"
+                "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
+                "}"
+            )
+            self.fileReferenceAddButton = QPushButton('Add File...')
+            self.fileReferenceAddButton.clicked.connect(self.add_reference_file)
+            self.fileReferenceRemoveButton = QPushButton('Remove File')
+            self.fileReferenceRemoveButton.clicked.connect(self.remove_reference_file)
 
-        fileButtonLayout = QHBoxLayout()
-        fileButtonLayout.addWidget(self.fileReferenceAddButton)
-        fileButtonLayout.addWidget(self.fileReferenceRemoveButton)
+            fileButtonLayout = QHBoxLayout()
+            fileButtonLayout.addWidget(self.fileReferenceAddButton)
+            fileButtonLayout.addWidget(self.fileReferenceRemoveButton)
 
-        configLayout.addWidget(self.fileReferenceLabel)
-        configLayout.addWidget(self.fileReferenceList)
-        configLayout.addLayout(fileButtonLayout)
+            configLayout.addWidget(self.fileReferenceLabel)
+            configLayout.addWidget(self.fileReferenceList)
+            configLayout.addLayout(fileButtonLayout)
 
         # Model selection
         self.modelLabel = QLabel('Model:')
@@ -310,8 +345,20 @@ class AssistantConfigDialog(QDialog):
 
     def create_realtime_tab(self):
         audioTab = QWidget()
-        self.audioLayout = QVBoxLayout(audioTab)
 
+        # Top-level layout for the tab
+        mainLayout = QVBoxLayout(audioTab)
+        mainLayout.setContentsMargins(5, 5, 5, 5)
+        mainLayout.setSpacing(5)
+
+        # Form layout for label–widget rows
+        formLayout = QFormLayout()
+        formLayout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        formLayout.setLabelAlignment(Qt.AlignRight)
+        formLayout.setFormAlignment(Qt.AlignLeft)
+
+        # -----------------------------------------------------------------------
+        # Dictionaries and data
         self.voices_dict = {
             AIClientType.OPEN_AI_REALTIME.name: ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'],
             AIClientType.AZURE_OPEN_AI_REALTIME.name: [
@@ -325,79 +372,89 @@ class AssistantConfigDialog(QDialog):
         self.voiceLabel = QLabel('Voice:')
         self.voiceComboBox = QComboBox()
         self.update_voice_combo_box()
-        self.audioLayout.addWidget(self.voiceLabel)
-        self.audioLayout.addWidget(self.voiceComboBox)
+        formLayout.addRow(self.voiceLabel, self.voiceComboBox)
 
         # Modality selection
         self.modalityLabel = QLabel('Modalities:')
         self.modalityComboBox = QComboBox()
         self.modalityComboBox.addItems(['text_and_audio', 'text'])
-        self.audioLayout.addWidget(self.modalityLabel)
-        self.audioLayout.addWidget(self.modalityComboBox)
+        formLayout.addRow(self.modalityLabel, self.modalityComboBox)
 
         # Input Audio Format
         self.inputAudioFormatLabel = QLabel('Input Audio Format:')
         self.inputAudioFormatComboBox = QComboBox()
         self.inputAudioFormatComboBox.addItems(['pcm16'])
-        self.audioLayout.addWidget(self.inputAudioFormatLabel)
-        self.audioLayout.addWidget(self.inputAudioFormatComboBox)
+        formLayout.addRow(self.inputAudioFormatLabel, self.inputAudioFormatComboBox)
 
         # Output Audio Format
         self.outputAudioFormatLabel = QLabel('Output Audio Format:')
         self.outputAudioFormatComboBox = QComboBox()
         self.outputAudioFormatComboBox.addItems(['pcm16'])
-        self.audioLayout.addWidget(self.outputAudioFormatLabel)
-        self.audioLayout.addWidget(self.outputAudioFormatComboBox)
+        formLayout.addRow(self.outputAudioFormatLabel, self.outputAudioFormatComboBox)
 
         # Input Audio Transcription Model
         self.inputAudioTranscriptionModelLabel = QLabel('Input Audio Transcription Model:')
         self.inputAudioTranscriptionModelComboBox = QComboBox()
         self.inputAudioTranscriptionModelComboBox.addItems(['whisper-1'])
-        self.audioLayout.addWidget(self.inputAudioTranscriptionModelLabel)
-        self.audioLayout.addWidget(self.inputAudioTranscriptionModelComboBox)
+        formLayout.addRow(self.inputAudioTranscriptionModelLabel,
+                        self.inputAudioTranscriptionModelComboBox)
 
         # Keyword Detection Model File Path
         self.keywordFilePathLabel = QLabel('Keyword Model File Path:')
         self.keywordFilePathEdit = QLineEdit()
         self.keywordFilePathEdit.setText(self.default_keyword_model_file_path)
-        self.keywordFilePathEdit.setToolTip("The path to the keyword model file. If left empty or invalid, the keyword detection will be disabled.")
+        self.keywordFilePathEdit.setToolTip(
+            "The path to the keyword model file. If left empty or invalid, the keyword detection will be disabled."
+        )
         self.keywordFilePathButton = QPushButton('Select File...')
         self.keywordFilePathButton.clicked.connect(self.select_keyword_file_path)
 
         keywordFilePathLayout = QHBoxLayout()
         keywordFilePathLayout.addWidget(self.keywordFilePathEdit)
         keywordFilePathLayout.addWidget(self.keywordFilePathButton)
-
-        self.audioLayout.addWidget(self.keywordFilePathLabel)
-        self.audioLayout.addLayout(keywordFilePathLayout)
+        formLayout.addRow(self.keywordFilePathLabel, keywordFilePathLayout)
 
         # Keyword Rearm silence timeout in seconds
         self.keywordRearmSilenceTimeoutLabel = QLabel('Keyword Rearm Silence Timeout (seconds):')
         self.keywordRearmSilenceTimeoutSpinBox = QSpinBox()
         self.keywordRearmSilenceTimeoutSpinBox.setRange(0, 60)
         self.keywordRearmSilenceTimeoutSpinBox.setValue(10)
-        self.keywordRearmSilenceTimeoutSpinBox.setToolTip("The time in seconds to wait after user is not speaking to rearm the keyword detection.")
-        self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutLabel)
-        self.audioLayout.addWidget(self.keywordRearmSilenceTimeoutSpinBox)
+        self.keywordRearmSilenceTimeoutSpinBox.setToolTip(
+            "The time in seconds to wait after user is not speaking to rearm the keyword detection."
+        )
+        formLayout.addRow(self.keywordRearmSilenceTimeoutLabel,
+                        self.keywordRearmSilenceTimeoutSpinBox)
 
         # add checkbox for enabling auto reconnect
         self.autoReconnectCheckBox = QCheckBox("Enable Automatic Reconnection to Server")
         self.autoReconnectCheckBox.setChecked(False)
-        self.autoReconnectCheckBox.setToolTip("Automatically reconnect to the server if the websocket connection is closed by server.")
-        self.audioLayout.addWidget(self.autoReconnectCheckBox)
+        self.autoReconnectCheckBox.setToolTip(
+            "Automatically reconnect to the server if the websocket connection is closed by server."
+        )
+        # We can place this on its own row, no label needed
+        formLayout.addRow("", self.autoReconnectCheckBox)
 
         # Turn Detection
         self.turnDetectionLabel = QLabel('Turn Detection:')
         self.turnDetectionComboBox = QComboBox()
-        self.turnDetectionComboBox.addItems(['local_vad']) # 'server_vad' is not enabled currently
+        self.turnDetectionComboBox.addItems(['local_vad'])  # 'server_vad' if/when needed
         self.turnDetectionComboBox.currentIndexChanged.connect(self.update_vad_settings)
-        self.audioLayout.addWidget(self.turnDetectionLabel)
-        self.audioLayout.addWidget(self.turnDetectionComboBox)
+        formLayout.addRow(self.turnDetectionLabel, self.turnDetectionComboBox)
+
+        # Add the form layout to the main vertical layout
+        mainLayout.addLayout(formLayout)
+
+        # Reserve an area for VAD settings. We will add them dynamically in update_vad_settings().
+        self.vadLayout = QVBoxLayout()
+        self.vadLayout.setContentsMargins(0, 0, 0, 0)
+        self.vadLayout.setSpacing(5)
+        mainLayout.addLayout(self.vadLayout)
 
         # Initialize with default VAD settings
         self.currentVadSettings = None
         self.update_vad_settings()
 
+        # Finally, set the main layout as the widget’s layout
         return audioTab
 
     def update_voice_combo_box(self):
@@ -421,17 +478,20 @@ class AssistantConfigDialog(QDialog):
 
     def update_vad_settings(self):
         """ Updates the UI based on the selected VAD option (server or local). """
-        # Remove existing VAD settings
-        if self.currentVadSettings:
-            self.clear_vad_layout(self.currentVadSettings)
-        
-        # Apply new settings based on the selected option
+
+        # Clear old VAD widgets (if any) from self.vadLayout
+        while self.vadLayout.count():
+            item = self.vadLayout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
         vad_selection = self.turnDetectionComboBox.currentText()
         if vad_selection == 'server_vad':
-            self.setup_server_vad(self.audioLayout)
+            self.setup_server_vad(self.vadLayout)
             self.currentVadSettings = self.serverVadSettings
         else:
-            self.setup_local_vad(self.audioLayout)
+            self.setup_local_vad(self.vadLayout)
             self.currentVadSettings = self.localVadSettings
 
     def clear_vad_layout(self, layout):
@@ -489,74 +549,63 @@ class AssistantConfigDialog(QDialog):
         layout.addLayout(self.serverVadSettings)
 
     def setup_local_vad(self, layout):
-        self.localVadSettings = QVBoxLayout()
-        
-        # 1) Chunk size (in samples)
-        self.chunkSizeLayout = QHBoxLayout()
+        # We'll use a QFormLayout for local VAD
+        self.localVadSettings = QFormLayout()
+        self.localVadSettings.setLabelAlignment(Qt.AlignRight)
+
+        # Chunk Size
         self.chunkSizeLabel = QLabel('Chunk Size (samples):')
         self.chunkSizeSpinBox = QSpinBox()
         self.chunkSizeSpinBox.setRange(64, 65536)
         self.chunkSizeSpinBox.setValue(512)
-        self.chunkSizeLayout.addWidget(self.chunkSizeLabel)
-        self.chunkSizeLayout.addWidget(self.chunkSizeSpinBox)
-        self.localVadSettings.addLayout(self.chunkSizeLayout)
+        self.localVadSettings.addRow(self.chunkSizeLabel, self.chunkSizeSpinBox)
 
-        # 2) Window size (in samples) corresponds to "window_size_samples" in Silero
-        self.windowSizeLayout = QHBoxLayout()
+        # Window Size
         self.windowSizeLabel = QLabel('Window Size (samples):')
         self.windowSizeSpinBox = QSpinBox()
         self.windowSizeSpinBox.setRange(64, 65536)
         self.windowSizeSpinBox.setValue(512)
-        self.windowSizeLayout.addWidget(self.windowSizeLabel)
-        self.windowSizeLayout.addWidget(self.windowSizeSpinBox)
-        self.localVadSettings.addLayout(self.windowSizeLayout)
+        self.localVadSettings.addRow(self.windowSizeLabel, self.windowSizeSpinBox)
 
-        # 3) Threshold (0.0 - 1.0)
-        self.thresholdLayout = QHBoxLayout()
+        # Threshold
         self.thresholdLabel = QLabel('Threshold (0.0 - 1.0):')
         self.thresholdSpinBox = QDoubleSpinBox()
         self.thresholdSpinBox.setRange(0.0, 1.0)
         self.thresholdSpinBox.setSingleStep(0.05)
         self.thresholdSpinBox.setValue(0.5)
-        self.thresholdLayout.addWidget(self.thresholdLabel)
-        self.thresholdLayout.addWidget(self.thresholdSpinBox)
-        self.localVadSettings.addLayout(self.thresholdLayout)
+        self.localVadSettings.addRow(self.thresholdLabel, self.thresholdSpinBox)
 
-        # 4) Minimum Speech Duration (ms) -> will convert to seconds later
-        self.minSpeechDurationLayout = QHBoxLayout()
+        # Minimum Speech Duration
         self.minSpeechDurationLabel = QLabel('Minimum Speech Duration (ms):')
         self.minSpeechDurationSpinBox = QSpinBox()
         self.minSpeechDurationSpinBox.setRange(0, 10000)
         self.minSpeechDurationSpinBox.setValue(300)
-        self.minSpeechDurationLayout.addWidget(self.minSpeechDurationLabel)
-        self.minSpeechDurationLayout.addWidget(self.minSpeechDurationSpinBox)
-        self.localVadSettings.addLayout(self.minSpeechDurationLayout)
+        self.localVadSettings.addRow(self.minSpeechDurationLabel, self.minSpeechDurationSpinBox)
 
-        # 5) Minimum Silence Duration (ms) -> will convert to seconds later
-        self.minSilenceDurationLayout = QHBoxLayout()
+        # Minimum Silence Duration
         self.minSilenceDurationLabel = QLabel('Minimum Silence Duration (ms):')
         self.minSilenceDurationSpinBox = QSpinBox()
         self.minSilenceDurationSpinBox.setRange(0, 10000)
         self.minSilenceDurationSpinBox.setValue(1000)
-        self.minSilenceDurationLayout.addWidget(self.minSilenceDurationLabel)
-        self.minSilenceDurationLayout.addWidget(self.minSilenceDurationSpinBox)
-        self.localVadSettings.addLayout(self.minSilenceDurationLayout)
+        self.localVadSettings.addRow(self.minSilenceDurationLabel, self.minSilenceDurationSpinBox)
 
-        # 6) VAD Model Path
+        # VAD Model Path
         self.vadModelPathLabel = QLabel('VAD Model Path:')
         self.vadModelPathEdit = QLineEdit()
         self.vadModelPathEdit.setText(self.default_voice_activity_detection_model_path)
-        self.vadModelPathEdit.setToolTip("The path to the VAD model file. If left empty or invalid, the default RMS based VAD will be used.")
+        self.vadModelPathEdit.setToolTip(
+            "The path to the VAD model file. If left empty or invalid, the default RMS-based VAD will be used."
+        )
         self.vadModelPathButton = QPushButton('Select File...')
         self.vadModelPathButton.clicked.connect(self.select_vad_model_path)
-        
-        self.localVadSettings.addWidget(self.vadModelPathLabel)
+
         vadFilePathLayout = QHBoxLayout()
         vadFilePathLayout.addWidget(self.vadModelPathEdit)
         vadFilePathLayout.addWidget(self.vadModelPathButton)
-        self.localVadSettings.addLayout(vadFilePathLayout)
-        
-        # Finally, add local VAD settings to the main layout
+
+        self.localVadSettings.addRow(self.vadModelPathLabel, vadFilePathLayout)
+
+        # Finally, add the form to the parent layout
         layout.addLayout(self.localVadSettings)
 
     def setup_code_interpreter_files(self, layout):
@@ -1296,7 +1345,7 @@ class AssistantConfigDialog(QDialog):
             'instructions': self.instructionsEdit.toPlainText(),
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
-            'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())],
+            'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())] if self.assistant_type != AssistantType.REALTIME_ASSISTANT.value else [],
             'tool_resources': tool_resources.to_dict() if self.assistant_type == AssistantType.ASSISTANT.value else None,
             'functions': self.functions,
             'file_search': self.fileSearchCheckBox.isChecked() if self.assistant_type == "assistant" else False,
