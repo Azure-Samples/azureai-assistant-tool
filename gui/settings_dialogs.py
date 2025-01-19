@@ -254,3 +254,10 @@ class ClientSettingsDialog(QDialog):
     def save_settings(self, settings_json : str):
         with open(self.file_path, 'w') as file:
             file.write(settings_json)
+
+        # Initialize the system assistant with the new settings
+        self.main_window.init_system_assistant_settings()
+        self.main_window.init_system_assistants()
+
+        # Save the settings to the config files
+        self.main_window.assistant_config_manager.save_configs()
