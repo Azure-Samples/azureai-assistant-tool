@@ -1,5 +1,5 @@
 # Assistant middleware from GitHub Release
-https://github.com/azureai-assistant-tool/releases/download/v0.5.1-alpha/azure_ai_assistant-0.5.1a1-py3-none-any.whl
+https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.5.1-alpha/azure_ai_assistant-0.5.1a1-py3-none-any.whl
 
 # GUI Framework
 PySide6
