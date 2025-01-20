@@ -6,6 +6,282 @@ from azure.ai.assistant.management.logger_module import logger
 
 import json, os
 from typing import Optional, Union
+from enum import Enum
+
+
+class AssistantType(Enum):
+    REALTIME_ASSISTANT = "realtime_assistant"
+    CHAT_ASSISTANT = "chat_assistant"
+    ASSISTANT = "assistant"
+
+
+class RealtimeConfig:
+    """
+    A class representing the configuration for realtime.
+
+    :param voice: The voice.
+    :type voice: str
+    :param modalities: The modalities.
+    :type modalities: str
+    :param input_audio_format: The input audio format.
+    :type input_audio_format: str
+    :param output_audio_format: The output audio format.
+    :type output_audio_format: str
+    :param input_audio_transcription_model: The input audio transcription model.
+    :type input_audio_transcription_model: str
+    :param keyword_detection_model: The keyword detection model.
+    :type keyword_detection_model: str
+    :param voice_activity_detection_model: The voice activity detection model. If empty, the default RMS VAD is used and turn detection parameters are ignored.
+    :type voice_activity_detection_model: str
+    :param keyword_rearm_silence_timeout: The keyword rearm silence timeout.
+    :type keyword_rearm_silence_timeout: int
+    :param turn_detection: The turn detection dictionary. For local_vad, it may include:
+        - type: "local_vad"
+        - chunk_size: int
+        - window_size_samples: int
+        - threshold: float (0–1)
+        - min_speech_duration: float (seconds)
+        - min_silence_duration: float (seconds)
+    :type turn_detection: dict
+    :param auto_reconnect: The auto reconnect.
+    :type auto_reconnect: bool
+    """
+    def __init__(self,
+                 voice: str,
+                 modalities: str,
+                 input_audio_format: str,
+                 output_audio_format: str,
+                 input_audio_transcription_model: str,
+                 keyword_detection_model: str,
+                 voice_activity_detection_model: str,
+                 keyword_rearm_silence_timeout: int,
+                 turn_detection: dict,
+                 auto_reconnect: bool = False
+    ) -> None:
+        self._voice = voice
+        self._modalities = modalities
+        self._input_audio_format = input_audio_format
+        self._output_audio_format = output_audio_format
+        self._input_audio_transcription_model = input_audio_transcription_model
+        self._keyword_detection_model = keyword_detection_model
+        self._voice_activity_detection_model = voice_activity_detection_model
+        self._keyword_rearm_silence_timeout = keyword_rearm_silence_timeout
+        self._turn_detection = turn_detection
+        self._auto_reconnect = auto_reconnect
+
+    @property
+    def voice(self) -> str:
+        """
+        Get the voice.
+
+        :return: The voice.
+        :rtype: str
+        """
+        return self._voice
+    
+    @voice.setter
+    def voice(self, value) -> None:
+        """
+        Set the voice.
+
+        :param value: The voice.
+        :type value: str
+        """
+        self._voice = value
+
+    @property
+    def modalities(self) -> list:
+        """
+        Get the modalities.
+
+        :return: The modalities.
+        :rtype: list
+        """
+        if self._modalities == "text_and_audio":
+            return ['text', 'audio']
+        elif self._modalities == "text":
+            return ['text']
+
+    @property
+    def input_audio_format(self) -> str:
+        """
+        Get the input audio format.
+
+        :return: The input audio format.
+        :rtype: str
+        """
+        return self._input_audio_format
+    
+    @input_audio_format.setter
+    def input_audio_format(self, value) -> None:
+        """
+        Set the input audio format.
+
+        :param value: The input audio format.
+        :type value: str
+        """
+        self._input_audio_format = value
+
+    @property
+    def output_audio_format(self) -> str:
+        """
+        Get the output audio format.
+
+        :return: The output audio format.
+        :rtype: str
+        """
+        return self._output_audio_format
+    
+    @output_audio_format.setter
+    def output_audio_format(self, value) -> None:
+        """
+        Set the output audio format.
+
+        :param value: The output audio format.
+        :type value: str
+        """
+        self._output_audio_format = value
+
+    @property
+    def input_audio_transcription_model(self) -> str:
+        """
+        Get the input audio transcription model.
+
+        :return: The input audio transcription model.
+        :rtype: str
+        """
+        return self._input_audio_transcription_model
+    
+    @input_audio_transcription_model.setter
+    def input_audio_transcription_model(self, value) -> None:
+        """
+        Set the input audio transcription model.
+
+        :param value: The input audio transcription model.
+        :type value: str
+        """
+        self._input_audio_transcription_model = value
+
+    @property
+    def keyword_detection_model(self) -> str:
+        """
+        Get the keyword detection model.
+
+        :return: The keyword detection model.
+        :rtype: str
+        """
+        return self._keyword_detection_model.strip()
+    
+    @keyword_detection_model.setter
+    def keyword_detection_model(self, value) -> None:
+        """
+        Set the keyword detection model.
+
+        :param value: The keyword detection model.
+        :type value: str
+        """
+        self._keyword_detection_model = value
+
+
+    @property
+    def voice_activity_detection_model(self) -> str:
+        """
+        Get the voice activity detection model.
+
+        :return: The voice activity detection model.
+        :rtype: str
+        """
+        return self._voice_activity_detection_model
+    
+    @voice_activity_detection_model.setter
+    def voice_activity_detection_model(self, value) -> None:
+        """
+        Set the voice activity detection model.
+
+        :param value: The voice activity detection model.
+        :type value: str
+        """
+        self._voice_activity_detection_model = value
+
+    @property
+    def keyword_rearm_silence_timeout(self) -> int:
+        """
+        Get the keyword rearm silence timeout.
+
+        :return: The keyword rearm silence timeout.
+        :rtype: int
+        """
+        return self._keyword_rearm_silence_timeout
+    
+    @keyword_rearm_silence_timeout.setter
+    def keyword_rearm_silence_timeout(self, value) -> None:
+        """
+        Set the keyword rearm silence timeout.
+
+        :param value: The keyword rearm silence timeout.
+        :type value: int
+        """
+        self._keyword_rearm_silence_timeout = value
+
+    @property
+    def turn_detection(self) -> dict:
+        """
+        Get the turn detection.
+
+        :return: The turn detection.
+        :rtype: dict
+        """
+        return self._turn_detection
+    
+    @turn_detection.setter
+    def turn_detection(self, value) -> None:
+        """
+        Set the turn detection.
+
+        :param value: The turn detection.
+        :type value: dict
+        """
+        self._turn_detection = value
+
+    @property
+    def auto_reconnect(self) -> bool:
+        """
+        Get the auto reconnect.
+
+        :return: The auto reconnect.
+        :rtype: bool
+        """
+        return self._auto_reconnect
+    
+    @auto_reconnect.setter
+    def auto_reconnect(self, value) -> None:
+        """
+        Set the auto reconnect.
+
+        :param value: The auto reconnect.
+        :type value: bool
+        """
+        self._auto_reconnect = value
+
+    def to_dict(self) -> dict:
+        """
+        Convert the audio configuration to a dictionary.
+
+        :return: The audio configuration as a dictionary.
+        :rtype: dict
+        """
+        return {
+            'voice': self.voice,
+            'modalities': self._modalities,
+            'input_audio_format': self.input_audio_format,
+            'output_audio_format': self.output_audio_format,
+            'input_audio_transcription_model': self.input_audio_transcription_model,
+            'keyword_detection_model': self.keyword_detection_model,
+            'voice_activity_detection_model': self.voice_activity_detection_model,
+            'keyword_rearm_silence_timeout': self.keyword_rearm_silence_timeout,
+            'auto_reconnect': self.auto_reconnect,
+            'turn_detection': self.turn_detection
+        }
 
 
 class TextCompletionConfig:
@@ -383,6 +659,94 @@ class AssistantTextCompletionConfig:
         self._truncation_strategy = value
 
 
+class RealtimeCompletionConfig:
+    """
+    A class representing the configuration for realtime completion.
+
+    :param temperature: The temperature.
+    :type temperature: float
+    :param max_text_messages: The maximum number of text messages.
+    :type max_text_messages: int
+    :param max_output_tokens: The maximum number of output tokens. A number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model
+    :type max_output_tokens: Union[int, str]
+    """
+    def __init__(self, 
+                 temperature: float, 
+                 max_text_messages: int,
+                 max_output_tokens: Union[int, str] = "inf"
+    ) -> None:
+        self._temperature = temperature
+        self._max_text_messages = max_text_messages
+        self._max_output_tokens = max_output_tokens
+
+    def to_dict(self):
+        return {'temperature': self.temperature,
+                'max_text_messages': self.max_text_messages,
+                'max_output_tokens': self.max_output_tokens,
+                }
+
+    @property
+    def temperature(self) -> float:
+        """
+        Get the temperature.
+
+        :return: The temperature.
+        :rtype: float
+        """
+        return self._temperature
+    
+    @temperature.setter
+    def temperature(self, value) -> None:
+        """
+        Set the temperature.
+
+        :param value: The temperature.
+        :type value: float
+        """
+        self._temperature = value
+
+    @property
+    def max_text_messages(self) -> int:
+        """
+        Get the maximum number of text messages.
+
+        :return: The maximum number of text messages.
+        :rtype: int
+        """
+        return self._max_text_messages
+    
+    @max_text_messages.setter
+    def max_text_messages(self, value) -> None:
+        """
+        Set the maximum number of text messages.
+
+        :param value: The maximum number of text messages.
+        :type value: int
+        """
+        self._max_text_messages = value
+
+    @property
+    def max_output_tokens(self) -> Union[int, str]:
+        """
+        Get the maximum number of output tokens, which can be a number between 1 and 4096 to limit output tokens, 
+        or 'inf' for the maximum available tokens for a given model.
+
+        :return: The maximum number of output tokens.
+        :rtype: Union[int, str]
+        """
+        return self._max_output_tokens
+    
+    @max_output_tokens.setter
+    def max_output_tokens(self, value) -> None:
+        """
+        Set the maximum number of output tokens.
+
+        :param value: The maximum number of output tokens.
+        :type value: str
+        """
+        self._max_output_tokens = value
+
+
 class VectorStoreConfig:
     """
     A class representing the configuration for a vector store.
@@ -635,7 +999,7 @@ class AssistantConfig:
         self._assistant_id = config_data.get('assistant_id', None) if config_data.get('assistant_id', '') != '' else None
         self._ai_client_type = config_data.get('ai_client_type', 'OPEN_AI')
         self._model = config_data['model']
-        self._assistant_type = config_data.get('assistant_type', 'assistant')
+        self._assistant_type = config_data.get('assistant_type', AssistantType.ASSISTANT.value)
         self._file_references = config_data.get('file_references', [])
         
         # Extracting tool resources configuration
@@ -655,13 +1019,14 @@ class AssistantConfig:
 
         # Completion settings based on assistant type
         self._text_completion_config = self._setup_completion_settings(config_data)
+        self._realtime_config = self._setup_realtime_config(config_data)
 
         # Config folder for local assistant and threads configuration
         self._config_folder = None
 
     def _setup_completion_settings(self, config_data):
         if config_data.get('completion_settings', None) is not None:
-            if self._assistant_type == 'chat_assistant':
+            if self._assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 completion_data = config_data.get('completion_settings', {
                     'frequency_penalty': 0.0,
                     'max_tokens': 1000,
@@ -683,7 +1048,7 @@ class AssistantConfig:
                     seed=None,
                     max_text_messages=completion_data['max_text_messages']
                 )
-            elif self._assistant_type == 'assistant':
+            elif self._assistant_type == AssistantType.ASSISTANT.value:
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
                     'max_completion_tokens': 1000,
@@ -704,6 +1069,57 @@ class AssistantConfig:
                     response_format=completion_data['response_format'],
                     truncation_strategy=completion_data['truncation_strategy']
                 )
+            elif self._assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                completion_data = config_data.get('completion_settings', {
+                    'temperature': 1.0,
+                    'max_text_messages': None,
+                    'max_output_tokens': 'inf'
+                })
+                # Constructing RealtimeCompletionConfig from the dictionary
+                return RealtimeCompletionConfig(
+                    temperature=completion_data['temperature'],
+                    max_text_messages=completion_data['max_text_messages'],
+                    max_output_tokens=completion_data['max_output_tokens']
+                )
+
+
+    def _setup_realtime_config(self, config_data):
+        if config_data.get('realtime_settings', None) is not None:
+            realtime_data = config_data.get('realtime_settings', {
+                'voice': 'alloy',
+                'modalities': 'text_and_audio',
+                'input_audio_format': 'pcm16',
+                'output_audio_format': 'pcm16',
+                'input_audio_transcription_model': 'whisper-1',
+                'keyword_detection_model': '',
+                'voice_activity_detection_model': '',
+                'keyword_rearm_silence_timeout': 10,
+                'turn_detection': {
+                    'type': 'local_vad',
+                    # Defaults below map to Silero VAD parameters:
+                    'chunk_size': 512,
+                    'window_size_samples': 512,
+                    'threshold': 0.5,
+                    'min_speech_duration': 0.3,
+                    'min_silence_duration': 1.0
+                },
+                'auto_reconnect': False
+            })
+
+            return RealtimeConfig(
+                voice=realtime_data['voice'],
+                modalities=realtime_data['modalities'],
+                input_audio_format=realtime_data['input_audio_format'],
+                output_audio_format=realtime_data['output_audio_format'],
+                input_audio_transcription_model=realtime_data['input_audio_transcription_model'],
+                keyword_detection_model=realtime_data['keyword_detection_model'],
+                voice_activity_detection_model=realtime_data.get('voice_activity_detection_model', ''),
+                keyword_rearm_silence_timeout=realtime_data['keyword_rearm_silence_timeout'],
+                turn_detection=realtime_data['turn_detection'],
+                auto_reconnect=realtime_data.get('auto_reconnect', False)
+            )
+        else:
+            return None
 
     def _initialize_tool_resources(self, tool_resources_data):
         if tool_resources_data:
@@ -727,10 +1143,10 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        if self._assistant_type == "chat_assistant":
-            return None
-        else:
+        if self._assistant_type == AssistantType.ASSISTANT.value:
             return ToolResourcesConfig()
+        else:
+            return None
 
     def __eq__(self, other):
         if not isinstance(other, AssistantConfig):
@@ -790,6 +1206,7 @@ class AssistantConfig:
         self._config_data['assistant_type'] = self._assistant_type
         self._config_data['assistant_role'] = self._assistant_role
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
+        self._config_data['realtime_settings'] = self._realtime_config.to_dict() if self._realtime_config is not None else None
         self._config_data['config_folder'] = self._config_folder
         return self._config_data
 
@@ -1022,14 +1439,23 @@ class AssistantConfig:
         return self._assistant_role
 
     @property
-    def text_completion_config(self) -> Union[TextCompletionConfig, AssistantTextCompletionConfig, None]:
+    def text_completion_config(self) -> Union[TextCompletionConfig, AssistantTextCompletionConfig, RealtimeCompletionConfig, None]:
         """Get the text completion config.
         
         :return: The completion config.
-        :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, None]
+        :rtype: Union[TextCompletionConfig, AssistantTextCompletionConfig, RealtimeCompletionConfig, None]
         """
         return self._text_completion_config
     
+    @property
+    def realtime_config(self) -> RealtimeConfig:
+        """Get the audio config.
+        
+        :return: The audio config.
+        :rtype: AudioConfig
+        """
+        return self._realtime_config
+
     @property
     def config_folder(self) -> str:
         """Get the config folder.

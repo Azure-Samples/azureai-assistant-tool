@@ -2,7 +2,6 @@ import threading
 from typing import Dict
 from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
-from azure.ai.assistant.management.message import TextMessage, FileMessage, ImageMessage
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.task_manager import TaskManager, TaskManagerCallbacks, MultiTask
@@ -72,6 +71,7 @@ class MultiAgentOrchestrator(TaskManagerCallbacks, AssistantClientCallbacks):
     def wait_for_all_tasks(self):
         for event in self.task_completion_events.values():
             event.wait()
+
 
 # Create multi agent orchestration, assumed that all assistants are of AZURE_OPEN_AI type
 orchestrator = MultiAgentOrchestrator(assistant_names, AIClientType.AZURE_OPEN_AI)

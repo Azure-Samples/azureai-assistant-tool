@@ -326,3 +326,23 @@ class BaseAssistantClient:
         :rtype: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI]
         """
         return self._ai_client
+    
+    @property
+    def ai_client_type(self) -> Union[AIClientType, AsyncAIClientType]:
+        """
+        The type of AI client used by the chat assistant.
+
+        :return: The AI client type.
+        :rtype: Union[AIClientType, AsyncAIClientType]
+        """
+        return self._ai_client_type
+
+    @property
+    def callbacks(self) -> Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]:
+        """
+        The callbacks used by the chat assistant.
+
+        :return: The callbacks.
+        :rtype: Union[AssistantClientCallbacks, AsyncAssistantClientCallbacks]
+        """
+        return self._callbacks

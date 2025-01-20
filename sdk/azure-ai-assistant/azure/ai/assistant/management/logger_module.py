@@ -27,6 +27,10 @@ def setup_logger() -> logging.Logger:
     :return: The logger instance.
     :rtype: logging.Logger
     """
+
+    realtime_ai_package_logger = logging.getLogger('realtime_ai')
+    realtime_ai_package_logger.setLevel(logging.CRITICAL)
+
     logger = logging.getLogger('assistant_logger')
     logger.setLevel(logging.INFO)
     

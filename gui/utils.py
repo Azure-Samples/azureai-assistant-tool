@@ -55,7 +55,7 @@ def init_system_assistant(instance, assistant_name: str):
             # Update the ai_client_type in the assistant_config
             assistant_config.ai_client_type = ai_client_type
 
-        if not assistant_config.model:
+        if not assistant_config.model or assistant_config.model != instance.system_model:
             logger.warning(f"Model not found in the {assistant_name} assistant config, using the system assistant model.")
             assistant_config.model = instance.system_model
 

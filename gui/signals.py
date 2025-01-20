@@ -11,17 +11,11 @@ from gui.status_bar import ActivityStatus
 class AppendConversationSignal(QObject):
     update_signal = Signal(str, str, str)
 
-class UserInputSignal(QObject):
-    update_signal = Signal(str)
-
-class UserInputSendSignal(QObject):
-    send_signal = Signal(str)
-
-class SpeechSynthesisCompleteSignal(QObject):
-    complete_signal = Signal()
-
 class ConversationViewClear(QObject):
     update_signal = Signal()
+
+class ConversationAppendMessageSignal(QObject):
+    append_signal = Signal(object)
 
 class ConversationAppendMessagesSignal(QObject):
     append_signal = Signal(list)

@@ -173,19 +173,18 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             stream: Optional[bool] = False
     ) -> Optional[str]:
         """
-        Process the messages in given thread.
+        Process the messages in a given thread.
 
         :param thread_name: The name of the thread to process.
         :type thread_name: Optional[str]
         :param user_request: The user request to process.
         :type user_request: Optional[str]
-        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param additional_instructions: Additional instructions for the assistant.
         :type additional_instructions: Optional[str]
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
-        :param stream: A flag to indicate if the response should be streamed.
+        :param stream: A flag indicating if the response should be streamed.
         :type stream: Optional[bool]
-
         :return: The response from the assistant.
         :rtype: Optional[str]
         """
@@ -194,10 +193,10 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             raise ValueError("Either thread_name or user_request must be provided.")
 
         try:
-            logger.info(f"Process messages for chat assistant")
+            logger.info("Process messages for chat assistant")
 
             if additional_instructions:
-                self._messages.append({"role": "system", "content": additional_instructions})
+                self._messages.append({"role": "developer", "content": additional_instructions})
 
             if thread_name:
                 max_text_messages = self._assistant_config.text_completion_config.max_text_messages if self._assistant_config.text_completion_config else None
@@ -219,39 +218,90 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
                 self._cancel_run_requested.clear()
 
             response = None
-            while continue_processing:
+            text_config = self._assistant_config.text_completion_config
+            model = self._assistant_config.model
 
+            temperature = text_config.temperature if text_config else None
+            seed = text_config.seed if text_config else None
+            frequency_penalty = text_config.frequency_penalty if text_config else None
+            max_tokens = text_config.max_tokens if text_config else None
+            presence_penalty = text_config.presence_penalty if text_config else None
+            top_p = text_config.top_p if text_config else None
+            response_format = {"type": text_config.response_format} if text_config else None
+
+            while continue_processing:
                 if self._cancel_run_requested.is_set():
                     logger.info("User input processing cancellation requested.")
                     self._cancel_run_requested.clear()
                     break
 
-                text_completion_config = self._assistant_config.text_completion_config
+                try:
+                    if not model.startswith("o1"):
+                        response = await self._async_client.chat.completions.create(
+                            model=model,
+                            messages=self._messages,
+                            tools=self._tools,
+                            tool_choice=None if self._tools is None else "auto",
+                            stream=stream,
+                            temperature=temperature,
+                            seed=seed,
+                            frequency_penalty=frequency_penalty,
+                            max_tokens=max_tokens,
+                            presence_penalty=presence_penalty,
+                            response_format=response_format,
+                            top_p=top_p,
+                            timeout=timeout
+                        )
+                    else:
+                        stream = False
+                        response = await self._async_client.chat.completions.create(
+                            model=model,
+                            messages=self._messages,
+                            tools=self._tools,
+                            tool_choice=None if self._tools is None else "auto",
+                            response_format=response_format,
+                            timeout=timeout
+                        )
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "developer" in err_str and "invalid_request_error" in err_str:
+                        logger.warning("Model does not support 'developer' role. Falling back to 'system' role.")
+                        # Convert all 'developer' role messages to 'system' role, preserving their content
+                        for i, msg in enumerate(self._messages):
+                            if msg.get("role") == "developer":
+                                self._messages[i]["role"] = "system"
 
-                temperature = None if text_completion_config is None else text_completion_config.temperature
-                seed = None if text_completion_config is None else text_completion_config.seed
-                frequency_penalty = None if text_completion_config is None else text_completion_config.frequency_penalty
-                max_tokens = 1000 if text_completion_config is None else text_completion_config.max_tokens
-                presence_penalty = None if text_completion_config is None else text_completion_config.presence_penalty
-                top_p = None if text_completion_config is None else text_completion_config.top_p
-                response_format = None if text_completion_config is None else {'type': text_completion_config.response_format}
+                        # Retry creation call after removing the "developer" role
+                        if not model.startswith("o1"):
+                            response = await self._async_client.chat.completions.create(
+                                model=model,
+                                messages=self._messages,
+                                tools=self._tools,
+                                tool_choice=None if self._tools is None else "auto",
+                                stream=stream,
+                                temperature=temperature,
+                                seed=seed,
+                                frequency_penalty=frequency_penalty,
+                                max_tokens=max_tokens,
+                                presence_penalty=presence_penalty,
+                                response_format=response_format,
+                                top_p=top_p,
+                                timeout=timeout
+                            )
+                        else:
+                            stream = False
+                            response = await self._async_client.chat.completions.create(
+                                model=model,
+                                messages=self._messages,
+                                tools=self._tools,
+                                tool_choice=None if self._tools is None else "auto",
+                                response_format=response_format,
+                                timeout=timeout
+                            )
+                    else:
+                        raise e
 
-                response = await self._async_client.chat.completions.create(
-                    model=self._assistant_config.model,
-                    messages=self._messages,
-                    tools=self._tools,
-                    tool_choice=None if self._tools is None else "auto",
-                    stream=stream,
-                    temperature=temperature,
-                    seed=seed,
-                    frequency_penalty=frequency_penalty,
-                    max_tokens=max_tokens,
-                    presence_penalty=presence_penalty,
-                    response_format=response_format,
-                    top_p=top_p,
-                    timeout=timeout
-                )
-
+                # Handle streaming or non-streaming responses
                 if response and stream:
                     continue_processing = await self._handle_streaming_response(response, thread_name, run_id)
                 elif response:
@@ -266,8 +316,8 @@ class AsyncChatAssistantClient(BaseChatAssistantClient):
             await self._callbacks.on_run_update(self._name, run_id, "completed", thread_name)
 
             run_end_time = str(datetime.now())
-            if not thread_name and not stream:
-                # If there's no thread name, call the end_run callback and return the response
+            # If there's no thread name and no streaming, return the response
+            if not thread_name and not stream and response:
                 response_message = response.choices[0].message.content
                 await self._callbacks.on_run_end(self._name, run_id, run_end_time, thread_name, response_message)
                 return response_message

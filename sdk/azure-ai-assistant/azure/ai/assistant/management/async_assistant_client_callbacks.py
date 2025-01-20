@@ -5,6 +5,35 @@ from azure.ai.assistant.management.async_message import AsyncConversationMessage
 
 
 class AsyncAssistantClientCallbacks:
+
+    async def on_connected(self, assistant_name, assistant_type, thread_name):
+        """Callback for when an assistant is connected.
+        
+        :param assistant_name: The name of the assistant.
+        :type assistant_name: str
+        :param assistant_type: The type of the assistant.
+        :type assistant_type: str
+        :param thread_name: The name of the thread.
+        :type thread_name: str
+
+        :return: None
+        :rtype: None
+        """
+        pass
+
+    async def on_disconnected(self, assistant_name, assistant_type):
+        """Callback for when an assistant is disconnected.
+        
+        :param assistant_name: The name of the assistant.
+        :type assistant_name: str
+        :param assistant_type: The type of the assistant.
+        :type assistant_type: str
+
+        :return: None
+        :rtype: None
+        """
+        pass
+
     async def on_run_start(self, assistant_name, run_identifier, run_start_time, user_input):
         """Callback for when a run starts.
         
@@ -22,7 +51,7 @@ class AsyncAssistantClientCallbacks:
         """
         pass
 
-    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message= None):
         """Callback for when a run updates.
         
         :param assistant_name: The name of the assistant.

@@ -7,9 +7,12 @@
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtGui import QAction
 
+from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
 from gui.debug_dialog import DebugViewDialog
@@ -22,28 +25,41 @@ from gui.log_broadcaster import LogBroadcaster
 
 
 class AssistantsMenu:
-    def __init__(self, main_window):
+    def __init__(self, main_window, client_type):
         self.main_window = main_window
+        self.client_type = client_type
         self.assistants_menu = self.main_window.menuBar().addMenu("&Assistants")
         self.function_config_manager = FunctionConfigManager.get_instance()
         self.assistant_client_manager = AssistantClientManager.get_instance()
         self.create_assistants_menu()
 
     def create_assistants_menu(self):
-        self.assistantActions = {}
-
-        createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
-        createAssistantAction.triggered.connect(self.create_new_edit_assistant)
-        self.assistants_menu.addAction(createAssistantAction)
-
-        createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
-        createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
-        self.assistants_menu.addAction(createChatAssistantAction)
-
-        # Add an action for exporting an assistant
+        self.assistants_menu.clear()  # Clear existing menu actions
+        if self.client_type == AIClientType.OPEN_AI_REALTIME or self.client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+            # Only add Realtime Assistant action
+            createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
+            createRealtimeAssistantAction.triggered.connect(self.create_new_edit_realtime_assistant)
+            self.assistants_menu.addAction(createRealtimeAssistantAction)
+        else:
+            # Add OpenAI Assistant action
+            createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
+            createAssistantAction.triggered.connect(self.create_new_edit_assistant)
+            self.assistants_menu.addAction(createAssistantAction)
+            
+            # Add Chat Assistant action
+            createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
+            createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
+            self.assistants_menu.addAction(createChatAssistantAction)
+        
+        # Common export action
         exportAction = QAction('Export', self.main_window)
         exportAction.triggered.connect(self.export_assistant)
         self.assistants_menu.addAction(exportAction)
+
+    def update_client_type(self, new_client_type):
+        if self.client_type != new_client_type:
+            self.client_type = new_client_type
+            self.create_assistants_menu()  # Update menu based on the new client type
 
     def create_new_edit_assistant(self):
         self.dialog = AssistantConfigDialog(parent=self.main_window, function_config_manager=self.function_config_manager)
@@ -55,7 +71,7 @@ class AssistantsMenu:
         self.dialog.show()
 
     def create_new_edit_chat_assistant(self):
-        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", function_config_manager=self.function_config_manager)
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, function_config_manager=self.function_config_manager)
         
         # Connect the custom signal to a method to process the submitted data
         self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
@@ -63,13 +79,34 @@ class AssistantsMenu:
         # Show the dialog non-modally
         self.dialog.show()
 
-    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type):
+    def create_new_edit_realtime_assistant(self):
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, function_config_manager=self.function_config_manager)
+        
+        # Connect the custom signal to a method to process the submitted data
+        self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
+
+        # Show the dialog non-modally
+        self.dialog.show()
+
+    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
-            if assistant_type == "chat_assistant":
+            realtime_audio = None
+            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            else:
+
+            elif assistant_type == AssistantType.ASSISTANT.value:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+
+            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
+                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
+                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                    assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
+                    realtime_audio.update(assistant_client.assistant_config)
+                else:
+                    assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                    realtime_audio = RealtimeAudio(assistant_client)
+            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
             self.dialog.update_assistant_combobox()
@@ -77,7 +114,7 @@ class AssistantsMenu:
             QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
 
     def export_assistant(self):
-        dialog = ExportAssistantDialog()
+        dialog = ExportAssistantDialog(main_window=self.main_window)
         dialog.exec_()
 
 
@@ -192,6 +229,10 @@ class TasksMenu:
         dialog.show()
 
     def schedule_task(self):
+        if self.main_window.active_ai_client_type == AIClientType.OPEN_AI_REALTIME or self.main_window.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
+            QMessageBox.information(self.main_window, "Not Implemented", "This feature is not implemented for Realtime Assistants.")
+            return
+
         dialog = ScheduleTaskDialog(self.main_window, self.main_window.task_manager)
         dialog.show()
 

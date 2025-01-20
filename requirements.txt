@@ -1,5 +1,5 @@
 # Assistant middleware from GitHub Release
-https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.4.5-alpha/azure_ai_assistant-0.4.5a1-py3-none-any.whl
+https://github.com/Azure-Samples/azureai-assistant-tool/releases/download/v0.5.1-alpha/azure_ai_assistant-0.5.1a1-py3-none-any.whl
 
 # GUI Framework
 PySide6
@@ -9,3 +9,6 @@ azure-cognitiveservices-speech
 
 # Beautiful Soup
 beautifulsoup4
+
+# Realtime Python Library
+https://github.com/jhakulin/realtime-ai/releases/download/v0.1.8/realtime_ai-0.1.8-py3-none-any.whl

@@ -35,10 +35,6 @@ class GeneralSettingsDialog(QDialog):
         self.useSystemAssistantForThreadsCheckbox = QCheckBox("Enable system assistant to generate friendly conversation thread names", self)
         self.useSystemAssistantForThreadsCheckbox.setChecked(self.main_window.use_system_assistant_for_thread_name)
 
-        # Text summarization checkbox for long messages for speech synthesis
-        self.useTextSummarizationCheckbox = QCheckBox("Enable system assistant to summarize long messages for speech synthesis", self)
-        self.useTextSummarizationCheckbox.setChecked(self.main_window.user_text_summarization_in_synthesis)
-
         # Streaming for assistant
         self.useStreamingForAssistantCheckbox = QCheckBox("Use streaming for assistant", self)
         self.useStreamingForAssistantCheckbox.setChecked(self.main_window.use_streaming_for_assistant)
@@ -54,7 +50,6 @@ class GeneralSettingsDialog(QDialog):
         self.layout.addLayout(self.connectionTimeoutLayout)
         self.layout.addWidget(self.useStreamingForAssistantCheckbox)
         self.layout.addWidget(self.useSystemAssistantForThreadsCheckbox)
-        self.layout.addWidget(self.useTextSummarizationCheckbox)
         self.layout.addLayout(self.buttonsLayout)
 
         # Connect signals
@@ -66,7 +61,6 @@ class GeneralSettingsDialog(QDialog):
             connection_timeout = float(self.connectionTimeoutEdit.text())
             self.main_window.connection_timeout = connection_timeout
             self.main_window.use_system_assistant_for_thread_name = self.useSystemAssistantForThreadsCheckbox.isChecked()
-            self.main_window.user_text_summarization_in_synthesis = self.useTextSummarizationCheckbox.isChecked()
             self.main_window.use_streaming_for_assistant = self.useStreamingForAssistantCheckbox.isChecked()
             # Here you would save these values to your settings or pass them to where they are needed
             super(GeneralSettingsDialog, self).accept()  # Close the dialog on success
@@ -100,8 +94,8 @@ class ClientSettingsDialog(QDialog):
 
         # Create combo box for client selection
         self.clientSelection = QComboBox()
-        ai_client_type_names = [client_type.name for client_type in AIClientType]
-        self.clientSelection.addItems(ai_client_type_names)
+        self.clientSelection.addItem(AIClientType.OPEN_AI.name)
+        self.clientSelection.addItem(AIClientType.AZURE_OPEN_AI.name)
         self.layout.addWidget(self.clientSelection)
         # Connect the client selection change signal to the slot
         self.clientSelection.currentIndexChanged.connect(self.update_model_selection)
@@ -168,6 +162,7 @@ class ClientSettingsDialog(QDialog):
         self.set_key_input_value(self.openai_api_key_input, "OPENAI_API_KEY")
         self.set_key_input_value(self.azure_api_key_input, "AZURE_OPENAI_API_KEY")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        endpoint = AIClientFactory.get_instance()._get_http_endpoint(endpoint)
         self.azure_endpoint_input.setText(endpoint)
 
     def fill_client_model_selection(self, ai_client_type, api_version=None):
@@ -206,7 +201,7 @@ class ClientSettingsDialog(QDialog):
                 self.model_selection.setCurrentText(default_model)
 
         except Exception as e:
-            QMessageBox.warning(self, "Warning", f"Failed to fill model selection: {e}")
+            QMessageBox.warning(self, "Warning", f"System assistant client initialization error: {e}")
 
     def update_model_selection(self):
         # Get the current AI client type
@@ -259,3 +254,10 @@ class ClientSettingsDialog(QDialog):
     def save_settings(self, settings_json : str):
         with open(self.file_path, 'w') as file:
             file.write(settings_json)
+
+        # Initialize the system assistant with the new settings
+        self.main_window.init_system_assistant_settings()
+        self.main_window.init_system_assistants()
+
+        # Save the settings to the config files
+        self.main_window.assistant_config_manager.save_configs()

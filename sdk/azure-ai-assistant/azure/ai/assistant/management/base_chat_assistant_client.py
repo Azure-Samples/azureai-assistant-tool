@@ -93,7 +93,7 @@ class BaseChatAssistantClient(BaseAssistantClient):
 
     def _reset_system_messages(self, assistant_config: AssistantConfig):
         instructions = self._replace_file_references_with_content(assistant_config)
-        self._messages = [{"role": "system", "content": instructions}]
+        self._messages = [{"role": "developer", "content": instructions}]
 
     def _parse_conversation_messages(self, messages):
         for message in reversed(messages):

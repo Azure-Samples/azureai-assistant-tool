@@ -1,5 +1,4 @@
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
-from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 
 import asyncio
@@ -21,8 +20,7 @@ async def main():
     assistant_client = await AsyncAssistantClient.from_yaml(config)
 
     # create a new conversation thread client
-    ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
-    conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
+    conversation_thread_client = AsyncConversationThreadClient.get_instance(assistant_client.ai_client_type)
 
     # create a new conversation thread
     thread_name = await conversation_thread_client.create_conversation_thread()
@@ -49,6 +47,7 @@ async def main():
 
         # add new line for better readability
         print()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -7,55 +7,89 @@
 ![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
 </div>
 <div align="center">
-⚡Develop stateful copilot applications powered by Azure OpenAI Assistants at lightning speed⚡
+⚡Develop AI agents powered by Azure OpenAI Assistants, Chat Completion and Realtime APIs at lightning speed⚡
 </div>
 <br>
 
-  **Azure AI Assistants tool** is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of Assistants created with **Azure OpenAI Assistants (Preview)** _(see below)_. Use this powerful, easy-to-setup low-code / no code playground tool to quickly experiment and build AI Assistants within your application with Azure OpenAI Assistants API.
+## Table of Contents
+
+- 🤖🛠️ Azure AI Assistants Tool
+- 🆕 Latest News
+- 🧱 What is Assistants from Azure OpenAI Service?
+- 🚀 How does this Tool help?
+- 🔊🎤 OpenAI Realtime Support (Experimental)
+- ✨ Quick Start: Getting Started with the Tool
+- 📖 License
+- Contributing
+- Code of Conduct
+- Getting Help
+
+## 🤖🛠️ Azure AI Assistants tool 
+Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with Azure OpenAI Assistants, Chat Completion and/or Realtime API based technologies. Use this powerful, easy-to-setup low-code playground tool to quickly experiment and build AI agents within your application.
 
 > [!IMPORTANT]
-> **The Azure AI Assistant Tool is currently in Alpha**. This early stage of development means the project is actively evolving, with significant updates and improvements expected. Users should anticipate changes as we work towards refining features, enhancing functionality, and expanding capabilities. We welcome feedback and contributions during this phase to help shape the future of the tool.
+> **The Azure AI Assistant Tool is experimental**, created to support your product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
+
+## 🆕 Latest News
+
+- **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
 ## 🧱 What is Assistants from Azure OpenAI service?
 
-🌟**Assistants**, a new API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and Retrieval. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
+🌟**Assistants**, API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and File Search. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
 
 **Features** include:
 
-💬 Inbuilt thread and memory management <br>
-📊 Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
-🚀 Build your own tools or call external tools and APIs with **Function Calling**<br>
-📚 Retrieval Augmented Generation with **File Search** tool (coming soon to Azure OpenAI Assistants)<br>
-🎤📢 Speech transcription and synthesis using Azure CognitiveServices Speech SDK<br>
-📤 Exporting the assistant configuration into simple CLI application
+- Inbuilt thread and memory management <br>
+- Advanced Data Analysis, create data visualizations and solving complex code and math problems with **Code Interpreter**<br>
+- Retrieval Augmented Generation with **File Search** tool<br>
+- Build your own tools or call external tools and APIs with **Function Calling**<br>
 
 **Learn more** about Assistants on Azure OpenAI Service:
 
-  📹 Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
-  📖 Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
-  📌 Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
+  - Watch a [short video](https://www.youtube.com/watch?v=CMXtAe5DhXc&embeds_referring_euri=https%3A%2F%2Ftechcommunity.microsoft.com%2F&source_ve_path=OTY3MTQ&feature=emb_imp_woyt) about Azure OpenAI Assistants
+  - Read the [launch announcement](https://techcommunity.microsoft.com/t5/ai-azure-ai-services-blog/azure-openai-service-announces-assistants-api-new-models-for/ba-p/4049940)
+  - Get familiar with the [Assistants API Quickstart](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/assistant)
 
 
-## 🚀 How does this Tool help?
+## 🚀 How Does This Tool Help?
 
-✔️ **Enhance Developer Productivity:** Streamline the assistant development process with Azure OpenAI Assistans through built-in middleware libraries and tools that making it easy to integrate AI capabilities into your copilot applications
+- **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using OpenAI's technologies, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
 
-✔️ **Enable rapid prototyping:** Create amazing demos with AOAI Assistants and develop end-to-end assistant solutions with a robust set of features, including built-in system functions, dynamic generation of user functions specification and implementation, assistant task creation and scheduling, and much more. 
-
-✔️**Optimize your copilot development workflow:** Get a reliable and scalable framework to test new Copilot use cases and dynamic AI applications with Assistants API without the need to build out manual tooling and configurations
+- **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
 
 
+## 🔊🎤 OpenAI Realtime Support (Experimental)
 
-## 💥 Highlights
+This section covers the Realtime capabilities for AI agent prototyping with OpenAI's Realtime APIs, focusing on speech and text input/output through real-time WebSocket communication.
 
-- **Easy Configuration**: Set up your assistant with the model, custom instructions, files, and tools
-- **Tool Integration**: Incorporate knowledge retrieval, code interpreters, and built-in system and dynamic user functions to enhance assistant skills and capabilities.
-- **Dynamic User Functions**: Quickly create and apply user-defined functions to assistants.
-- **Task Management**: Efficiently manage and schedule tasks, including batch and multi-step operations, for parallel execution.
+Please note that these capabilities are offered as an experimental feature. They are intended primarily for exploration, demos, or proof-of-concept usage. 
+We do not recommend using these features in production or business-critical applications until further notice.
+
+### Key Features
+
+- **Real-time Audio Interaction**: Use the Realtime API with speech input using predefined and integrated keyword `Computer` to trigger the conversation.
+  - Using keyword can be helpful to optimize cost and reliability of your application. To create your own keywords, visit [Creating the Custom Keyword](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/custom-keyword-basics?pivots=programming-language-python). Currently only 1 keyword is supported.
+- **Real-time Text Interaction**: Use the Realtime API with text input. The agent can respond back with audio or text.
+- **Local Voice Activity Detection**: Efficiently manage audio data by detecting speech activities by using local voice activity detection.
+- **Function Calling**: Customize the realtime agent with your own functions which runs asynchronously in the background.
+- **Configurable AI Options**: Fine-tune realtime agent responses and behaviors with different options in Realtime API.
+
+### Demo Video
+
+Check out the demo video to see the OpenAI Realtime Support in action!
+
+https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
+
+### Resources
+
+- [Realtime AI GitHub Repository](https://github.com/jhakulin/realtime-ai)
+- [OpenAI Realtime WebSocket API Documentation](https://platform.openai.com/docs/guides/realtime)
+- [Azure Speech Services Documentation](https://azure.microsoft.com/en-us/services/cognitive-services/speech-services/)
 
 
-## ✨ Quick Start
+## ✨ Quick Start: Getting Started with the Tool
 
 ### Step 1: Complete Azure prerequisities
 
@@ -141,20 +175,6 @@ export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
 export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
 export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
 export OPENAI_API_KEY="Your OpenAI Key"
-```
-
-2. Set Cognitive Services Speech key (this is optional and if you want to use speech input & output).
-
-**Windows:**
-```
-setx AZURE_AI_SPEECH_KEY "Your Speech Key"
-setx AZURE_AI_SPEECH_REGION "Your Speech Region"
-```
-
-**Linux/Mac**
-``` 
-export AZURE_AI_SPEECH_KEY="Your Speech Key"
-export AZURE_AI_SPEECH_REGION="Your Speech Region"
 ```
 
 ### Step 7: Launch the application

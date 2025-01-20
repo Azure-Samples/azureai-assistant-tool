@@ -10,11 +10,14 @@ from PySide6.QtGui import QFont, QIcon, QAction
 
 import os, time
 
+from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
@@ -23,11 +26,14 @@ from gui.utils import resource_path
 
 
 class AssistantItemWidget(QWidget):
+    checked_changed = Signal(str, bool)  # (assistant_name, is_checked)
+
     def __init__(self, name, parent=None):
         super().__init__(parent)
         self.layout = QHBoxLayout(self)
         self.checkbox = QCheckBox(self)
         self.label = QLabel(name, self)
+        self.name = name
 
         font = QFont("Arial", 11)
         self.checkbox.setFont(font)
@@ -36,6 +42,12 @@ class AssistantItemWidget(QWidget):
         self.layout.addWidget(self.label)
         self.layout.addStretch()
         self.setLayout(self.layout)
+        # Connect the checkbox state change to emit the custom signal
+        self.checkbox.stateChanged.connect(self.on_checkbox_state_changed)
+
+    def on_checkbox_state_changed(self, state):
+        is_checked = state == Qt.CheckState.Checked.value
+        self.checked_changed.emit(self.name, is_checked)
 
 
 class CustomListWidget(QListWidget):
@@ -229,9 +241,18 @@ class CustomListWidget(QListWidget):
     def is_thread_selected(self, thread_name):
         """Check if the given thread name is the selected thread."""
         return self.get_current_text() == thread_name
+    
+    def get_last_thread_name(self):
+        """Return the name of the last thread in the list."""
+        if self.count() > 0:
+            return self.item(self.count() - 1).text()
+        return ""
 
 
 class ConversationSidebar(QWidget):
+
+    assistant_checkbox_toggled = Signal(str, bool)  # (assistant_name, is_checked)
+
     def __init__(self, main_window):
         super().__init__(main_window)
         self.main_window = main_window
@@ -249,26 +270,11 @@ class ConversationSidebar(QWidget):
         self.cancelRunButton.setFixedHeight(23)
         self.cancelRunButton.setFont(QFont("Arial", 11))
 
-        # Load icons
-        self.mic_on_icon = QIcon(resource_path("gui/images/mic_on.png"))
-        self.mic_off_icon = QIcon(resource_path("gui/images/mic_off.png"))
-
-        # Create a toggle button for the microphone
-        self.toggle_mic_button = QPushButton(self)
-        # Create and style the toggle_mic_button
-        self.toggle_mic_button.setFixedSize(20, 23)
-        self.toggle_mic_button.setIcon(self.mic_off_icon)
-        self.toggle_mic_button.setIconSize(QSize(23, 23))  # Set size as needed
-        self.toggle_mic_button.setStyleSheet("QPushButton { border: none; }")
-
         # Horizontal layout to hold both buttons
         buttonLayout = QHBoxLayout()
         buttonLayout.addWidget(self.addThreadButton)
         buttonLayout.addWidget(self.cancelRunButton)
-        buttonLayout.addWidget(self.toggle_mic_button)
         buttonLayout.setSpacing(10)  # Adjust spacing as needed
-
-        self.is_listening = False
 
         # Create a list widget for displaying the threads
         self.threadList = CustomListWidget(self)
@@ -285,7 +291,6 @@ class ConversationSidebar(QWidget):
         self.cancelRunButton.clicked.connect(self.main_window.on_cancel_run_button_clicked)
         self.threadList.itemClicked.connect(self.select_conversation_thread_by_item)
         self.threadList.itemDeleted.connect(self.on_selected_thread_delete)
-        self.toggle_mic_button.clicked.connect(self.toggle_mic)
 
         # Create a list widget for displaying assistants
         self.assistantList = QListWidget(self)
@@ -322,6 +327,7 @@ class ConversationSidebar(QWidget):
             "}"
         )
         self.on_ai_client_type_changed(self.aiClientComboBox.currentIndex())
+        self.assistant_checkbox_toggled.connect(self.main_window.handle_assistant_checkbox_toggled)
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
@@ -335,20 +341,36 @@ class ConversationSidebar(QWidget):
         assistant_name = widget.label.text()
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         if assistant_config:
-            if assistant_config.assistant_type == "assistant":
+            if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-            else:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type="chat_assistant", assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+
+            elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+
+            elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
             self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
             self.dialog.show()
 
-    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type):
+    def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
-            if assistant_type == "chat_assistant":
+            realtime_audio = None
+            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            else:
+
+            elif assistant_type == AssistantType.ASSISTANT.value:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-            self.assistant_client_manager.register_client(assistant_client.name, assistant_client)
+
+            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
+                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
+                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                    assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
+                    realtime_audio.update(assistant_client.assistant_config)
+                else:
+                    assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                    realtime_audio = RealtimeAudio(assistant_client)
+            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
             self.dialog.update_assistant_combobox()
@@ -391,6 +413,8 @@ class ConversationSidebar(QWidget):
             item.setSizeHint(widget.sizeHint())
             self.assistantList.addItem(item)
             self.assistantList.setItemWidget(item, widget)
+            # Connect the widget's checked_changed signal to ConversationSidebar's signal
+            widget.checked_changed.connect(self.assistant_checkbox_toggled.emit)
 
         # Restore selection if the assistant is still in the list
         for i in range(self.assistantList.count()):
@@ -411,6 +435,15 @@ class ConversationSidebar(QWidget):
                 selected_assistants.append(widget.label.text())
         return selected_assistants
 
+    def is_assistant_selected(self, assistant_name):
+        """Check if the given assistant name is selected."""
+        for i in range(self.assistantList.count()):
+            item = self.assistantList.item(i)
+            widget = self.assistantList.itemWidget(item)
+            if isinstance(widget, AssistantItemWidget) and widget.label.text() == assistant_name:
+                return widget.checkbox.isChecked()
+        return False
+
     def get_ai_client_type(self):
         """Return the AI client type selected in the combo box."""
         return self._ai_client_type
@@ -419,17 +452,22 @@ class ConversationSidebar(QWidget):
         """Populate the assistant list with the given assistant names."""
         try:
             assistant_names = self.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
-            # TODO retrieve assistant clients using cloud API
-            #assistant_list = AssistantClient.get_assistant_list(ai_client_type)
             for name in assistant_names:
                 if not self.assistant_client_manager.get_client(name):
                     assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
                     assistant_config.config_folder = "config"
-                    if assistant_config.assistant_type == "assistant":
+                    realtime_audio = None
+                    if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                    else:
+
+                    elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                         assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                    self.assistant_client_manager.register_client(name, assistant_client)
+
+                    elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                        assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                        realtime_audio = RealtimeAudio(assistant_client)
+
+                    self.assistant_client_manager.register_client(name=name, assistant_client=assistant_client, realtime_audio=realtime_audio)
         except Exception as e:
             logger.error(f"Error while loading assistant list: {e}")
         finally:
@@ -504,20 +542,6 @@ class ConversationSidebar(QWidget):
     def select_conversation_thread_by_name(self, unique_thread_name):
         self._select_thread(unique_thread_name)
 
-    def toggle_mic(self):
-        self.is_listening = not self.is_listening
-        if self.is_listening:
-            is_started = self.main_window.on_listening_started()
-            if not is_started:
-                self.is_listening = False
-                return
-            self.toggle_mic_button.setIcon(self.mic_on_icon)
-            logger.info("Microphone is now active.")
-        else:
-            self.toggle_mic_button.setIcon(self.mic_off_icon)
-            self.main_window.on_listening_stopped()
-            logger.info("Microphone is now inactive.")
-
     def _select_threadlist_item(self, unique_thread_name):
         # Select the thread item in the sidebar
         for index in range(self.threadList.count()):
@@ -530,13 +554,17 @@ class ConversationSidebar(QWidget):
         self._select_threadlist_item(unique_thread_name)
         try:
             threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            #TODO separate threads per ai_client_type in the json file
             threads_client.set_current_conversation_thread(unique_thread_name)
             self.main_window.conversation_view.conversationView.clear()
             # Retrieve the messages for the selected thread
             conversation = threads_client.retrieve_conversation(unique_thread_name, timeout=self.main_window.connection_timeout)
             if conversation.messages is not None:
-                self.main_window.conversation_view.append_messages(conversation.messages)
+                self.main_window.conversation_view.append_conversation_messages(conversation.messages)
+            selected_assistants = self.get_selected_assistants()
+            for assistant_name in selected_assistants:
+                assistant_client = self.assistant_client_manager.get_client(assistant_name)
+                if assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+                    assistant_client.set_active_thread(unique_thread_name)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while selecting the thread: {e}")
 

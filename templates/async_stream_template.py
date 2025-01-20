@@ -1,6 +1,5 @@
 import asyncio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
-from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_message import AsyncConversationMessage
@@ -26,6 +25,7 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
                 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         await self.handle_message("function", function_name)
+
 
 # Define a function to display streamed messages
 async def display_streamed_messages(message_queue, assistant_name):
@@ -60,10 +60,9 @@ async def main():
         
         # Create a new assistant client
         assistant_client = await AsyncAssistantClient.from_yaml(config, callbacks=callbacks)
-        ai_client_type = AsyncAIClientType[assistant_client.assistant_config.ai_client_type]
         
         # Create a new conversation thread client
-        conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
+        conversation_thread_client = AsyncConversationThreadClient.get_instance(assistant_client.ai_client_type)
         
         # Create a new conversation thread
         thread_name = await conversation_thread_client.create_conversation_thread()
@@ -91,6 +90,7 @@ async def main():
         await message_queue.join()
         display_task.cancel()
         await conversation_thread_client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
