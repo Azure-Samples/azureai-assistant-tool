@@ -21,6 +21,7 @@ from azure.ai.assistant.functions.llm_functions import (
     generate_o1_response,
     take_screenshot,
     look_at_screen,
+    generate_image,
 )
 
 # Statically defined system functions for fast reference
@@ -40,4 +41,5 @@ system_functions = {
     "generate_o1_response": generate_o1_response,
     "take_screenshot": take_screenshot,
     "look_at_screen": look_at_screen,
+    "generate_image": generate_image,
 }

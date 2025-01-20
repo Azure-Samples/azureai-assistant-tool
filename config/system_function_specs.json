@@ -291,5 +291,25 @@
                 ]
             }
         }
-    }    
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_image",
+            "module": "azure.ai.assistant.functions.llm_functions",
+            "description": "Generates an image based on the provided information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image_description": {
+                        "type": "string",
+                        "description": "A description of the image to be generated."
+                    }
+                },
+                "required": [
+                    "image_description"
+                ]
+            }
+        }
+    }
 ]

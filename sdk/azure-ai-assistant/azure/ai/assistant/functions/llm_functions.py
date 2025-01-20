@@ -320,3 +320,96 @@ def take_screenshot() -> str:
         error_message = f"Failed to capture screenshot: {str(e)}"
         logger.exception(error_message)
         return json.dumps({"function_error": error_message})
+    
+
+def generate_image(image_description: str) -> str:
+    """
+    Generates an image from given information using DALL·E via OpenAI's Python API
+    and attaches it to the conversation.
+
+    :param image_description: Information details to generate the image.
+    :type image_description: str
+    :rtype: str
+    """
+
+    try:
+        import openai
+        import requests
+        from PIL import Image
+        import os
+        import json
+        import io
+        import base64
+
+        # Initialize AI and thread clients (similar to take_screenshot)
+        current_client_type = AIClientFactory.get_instance().current_client_type
+        ai_client, thread_client = _initialize_clients(current_client_type)
+        if not ai_client or not thread_client:
+            return json.dumps({"function_error": "Failed to initialize AI or thread client."})
+
+        # Build a simple descriptive prompt for the image generation
+        prompt = (
+            f"A beautiful painting of given information. "
+            f"{image_description}. "
+            "Illustrate it as a whimsical landscape scene in a painterly style."
+        )
+
+        # Call OpenAI to generate an image using DALL·E
+        try:
+            # NOTE: This usage may differ based on your openai library version
+            response = openai.images.generate(
+                prompt=prompt,
+                model="dall-e-3",
+                n=1,                # number of images
+                size="1024x1024",    # resolution of the generated image
+                response_format="b64_json"  # requesting base64 to avoid ephemeral URLs
+            )
+        except Exception as e:
+            error_msg = f"Failed to generate image with DALL·E. Error: {str(e)}"
+            logger.error(error_msg)
+            return json.dumps({"function_error": error_msg})
+
+         # Extract the base64 image data from the response
+        # For n=1, the result is typically in response.data[0].b64_json
+        if not response.data or not response.data[0].b64_json:
+            error_msg = "No valid base64 image data found in the response."
+            logger.error(error_msg)
+            return json.dumps({"function_error": error_msg})
+
+        image_b64 = response.data[0].b64_json
+
+        # Decode the base64 string to raw image bytes
+        image_bytes = base64.b64decode(image_b64)
+
+        # Load the image via PIL
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        # Create output folder if it doesn’t exist
+        output_dir = os.path.abspath("output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Construct a file name (you can adapt _create_identifier to your needs)
+        file_name = f"{_create_identifier('generated_image')}.png"
+        img_path = os.path.join(output_dir, file_name)
+
+        # Save the image locally
+        img.save(img_path, format="PNG")
+
+        # Attach the image file to the conversation
+        attachment = Attachment(file_path=img_path, attachment_type=AttachmentType.IMAGE_FILE)
+        current_thread_id = thread_client.get_config().get_current_thread_id()
+        thread_name = thread_client.get_config().get_thread_name_by_id(current_thread_id)
+
+        thread_client.create_conversation_thread_message(
+            message="Here’s a generated image based on the given information",
+            thread_name=thread_name,
+            attachments=[attachment],
+            metadata={"chat_assistant": "function"}
+        )
+
+        return json.dumps({"result": "Image generated and displayed."})
+
+    except Exception as e:
+        error_message = f"Unexpected error generating image: {str(e)}"
+        logger.exception(error_message)
+        return json.dumps({"function_error": error_message})

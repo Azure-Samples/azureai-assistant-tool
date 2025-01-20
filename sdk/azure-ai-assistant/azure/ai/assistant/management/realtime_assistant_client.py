@@ -255,8 +255,12 @@ class RealtimeAssistantEventHandler(RealtimeAIEventHandler):
             function_name = event.item.get("name")
             if call_id and function_name:
                 with self._lock:
-                    self._call_id_to_function_name[call_id] = function_name
-                logger.debug(f"Registered function call. Call ID: {call_id}, Function Name: {function_name}")
+                    # Only register the call_id if we haven't seen it before
+                    if call_id in self._call_id_to_function_name:
+                        logger.debug(f"Ignoring duplicated function call registration for call_id: {call_id}")
+                    else:
+                        self._call_id_to_function_name[call_id] = function_name
+                        logger.debug(f"Registered new function call. Call ID: {call_id}, Function Name: {function_name}")
             else:
                 logger.warning("Function call item missing 'call_id' or 'name' fields.")
 

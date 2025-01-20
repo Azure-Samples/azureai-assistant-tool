@@ -80,7 +80,7 @@ We do not recommend using these features in production or business-critical appl
 
 Check out the demo video to see the OpenAI Realtime Support in action!
 
-https://github.com/user-attachments/assets/19dd4053-dbd5-4ffe-93e6-353c3052bbad
+https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
 
 ### Resources
 
