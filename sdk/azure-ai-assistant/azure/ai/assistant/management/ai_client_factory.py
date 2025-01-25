@@ -22,6 +22,8 @@ class AIClientType(Enum):
     """Azure OpenAI client used with Realtime API"""
     OPEN_AI_REALTIME = auto()
     """OpenAI client used with Realtime API"""
+    AZURE_AI_AGENTS = auto()
+    """Azure AI Agents client"""
 
 
 class AsyncAIClientType(Enum):
@@ -36,6 +38,8 @@ class AsyncAIClientType(Enum):
     """Azure OpenAI async client used with Realtime API"""
     OPEN_AI_REALTIME = auto()
     """OpenAI async client used with Realtime API"""
+    AZURE_AI_AGENTS = auto()
+    """Azure AI Agents async client"""
 
 
 class AIClientFactory:
@@ -85,6 +89,23 @@ class AIClientFactory:
                 )
             elif client_type in {AIClientType.OPEN_AI, AIClientType.OPEN_AI_REALTIME}:
                 self._clients[client_key] = OpenAI(**client_args)
+            elif client_type == AIClientType.AZURE_AI_AGENTS:
+                from azure.ai.projects import AIProjectClient
+                from azure.identity import DefaultAzureCredential
+                conn_str = os.getenv("PROJECT_CONNECTION_STRING")
+                if not conn_str:
+                    raise ValueError(
+                        "No PROJECT_CONNECTION_STRING was found in environment variables. "
+                        "Please set PROJECT_CONNECTION_STRING to a valid Azure AI Agents "
+                        "connection string to continue."
+                    )
+
+                project_client = AIProjectClient.from_connection_string(
+                    credential=DefaultAzureCredential(),
+                    conn_str=conn_str,
+                    **client_args
+                )
+                self._clients[client_key] = project_client
                     
         elif isinstance(client_type, AsyncAIClientType):
             if client_type in {AsyncAIClientType.AZURE_OPEN_AI, AsyncAIClientType.AZURE_OPEN_AI_REALTIME}:
@@ -95,6 +116,24 @@ class AIClientFactory:
                 )
             elif client_type in {AsyncAIClientType.OPEN_AI, AsyncAIClientType.OPEN_AI_REALTIME}:
                 self._clients[client_key] = AsyncOpenAI(**client_args)
+            elif client_type == AsyncAIClientType.AZURE_AI_AGENTS:
+                from azure.ai.projects.aio import AIProjectClient
+                from azure.identity.aio import DefaultAzureCredential
+                conn_str = os.getenv("PROJECT_CONNECTION_STRING")
+                if not conn_str:
+                    raise ValueError(
+                        "No PROJECT_CONNECTION_STRING was found in environment variables. "
+                        "Please set PROJECT_CONNECTION_STRING to a valid Azure AI Agents "
+                        "connection string to continue."
+                    )
+
+                project_client = AIProjectClient.from_connection_string(
+                    credential=DefaultAzureCredential(),
+                    conn_str=conn_str,
+                    **client_args
+                )
+                self._clients[client_key] = project_client
+
         else:
             raise ValueError(f"Invalid client type: {client_type}")
 
