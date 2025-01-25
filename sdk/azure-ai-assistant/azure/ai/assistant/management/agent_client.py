@@ -15,7 +15,9 @@ from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
 from datetime import datetime
-import json, time, yaml
+import json
+import time
+import yaml
 
 
 class AgentClient(BaseAssistantClient):
@@ -23,7 +25,7 @@ class AgentClient(BaseAssistantClient):
     A class that manages an agent client.
 
     The agent client is used to create, retrieve, update, and delete agents in the cloud service 
-    using the given AI client type and json configuration data.
+    using the given AI client type and JSON configuration data.
 
     :param config_json: The configuration data to use to create the agent client.
     :type config_json: str
@@ -73,7 +75,13 @@ class AgentClient(BaseAssistantClient):
         try:
             config_data = json.loads(config_json)
             is_create = not ("assistant_id" in config_data and config_data["assistant_id"])
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout, **client_args)
+            return cls(
+                config_json=config_json,
+                callbacks=callbacks,
+                is_create=is_create,
+                timeout=timeout,
+                **client_args
+            )
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON format: {e}")
             raise InvalidJSONError(f"Invalid JSON format: {e}")
@@ -135,7 +143,13 @@ class AgentClient(BaseAssistantClient):
         try:
             config_json = config.to_json()
             is_create = not config.assistant_id
-            return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout, **client_args)
+            return cls(
+                config_json=config_json,
+                callbacks=callbacks,
+                is_create=is_create,
+                timeout=timeout,
+                **client_args
+            )
         except Exception as e:
             logger.error(f"Failed to create agent client from config: {e}")
             raise EngineError(f"Failed to create agent client from config: {e}")
@@ -215,8 +229,8 @@ class AgentClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ):
         try:
-            # Create or update the agent
             assistant_config = AssistantConfig.from_dict(config_data)
+
             if is_create:
                 start_time = time.time()
                 self._create_agent(assistant_config, timeout=timeout)
@@ -226,7 +240,6 @@ class AgentClient(BaseAssistantClient):
                 start_time = time.time()
                 config_manager = AssistantConfigManager.get_instance()
                 local_config = config_manager.get_config(self.name)
-                # check if the local configuration is different from the given configuration
                 if local_config and local_config != assistant_config:
                     logger.debug("Local config is different from the given configuration. Updating the agent...")
                     self._update_agent(assistant_config, timeout=timeout)
@@ -235,14 +248,14 @@ class AgentClient(BaseAssistantClient):
                 end_time = time.time()
                 logger.debug(f"Total time taken for _update_agent: {end_time - start_time} seconds")
 
+            # Load functions
             start_time = time.time()
             self._load_selected_functions(assistant_config)
             end_time = time.time()
             logger.debug(f"Total time taken for _load_selected_functions: {end_time - start_time} seconds")
             self._assistant_config = assistant_config
 
-            # Update the local configuration using AssistantConfigManager
-            # TODO make optional to save the assistant_config in the config manager
+            # Update assistant config manager
             config_manager = AssistantConfigManager.get_instance()
             config_manager.update_config(self._name, assistant_config.to_json())
 
@@ -259,7 +272,7 @@ class AgentClient(BaseAssistantClient):
             logger.info(f"Creating new agent with name: {assistant_config.name}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._create_tool_resources(assistant_config)
+            tools_resources = self._create_tool_resources(assistant_config, timeout=timeout)
 
             assistant = self._ai_client.agents.create_agent(
                 name=assistant_config.name,
@@ -279,9 +292,8 @@ class AgentClient(BaseAssistantClient):
     def _create_tool_resources(
             self,
             assistant_config: AssistantConfig,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ) -> dict:
-
         logger.info(f"Creating tool resources for agent: {assistant_config.name}")
 
         if not assistant_config.tool_resources:
@@ -290,16 +302,17 @@ class AgentClient(BaseAssistantClient):
 
         # Upload the code interpreter files
         code_interpreter_file_ids = []
-        if assistant_config.tool_resources.code_interpreter_files:
-            self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
-            code_interpreter_file_ids = list(assistant_config.tool_resources.code_interpreter_files.values())
+        ci_files = assistant_config.tool_resources.code_interpreter_files
+        if ci_files:
+            self._upload_files(assistant_config, ci_files, timeout=timeout)
+            code_interpreter_file_ids = list(ci_files.values())
 
-        # create the vector store for file search
-        assistant_config_vs = None
+        # Create the vector store for file search
+        file_search_vs = None
         if assistant_config.tool_resources.file_search_vector_stores:
-            assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-            self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
-            assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
+            file_search_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+            self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
+            file_search_vs.id = self._create_vector_store_with_files(assistant_config, file_search_vs, timeout=timeout)
 
         # Create the tool resources dictionary
         tool_resources = {
@@ -307,7 +320,7 @@ class AgentClient(BaseAssistantClient):
                 "file_ids": code_interpreter_file_ids
             },
             "file_search": {
-                "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs else []
+                "vector_store_ids": [file_search_vs.id] if file_search_vs else []
             }
         }
         logger.info(f"Created tool resources: {tool_resources}")
@@ -322,7 +335,7 @@ class AgentClient(BaseAssistantClient):
         try:
             client_vs = self._ai_client.agents.create_vector_store(
                 name=vector_store.name,
-                file_ids = list(vector_store.files.values()),
+                file_ids=list(vector_store.files.values()),
                 metadata=vector_store.metadata,
                 expires_after=vector_store.expires_after,
                 timeout=timeout
@@ -337,7 +350,6 @@ class AgentClient(BaseAssistantClient):
             assistant_config: AssistantConfig,
             timeout: Optional[float] = None
     ) -> dict:
-
         try:
             logger.info(f"Updating tool resources for agent: {assistant_config.name}")
 
@@ -346,42 +358,57 @@ class AgentClient(BaseAssistantClient):
                 return None
 
             assistant = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
-            # code interpreter files
+            # Code interpreter files
             existing_file_ids = set()
             if assistant.tool_resources.code_interpreter:
                 existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
-            if assistant_config.tool_resources.code_interpreter_files:
-                self._delete_files(assistant_config, existing_file_ids, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
-                self._upload_files(assistant_config, assistant_config.tool_resources.code_interpreter_files, timeout=timeout)
 
-            # file search files in cloud
+            ci_files = assistant_config.tool_resources.code_interpreter_files
+            if ci_files:
+                self._delete_files(assistant_config, existing_file_ids, ci_files, timeout=timeout)
+                self._upload_files(assistant_config, ci_files, timeout=timeout)
+
+            # File search resources
             existing_vs_ids = []
-            existing_file_ids = set()
+            existing_fs_file_ids = set()
             if assistant.tool_resources.file_search:
                 existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
                 if existing_vs_ids:
-                    all_files_in_vs = list(self._ai_client.agents.list_vector_store_files(existing_vs_ids[0], timeout=timeout))
-                    existing_file_ids = set([file.id for file in all_files_in_vs])
+                    all_files_in_vs = list(
+                        self._ai_client.agents.list_vector_store_files(existing_vs_ids[0], timeout=timeout)
+                    )
+                    existing_fs_file_ids = {file.id for file in all_files_in_vs}
 
-            # if there are new files to upload or delete, recreate the vector store
-            assistant_config_vs = None
+            # If there are new files to upload or delete, recreate or update the vector store
+            file_search_vs = None
             if assistant_config.tool_resources.file_search_vector_stores:
-                assistant_config_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-                if not existing_vs_ids and assistant_config_vs.id is None:
-                    self._upload_files(assistant_config, assistant_config_vs.files, timeout=timeout)
-                    assistant_config_vs.id = self._create_vector_store_with_files(assistant_config, assistant_config_vs, timeout=timeout)
-                elif set(assistant_config_vs.files.values()) != existing_file_ids:
+                file_search_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+                if not existing_vs_ids and file_search_vs.id is None:
+                    self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
+                    file_search_vs.id = self._create_vector_store_with_files(assistant_config, file_search_vs, timeout=timeout)
+                elif set(file_search_vs.files.values()) != existing_fs_file_ids:
                     if existing_vs_ids:
-                        self._delete_files_from_vector_store(assistant_config, existing_vs_ids[0], existing_file_ids, assistant_config_vs.files, timeout=timeout)
-                        self._upload_files_to_vector_store(assistant_config, existing_vs_ids[0], assistant_config_vs.files, timeout=timeout)
+                        self._delete_files_from_vector_store(
+                            assistant_config,
+                            existing_vs_ids[0],
+                            existing_fs_file_ids,
+                            file_search_vs.files,
+                            timeout=timeout
+                        )
+                        self._upload_files_to_vector_store(
+                            assistant_config,
+                            existing_vs_ids[0],
+                            file_search_vs.files,
+                            timeout=timeout
+                        )
 
             # Create the tool resources dictionary
             tool_resources = {
                 "code_interpreter": {
-                    "file_ids": list(assistant_config.tool_resources.code_interpreter_files.values()) if assistant_config.tool_resources.code_interpreter_files else []
+                    "file_ids": list(ci_files.values()) if ci_files else []
                 },
                 "file_search": {
-                    "vector_store_ids": [assistant_config_vs.id] if assistant_config_vs and assistant_config_vs.id is not None else []
+                    "vector_store_ids": [file_search_vs.id] if file_search_vs and file_search_vs.id else []
                 }
             }
             logger.info(f"Updated tool resources: {tool_resources}")
@@ -394,7 +421,7 @@ class AgentClient(BaseAssistantClient):
     def purge(
             self,
             timeout: Optional[float] = None
-    )-> None:
+    ) -> None:
         """
         Purges the agent from the cloud service and the local configuration.
 
@@ -406,26 +433,20 @@ class AgentClient(BaseAssistantClient):
         """
         try:
             logger.info(f"Purging agent with name: {self.name}")
-            # retrieve the agent configuration
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
 
-            # remove from the cloud service
             self._delete_agent(assistant_config, timeout=timeout)
-
-            # remove from the local config
             config_manager.delete_config(assistant_config.name)
-
             self._clear_variables()
-
         except Exception as e:
             logger.error(f"Failed to purge agent with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge agent with name: {self.name}: {e}")
 
     def _delete_agent(
             self, 
-            assistant_config : AssistantConfig,
-            timeout : Optional[float] = None
+            assistant_config: AssistantConfig,
+            timeout: Optional[float] = None
     ):
         try:
             assistant_id = assistant_config.assistant_id
@@ -433,7 +454,6 @@ class AgentClient(BaseAssistantClient):
                 assistant_id=assistant_id,
                 timeout=timeout
             )
-            # delete threads associated with the agent
             logger.info(f"Deleted agent with ID: {assistant_id}")
         except Exception as e:
             logger.error(f"Failed to delete agent with ID: {assistant_id}: {e}")
@@ -454,7 +474,7 @@ class AgentClient(BaseAssistantClient):
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
-        threads_config : ConversationThreadConfig = self._conversation_thread_client.get_config()
+        threads_config: ConversationThreadConfig = self._conversation_thread_client.get_config()
         thread_id = threads_config.get_thread_id_by_name(thread_name)
 
         try:
@@ -473,17 +493,8 @@ class AgentClient(BaseAssistantClient):
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None
     ) -> None:
-        """
-        Process the messages in a given thread without streaming.
-
-        :param thread_name: The name of the thread to process.
-        :param thread_id: The ID of the thread to process.
-        :param additional_instructions: Additional instructions to provide to the agent.
-        :param timeout: The HTTP request timeout in seconds.
-        """
         try:
             text_completion_config = self._assistant_config.text_completion_config
-
             logger.info(f"Creating a run for agent: {self.assistant_config.assistant_id} and thread: {thread_id}")
 
             run = self._ai_client.agents.create_run(
@@ -499,62 +510,65 @@ class AgentClient(BaseAssistantClient):
                 timeout=timeout
             )
 
-            # call the start_run callback
             run_start_time = str(datetime.now())
-            user_request = self._conversation_thread_client.retrieve_conversation(thread_name).get_last_text_message("user").content
+            user_request = self._conversation_thread_client.retrieve_conversation(
+                thread_name
+            ).get_last_text_message("user").content
             self._callbacks.on_run_start(self._name, run.id, run_start_time, user_request)
+
             if self._cancel_run_requested.is_set():
                 self._cancel_run_requested.clear()
-            is_first_message = True
 
+            is_first_message = True
             while True:
                 time.sleep(0.5)
-
-                logger.debug(f"Retrieving run: {run.id} with status: {run.status}")
-                run = self._ai_client.agents.get_run(
-                    thread_id=thread_id,
-                    run_id=run.id,
-                    timeout=timeout
-                )
-
+                run = self._ai_client.agents.get_run(thread_id=thread_id, run_id=run.id, timeout=timeout)
                 if run is None:
                     logger.error("Retrieved run is None, exiting the loop.")
-                    return None
-
-                logger.info(f"Processing run: {run.id} with status: {run.status}")
+                    return
 
                 if self._cancel_run_requested.is_set():
                     self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run.id, timeout=timeout)
                     self._cancel_run_requested.clear()
                     logger.info("Processing run cancelled by user, exiting the loop.")
-                    return None
+                    return
 
+                logger.debug(f"Run {run.id} status: {run.status}")
                 self._callbacks.on_run_update(self._name, run.id, run.status, thread_name, is_first_message)
                 is_first_message = False
 
-                if run.status == "completed":
-                    logger.info("Processing run status: completed")
-                    run_end_time = str(datetime.now())
-                    self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
-                    return None
-                elif run.status == "failed":
-                    logger.warning(f"Processing run status: failed, error code: {run.last_error.code}, error message: {run.last_error.message}")
-                    run_end_time = str(datetime.now())
-                    self._callbacks.on_run_failed(self._name, run.id, run_end_time, run.last_error.code, run.last_error.message, thread_name)
-                    return None
-                elif run.status == "cancelled" or run.status == "expired":
-                    logger.info("Processing run status: cancelled")
-                    run_end_time = str(datetime.now())
-                    self._callbacks.on_run_cancelled(self._name, run.id, run_end_time, thread_name)
-                    return None
+                if run.status in ["completed", "failed", "cancelled", "expired"]:
+                    self._handle_terminal_run_status(run, thread_name)
+                    return
+
                 if run.status == "requires_action":
                     tool_calls = run.required_action.submit_tool_outputs.tool_calls
                     if not self._handle_required_action(self._name, thread_id, run.id, tool_calls):
-                        return None
+                        return
 
         except Exception as e:
             logger.error(f"Error occurred during non-streaming processing run: {e}")
             raise EngineError(f"Error occurred during non-streaming processing run: {e}")
+
+    def _handle_terminal_run_status(self, run, thread_name):
+        run_end_time = str(datetime.now())
+
+        if run.status == "completed":
+            logger.info("Processing run status: completed")
+            self._callbacks.on_run_end(self._name, run.id, run_end_time, thread_name)
+        elif run.status == "failed":
+            logger.warning(f"Processing run status: failed, error: {run.last_error}")
+            self._callbacks.on_run_failed(
+                self._name,
+                run.id,
+                run_end_time,
+                run.last_error.code if run.last_error else "",
+                run.last_error.message if run.last_error else "",
+                thread_name
+            )
+        else:  # "cancelled" or "expired"
+            logger.info(f"Processing run status: {run.status}")
+            self._callbacks.on_run_cancelled(self._name, run.id, run_end_time, thread_name)
 
     def _process_messages_streaming(
             self, 
@@ -563,17 +577,8 @@ class AgentClient(BaseAssistantClient):
             additional_instructions: Optional[str] = None,
             timeout: Optional[float] = None
     ) -> None:
-        """
-        Process the messages in a given thread with streaming.
-
-        :param thread_name: The name of the thread to process.
-        :param thread_id: The ID of the thread to process.
-        :param additional_instructions: Additional instructions to provide to the agent.
-        :param timeout: The HTTP request timeout in seconds.
-        """
         try:
             logger.info(f"Creating and streaming a run for agent: {self._assistant_config.assistant_id} and thread: {thread_id}")
-
             text_completion_config = self._assistant_config.text_completion_config
 
             with self._ai_client.agents.create_stream(
@@ -595,7 +600,7 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Error occurred during streaming processing run: {e}")
             raise EngineError(f"Error occurred during streaming processing run: {e}")
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout: Optional[float] = None, stream: Optional[bool] = None) -> bool:
         logger.info("Handling required action")
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
@@ -615,7 +620,6 @@ class AgentClient(BaseAssistantClient):
                 timeout=timeout,
                 event_handler=AgentStreamEventHandler(self, thread_id, is_submit_tool_call=True, timeout=timeout)
             )
-
         else:
             self._ai_client.agents.submit_tool_outputs_to_run(
                 thread_id=thread_id,
@@ -631,118 +635,113 @@ class AgentClient(BaseAssistantClient):
             start_time = time.time()
             function_response = str(self._handle_function_call(tool_call.function.name, tool_call.function.arguments))
             end_time = time.time()
-            logger.debug(f"Total time taken for function {tool_call.function.name} : {end_time - start_time} seconds")
+            logger.debug(f"Total time taken for function {tool_call.function.name}: {end_time - start_time} seconds")
             logger.info(f"Function response: {function_response}")
-            # call the on_function_call_processed callback
-            self._callbacks.on_function_call_processed(name, run_id, tool_call.function.name, tool_call.function.arguments, str(function_response))
-            tool_output = {
+
+            self._callbacks.on_function_call_processed(
+                name, run_id, tool_call.function.name, tool_call.function.arguments, function_response
+            )
+            tool_outputs.append({
                 "tool_call_id": tool_call.id,
                 "output": function_response,
-            }
-            tool_outputs.append(tool_output)
-
+            })
         return tool_outputs
 
     def _retrieve_agent(
             self, 
-            assistant_id : str,
-            timeout : Optional[float] = None
+            assistant_id: str,
+            timeout: Optional[float] = None
     ):
         try:
             logger.info(f"Retrieving agent with ID: {assistant_id}")
-            assistant = self._ai_client.agents.get_agent(
-                assistant_id=assistant_id,
-                timeout=timeout
-            )
-            return assistant
+            return self._ai_client.agents.get_agent(assistant_id=assistant_id, timeout=timeout)
         except Exception as e:
             logger.error(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
 
     def _delete_files_from_vector_store(
             self,
-            assistant_config : AssistantConfig,
+            assistant_config: AssistantConfig,
             vector_store_id: str,
             existing_file_ids: set,
             updated_files: Optional[dict] = None,
             delete_from_service: Optional[bool] = True,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ):
         updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} from agent: {assistant_config.name} vector store: {vector_store_id}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.agents.delete_vector_store_file(
+            self._ai_client.agents.delete_vector_store_file(
                 vector_store_id=vector_store_id,
                 file_id=file_id,
                 timeout=timeout
             )
             if delete_from_service:
-                file_deletion_status = self._ai_client.agents.delete_file(
-                    file_id=file_id,
-                    timeout=timeout
-                )
+                self._ai_client.agents.delete_file(file_id=file_id, timeout=timeout)
 
     def _upload_files_to_vector_store(
             self,
             assistant_config: AssistantConfig,
             vector_store_id: str,
             updated_files: Optional[dict] = None,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ):
         logger.info(f"Uploading files to agent {assistant_config.name} vector store: {vector_store_id}")
         for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
-                file = self._ai_client.agents.create_vector_store_file_and_poll(
-                    vector_store_id=vector_store_id,
-                    file=open(file_path, "rb")
-                )
+                # Use a context manager to ensure files close properly
+                with open(file_path, "rb") as f:
+                    file = self._ai_client.agents.create_vector_store_file_and_poll(
+                        vector_store_id=vector_store_id,
+                        file=f,
+                        timeout=timeout
+                    )
                 updated_files[file_path] = file.id
 
     def _delete_files(
             self,
-            assistant_config : AssistantConfig,
-            existing_file_ids : set,
+            assistant_config: AssistantConfig,
+            existing_file_ids: set,
             updated_files: Optional[dict] = None,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ):
         updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.agents.delete_file(
-                file_id=file_id,
-                timeout=timeout
-            )
-    
+            self._ai_client.agents.delete_file(file_id=file_id, timeout=timeout)
+
     def _upload_files(
             self, 
             assistant_config: AssistantConfig,
             updated_files: Optional[dict] = None,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ):
         logger.info(f"Uploading files for agent: {assistant_config.name}")
         for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
-                file = self._ai_client.agents.upload_file(
-                    file=open(file_path, "rb"),
-                    purpose='assistants',
-                    timeout=timeout
-                )
-                updated_files[file_path] = file.id
+                # Use a context manager to ensure files close properly
+                with open(file_path, "rb") as f:
+                    uploaded_file = self._ai_client.agents.upload_file(
+                        file=f,
+                        purpose='assistants',
+                        timeout=timeout
+                    )
+                updated_files[file_path] = uploaded_file.id
 
     def _update_agent(
             self, 
             assistant_config: AssistantConfig,
-            timeout : Optional[float] = None
+            timeout: Optional[float] = None
     ):
         try:
             logger.info(f"Updating agent with ID: {assistant_config.assistant_id}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._update_tool_resources(assistant_config)
+            tools_resources = self._update_tool_resources(assistant_config, timeout=timeout)
 
             self._ai_client.agents.update_agent(
                 assistant_id=assistant_config.assistant_id,
