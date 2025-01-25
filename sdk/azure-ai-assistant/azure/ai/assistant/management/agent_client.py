@@ -2,6 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.agent_stream_event_handler import AgentStreamEventHandler
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config import VectorStoreConfig
@@ -14,21 +15,21 @@ from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
 from datetime import datetime
-import json, time, yaml, contextlib
+import json, time, yaml
 
 
 class AgentClient(BaseAssistantClient):
     """
-    A class that manages an assistant client.
+    A class that manages an agent client.
 
-    The assistant client is used to create, retrieve, update, and delete assistants in the cloud service 
+    The agent client is used to create, retrieve, update, and delete agents in the cloud service 
     using the given AI client type and json configuration data.
 
-    :param config_json: The configuration data to use to create the assistant client.
+    :param config_json: The configuration data to use to create the agent client.
     :type config_json: str
-    :param callbacks: The callbacks to use for the assistant client.
+    :param callbacks: The callbacks to use for the agent client.
     :type callbacks: Optional[AssistantClientCallbacks]
-    :param is_create: A flag to indicate if the assistant client is being created.
+    :param is_create: A flag to indicate if the agent client is being created.
     :type is_create: bool
     :param timeout: The HTTP request timeout in seconds.
     :type timeout: Optional[float]
@@ -57,9 +58,9 @@ class AgentClient(BaseAssistantClient):
         """
         Creates an AgentClient instance from JSON configuration data.
 
-        :param config_json: JSON string containing the configuration for the assistant.
+        :param config_json: JSON string containing the configuration for the agent.
         :type config_json: str
-        :param callbacks: Optional callbacks for the assistant client.
+        :param callbacks: Optional callbacks for the agent client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -88,9 +89,9 @@ class AgentClient(BaseAssistantClient):
         """
         Creates an AgentClient instance from YAML configuration data.
 
-        :param config_yaml: YAML string containing the configuration for the assistant.
+        :param config_yaml: YAML string containing the configuration for the agent.
         :type config_yaml: str
-        :param callbacks: Optional callbacks for the assistant client.
+        :param callbacks: Optional callbacks for the agent client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -119,9 +120,9 @@ class AgentClient(BaseAssistantClient):
         """
         Creates an AgentClient instance from an AssistantConfig object.
 
-        :param config: AssistantConfig object containing the configuration for the assistant.
+        :param config: AssistantConfig object containing the configuration for the agent.
         :type config: AssistantConfig
-        :param callbacks: Optional callbacks for the assistant client.
+        :param callbacks: Optional callbacks for the agent client.
         :type callbacks: Optional[AssistantClientCallbacks]
         :param timeout: Optional timeout for HTTP requests.
         :type timeout: Optional[float]
@@ -136,8 +137,8 @@ class AgentClient(BaseAssistantClient):
             is_create = not config.assistant_id
             return cls(config_json=config_json, callbacks=callbacks, is_create=is_create, timeout=timeout, **client_args)
         except Exception as e:
-            logger.error(f"Failed to create assistant client from config: {e}")
-            raise EngineError(f"Failed to create assistant client from config: {e}")
+            logger.error(f"Failed to create agent client from config: {e}")
+            raise EngineError(f"Failed to create agent client from config: {e}")
 
     def sync_from_cloud(
             self,
@@ -158,7 +159,7 @@ class AgentClient(BaseAssistantClient):
             if assistant_config is None:
                 raise EngineError(f"Agent with name: {self.name} does not exist.")
 
-            # Retrieve the assistant from the cloud service and update the local configuration
+            # Retrieve the agent from the cloud service and update the local configuration
             assistant = self._retrieve_agent(assistant_config.assistant_id, timeout)
             assistant_config.instructions = assistant.instructions
             # TODO text_completion_config parameters are currently used in runs only, not assistant creation
@@ -175,19 +176,19 @@ class AgentClient(BaseAssistantClient):
             if assistant_config.tool_resources and assistant_config.tool_resources.code_interpreter_files:
                 logger.info(f"Code interpreter files in local: {assistant_config.tool_resources.code_interpreter_files}")
                 for file_id in code_interpreter_file_ids_cloud:
-                    file_name = self._ai_client.files.retrieve(file_id).filename
+                    file_name = self._ai_client.agents.get_file(file_id).filename
                     logger.info(f"Code interpreter file id: {file_id}, name: {file_name} in cloud")
 
             file_search_vs_ids_cloud = []
             if assistant.tool_resources and assistant.tool_resources.file_search:
                 file_search_vs_ids_cloud = assistant.tool_resources.file_search.vector_store_ids
-                files_in_vs_cloud = list(self._ai_client.beta.vector_stores.files.list(file_search_vs_ids_cloud[0], timeout=timeout))
+                files_in_vs_cloud = list(self._ai_client.agents.list_vector_store_files(file_search_vs_ids_cloud[0], timeout=timeout))
                 file_search_file_ids_cloud = [file.id for file in files_in_vs_cloud]
 
             if assistant_config.tool_resources and assistant_config.tool_resources.file_search_vector_stores:
                 logger.info(f"File search vector stores in local: {assistant_config.tool_resources.file_search_vector_stores}")
                 for file_id in file_search_file_ids_cloud:
-                    file_name = self._ai_client.files.retrieve(file_id).filename
+                    file_name = self._ai_client.agents.get_file(file_id).filename
                     logger.info(f"File search file id: {file_id}, name: {file_name} in cloud")
 
             #assistant_config.tool_resources = ToolResourcesConfig(
@@ -214,7 +215,7 @@ class AgentClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ):
         try:
-            # Create or update the assistant
+            # Create or update the agent
             assistant_config = AssistantConfig.from_dict(config_data)
             if is_create:
                 start_time = time.time()
@@ -227,10 +228,10 @@ class AgentClient(BaseAssistantClient):
                 local_config = config_manager.get_config(self.name)
                 # check if the local configuration is different from the given configuration
                 if local_config and local_config != assistant_config:
-                    logger.debug("Local config is different from the given configuration. Updating the assistant...")
+                    logger.debug("Local config is different from the given configuration. Updating the agent...")
                     self._update_agent(assistant_config, timeout=timeout)
                 else:
-                    logger.debug("Local config is the same as the given configuration. No need to update the assistant.")
+                    logger.debug("Local config is the same as the given configuration. No need to update the agent.")
                 end_time = time.time()
                 logger.debug(f"Total time taken for _update_agent: {end_time - start_time} seconds")
 
@@ -246,8 +247,8 @@ class AgentClient(BaseAssistantClient):
             config_manager.update_config(self._name, assistant_config.to_json())
 
         except Exception as e:
-            logger.error(f"Failed to initialize assistant instance: {e}")
-            raise EngineError(f"Failed to initialize assistant instance: {e}")
+            logger.error(f"Failed to initialize agent instance: {e}")
+            raise EngineError(f"Failed to initialize agent instance: {e}")
 
     def _create_agent(
             self, 
@@ -255,7 +256,7 @@ class AgentClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ):
         try:
-            logger.info(f"Creating new assistant with name: {assistant_config.name}")
+            logger.info(f"Creating new agent with name: {assistant_config.name}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = self._create_tool_resources(assistant_config)
@@ -387,15 +388,15 @@ class AgentClient(BaseAssistantClient):
             return tool_resources
 
         except Exception as e:
-            logger.error(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
-            raise EngineError(f"Failed to update tool resources for assistant: {assistant_config.name}: {e}")
+            logger.error(f"Failed to update tool resources for agent: {assistant_config.name}: {e}")
+            raise EngineError(f"Failed to update tool resources for agent: {assistant_config.name}: {e}")
 
     def purge(
             self,
             timeout: Optional[float] = None
     )-> None:
         """
-        Purges the assistant from the cloud service and the local configuration.
+        Purges the agent from the cloud service and the local configuration.
 
         :param timeout: The HTTP request timeout in seconds.
         :type timeout: Optional[float]
@@ -404,13 +405,13 @@ class AgentClient(BaseAssistantClient):
         :rtype: None
         """
         try:
-            logger.info(f"Purging assistant with name: {self.name}")
-            # retrieve the assistant configuration
+            logger.info(f"Purging agent with name: {self.name}")
+            # retrieve the agent configuration
             config_manager = AssistantConfigManager.get_instance()
             assistant_config = config_manager.get_config(self.name)
 
             # remove from the cloud service
-            self._delete_assistant(assistant_config, timeout=timeout)
+            self._delete_agent(assistant_config, timeout=timeout)
 
             # remove from the local config
             config_manager.delete_config(assistant_config.name)
@@ -418,8 +419,8 @@ class AgentClient(BaseAssistantClient):
             self._clear_variables()
 
         except Exception as e:
-            logger.error(f"Failed to purge assistant with name: {self.name}: {e}")
-            raise EngineError(f"Failed to purge assistant with name: {self.name}: {e}")
+            logger.error(f"Failed to purge agent with name: {self.name}: {e}")
+            raise EngineError(f"Failed to purge agent with name: {self.name}: {e}")
 
     def _delete_agent(
             self, 
@@ -432,7 +433,7 @@ class AgentClient(BaseAssistantClient):
                 assistant_id=assistant_id,
                 timeout=timeout
             )
-            # delete threads associated with the assistant
+            # delete threads associated with the agent
             logger.info(f"Deleted agent with ID: {assistant_id}")
         except Exception as e:
             logger.error(f"Failed to delete agent with ID: {assistant_id}: {e}")
@@ -449,7 +450,7 @@ class AgentClient(BaseAssistantClient):
         Process the messages in given thread, either in streaming or non-streaming mode.
 
         :param thread_name: The name of the thread to process.
-        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param additional_instructions: Additional instructions to provide to the agent.
         :param timeout: The HTTP request timeout in seconds.
         :param stream: Flag to indicate if the messages should be processed in streaming mode.
         """
@@ -477,7 +478,7 @@ class AgentClient(BaseAssistantClient):
 
         :param thread_name: The name of the thread to process.
         :param thread_id: The ID of the thread to process.
-        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param additional_instructions: Additional instructions to provide to the agent.
         :param timeout: The HTTP request timeout in seconds.
         """
         try:
@@ -567,10 +568,9 @@ class AgentClient(BaseAssistantClient):
 
         :param thread_name: The name of the thread to process.
         :param thread_id: The ID of the thread to process.
-        :param additional_instructions: Additional instructions to provide to the assistant.
+        :param additional_instructions: Additional instructions to provide to the agent.
         :param timeout: The HTTP request timeout in seconds.
         """
-        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
         try:
             logger.info(f"Creating and streaming a run for agent: {self._assistant_config.assistant_id} and thread: {thread_id}")
 
@@ -586,7 +586,7 @@ class AgentClient(BaseAssistantClient):
                 top_p=None if text_completion_config is None else text_completion_config.top_p,
                 response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
                 truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                event_handler=AgentStreamEventHandler(self, thread_id, timeout=timeout),
                 timeout=timeout
             ) as stream:
                 stream.until_done()
@@ -596,7 +596,6 @@ class AgentClient(BaseAssistantClient):
             raise EngineError(f"Error occurred during streaming processing run: {e}")
 
     def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout : Optional[float] = None, stream : Optional[bool] = None) -> bool:
-        from azure.ai.assistant.management.stream_event_handler import StreamEventHandler
         logger.info("Handling required action")
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
@@ -609,16 +608,16 @@ class AgentClient(BaseAssistantClient):
 
         if stream:
             logger.info("Submitting tool outputs with stream")
-            with self._ai_client.agents.submit_tool_outputs_to_stream(
+            self._ai_client.agents.submit_tool_outputs_to_stream(
                 thread_id=thread_id,
                 run_id=run_id,
                 tool_outputs=tool_outputs,
                 timeout=timeout,
-                event_handler=StreamEventHandler(self, thread_id, is_submit_tool_call=True)
-            ) as stream:
-                stream.until_done()
+                event_handler=AgentStreamEventHandler(self, thread_id, is_submit_tool_call=True, timeout=timeout)
+            )
+
         else:
-            self._ai_client.beta.threads.runs.submit_tool_outputs(
+            self._ai_client.agents.submit_tool_outputs_to_run(
                 thread_id=thread_id,
                 run_id=run_id,
                 tool_outputs=tool_outputs,
@@ -657,8 +656,8 @@ class AgentClient(BaseAssistantClient):
             )
             return assistant
         except Exception as e:
-            logger.error(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
-            raise EngineError(f"Failed to retrieve assistant with ID: {assistant_id}: {e}")
+            logger.error(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
+            raise EngineError(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
 
     def _delete_files_from_vector_store(
             self,
@@ -671,15 +670,15 @@ class AgentClient(BaseAssistantClient):
     ):
         updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
-        logger.info(f"Deleting files: {file_ids_to_delete} from assistant: {assistant_config.name} vector store: {vector_store_id}")
+        logger.info(f"Deleting files: {file_ids_to_delete} from agent: {assistant_config.name} vector store: {vector_store_id}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.beta.vector_stores.files.delete(
+            file_deletion_status = self._ai_client.agents.delete_vector_store_file(
                 vector_store_id=vector_store_id,
                 file_id=file_id,
                 timeout=timeout
             )
             if delete_from_service:
-                file_deletion_status = self._ai_client.files.delete(
+                file_deletion_status = self._ai_client.agents.delete_file(
                     file_id=file_id,
                     timeout=timeout
                 )
@@ -691,11 +690,11 @@ class AgentClient(BaseAssistantClient):
             updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        logger.info(f"Uploading files to assistant {assistant_config.name} vector store: {vector_store_id}")
+        logger.info(f"Uploading files to agent {assistant_config.name} vector store: {vector_store_id}")
         for file_path, file_id in updated_files.items():
             if file_id is None:
-                logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
-                file = self._ai_client.beta.vector_stores.files.upload_and_poll(
+                logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
+                file = self._ai_client.agents.create_vector_store_file_and_poll(
                     vector_store_id=vector_store_id,
                     file=open(file_path, "rb")
                 )
@@ -710,9 +709,9 @@ class AgentClient(BaseAssistantClient):
     ):
         updated_file_ids = set(updated_files.values())
         file_ids_to_delete = existing_file_ids - updated_file_ids
-        logger.info(f"Deleting files: {file_ids_to_delete} for assistant: {assistant_config.name}")
+        logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            file_deletion_status = self._ai_client.files.delete(
+            file_deletion_status = self._ai_client.agents.delete_file(
                 file_id=file_id,
                 timeout=timeout
             )
@@ -723,11 +722,11 @@ class AgentClient(BaseAssistantClient):
             updated_files: Optional[dict] = None,
             timeout : Optional[float] = None
     ):
-        logger.info(f"Uploading files for assistant: {assistant_config.name}")
+        logger.info(f"Uploading files for agent: {assistant_config.name}")
         for file_path, file_id in updated_files.items():
             if file_id is None:
-                logger.info(f"Uploading file: {file_path} for assistant: {assistant_config.name}")
-                file = self._ai_client.files.create(
+                logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
+                file = self._ai_client.agents.upload_file(
                     file=open(file_path, "rb"),
                     purpose='assistants',
                     timeout=timeout
@@ -755,5 +754,5 @@ class AgentClient(BaseAssistantClient):
                 timeout=timeout
             )
         except Exception as e:
-            logger.error(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
-            raise EngineError(f"Failed to update assistant with ID: {assistant_config.assistant_id}: {e}")
+            logger.error(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
+            raise EngineError(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
