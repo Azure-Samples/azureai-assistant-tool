@@ -184,19 +184,6 @@ class ConversationThreadClient:
             logger.error(error_message)
             raise EngineError(error_message)
 
-	# TODO Change Message type union of OpenAI and Agent ThreadMessage
-    def retrieve_message(self, original_message: Message) -> ConversationMessage:
-        """
-        Retrieves a single conversation message.
-
-        :param original_message: The original message to retrieve.
-        :type original_message: Message
-
-        :return: The conversation message.
-        :rtype: ConversationMessage
-        """
-        return ConversationMessage(self._ai_client, original_message)
-
     def create_conversation_thread_message(
             self,
             message: str,

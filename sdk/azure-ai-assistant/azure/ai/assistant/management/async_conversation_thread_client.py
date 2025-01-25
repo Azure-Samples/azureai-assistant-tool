@@ -194,19 +194,7 @@ class AsyncConversationThreadClient:
             error_message = f"Error retrieving messages content: Exception: {e}"
             logger.error(error_message)
             raise EngineError(error_message)
-
-    async def retrieve_message(self, original_message: Message) -> AsyncConversationMessage:
-        """
-        Retrieves a single conversation message.
-
-        :param original_message: The original message to retrieve.
-        :type original_message: Message
-
-        :return: The conversation message.
-        :rtype: ConversationMessage
-        """
-        return await AsyncConversationMessage().create(self._ai_client, original_message)
-    
+ 
     async def create_conversation_thread_message(
             self, 
             message : str,

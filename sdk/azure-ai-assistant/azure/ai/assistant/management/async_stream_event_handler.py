@@ -85,7 +85,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     @override
     async def on_message_delta(self, delta, snapshot) -> None:
         logger.debug(f"on_message_delta called, delta: {delta}")
-        message : AsyncConversationMessage = await self._conversation_thread_client.retrieve_message(snapshot)
+        message = await AsyncConversationMessage().create(self._parent.ai_client, snapshot)
         if delta.content:
             for content_block in delta.content:
                 if isinstance(content_block, TextDeltaBlock) and content_block.text:
@@ -96,7 +96,7 @@ class AsyncStreamEventHandler(AsyncAssistantEventHandler):
     @override
     async def on_message_done(self, message) -> None:
         logger.info(f"on_message_done called, message: {message}")
-        message = await self._conversation_thread_client.retrieve_message(message)
+        message = await AsyncConversationMessage().create(self._parent.ai_client, message)
         await self._parent._callbacks.on_run_update(self._name, self.current_run.id, "completed", self._thread_name, self._is_first_message, message=message)
         self._is_first_message = False
 
