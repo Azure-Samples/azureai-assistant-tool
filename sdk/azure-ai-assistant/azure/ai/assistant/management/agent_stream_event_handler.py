@@ -1,4 +1,3 @@
-
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
@@ -8,14 +7,24 @@ from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.logger_module import logger
 
-from azure.ai.projects.models import AgentEventHandler, SubmitToolOutputsAction, RunStep, ThreadMessage, ThreadRun, MessageDeltaChunk
+from azure.ai.projects.models import (
+    AgentEventHandler,
+    SubmitToolOutputsAction,
+    RunStep,
+    ThreadMessage,
+    ThreadRun,
+    MessageDeltaChunk,
+    RunStepDeltaChunk,
+)
 from datetime import datetime
 from typing import Optional, Any
 
 
 class AgentStreamEventHandler(AgentEventHandler):
     """
-    Class to handle the streaming events from the Assistant using the AgentEventHandler interface.
+    Handles the streaming events from the Assistant (such as message deltas, 
+    tool calls, and run status updates), bridging them into the local logic
+    of an AgentClient instance.
     """
 
     def __init__(
@@ -25,108 +34,109 @@ class AgentStreamEventHandler(AgentEventHandler):
         is_submit_tool_call: bool = False,
         timeout: Optional[float] = None
     ):
+        """
+        Initializes the event handler for streaming-based interactions.
+
+        :param parent: The AgentClient instance that owns this event handler.
+        :param thread_id: The ID for the thread being processed.
+        :param is_submit_tool_call: True if these events are part of a tool call submission.
+        :param timeout: A timeout for API calls, if applicable.
+        """
         super().__init__()
         self._parent = parent
-        self._name = parent._assistant_config.name
-        self._is_first_message = True
-        self._is_started = False
+        self._name = parent.assistant_config.name
+        self._first_message = True
+        self._run_id = None
+        self._started = False
         self._is_submit_tool_call = is_submit_tool_call
         self._conversation_thread_client = ConversationThreadClient.get_instance(
             self._parent._ai_client_type
         )
-        threads_config: ConversationThreadConfig = (
-            self._conversation_thread_client.get_config()
-        )
+        threads_config: ConversationThreadConfig = self._conversation_thread_client.get_config()
         self._thread_name = threads_config.get_thread_name_by_id(thread_id)
         self._thread_id = thread_id
         self._timeout = timeout
 
     def on_message_delta(
-        self, delta: "MessageDeltaChunk"  # type: ignore[name-defined]
+        self, delta: MessageDeltaChunk
     ) -> None:
         """
-        When a portion of a message is streamed back (text delta).
+        Called when a portion of a message is streamed back (text delta).
+        Typically used to show partial/streamed response content to the user.
         """
         logger.debug(f"on_message_delta called, delta: {delta}")
-        # TODO: Update ConversationMessage
+        # Create or update a ConversationMessage with the streamed content.
         message = ConversationMessage(self._parent.ai_client, delta)
         if delta.text:
-            # Append the delta text to your conversation message, if you wish:
             message.text_message.content += delta.text
-        # Fire your "stream update" callback (previously in on_message_delta)
+
+        # Fire a run update callback, passing the message so the UI or logs can be updated.
         self._parent._callbacks.on_run_update(
             self._name,
-            self.current_run.id,
+            self._run_id,
             "streaming",
             self._thread_name,
-            self._is_first_message,
+            self._first_message,
             message=message
         )
-        self._is_first_message = False
+        self._first_message = False
 
     def on_thread_message(
-        self, message: "ThreadMessage"  # type: ignore[name-defined]
+        self, message: ThreadMessage
     ) -> None:
         """
-        A new message in the conversation (fully created).
+        Called when a new message is added to the conversation thread.
+        This may also be called when a message completes (status done/completed).
         """
-        logger.info(f"on_thread_message called, message: {message}")
-        # If you used to handle "on_message_created" or "on_message_done",
-        # you can fold that logic here. For instance:
-        if message.status == "done" or message.status == "completed":
-            # This could be your "on_message_done" logic:
+        logger.info(f"on_thread_message called, message.id: {message.id}, status: {message.status}")
+
+        if message.status in ["done", "completed"]:
+            # A completed message event. If you track final responses, handle here.
             logger.info(f"Message completed with ID: {message.id}")
-            # TODO: Update ConversationMessage
             retrieved_msg = ConversationMessage(self._parent.ai_client, message)
             self._parent._callbacks.on_run_update(
                 self._name,
-                self.current_run.id,
+                self._run_id,
                 "completed",
                 self._thread_name,
-                self._is_first_message,
+                self._first_message,
                 message=retrieved_msg
             )
-            self._is_first_message = False
+            self._first_message = False
         else:
-            # Otherwise treat as a "newly created" message
-            logger.info(f"Message created with ID: {message.id}")
+            # Otherwise, it's a newly created or in-progress message.
+            logger.info(f"New thread message created with ID: {message.id}")
 
     def on_thread_run(
-        self, run: "ThreadRun"  # type: ignore[name-defined]
+        self, run: ThreadRun
     ) -> None:
         """
-        A run event has occurred, such as a new run or status change
-        (created, failed, requires_action, done, etc.).
+        Called when any run-level event occurs, such as run creation, failure, or completion.
         """
         logger.info(f"on_thread_run called, run_id: {run.id}, status: {run.status}")
+        self._run_id = run.id
 
         if run.status == "queued":
             logger.info(f"ThreadRunCreated, run_id: {run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
-            if not self._is_started and not self._is_submit_tool_call:
+            if not self._started and not self._is_submit_tool_call:
                 conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
                 user_request = conversation.get_last_text_message("user").content
-                self._parent._callbacks.on_run_start(
-                    self._name,
-                    run.id,
-                    str(datetime.now()),
-                    user_request
-                )
-                self._is_started = True
+                self._parent._callbacks.on_run_start(self._name, run.id, str(datetime.now()), user_request)
+                self._started = True
 
-        if run.status == "failed":
+        elif run.status == "failed":
             logger.error(f"Run failed, last_error: {run.last_error}")
             if run.last_error:
                 self._parent._callbacks.on_run_failed(
                     self._name,
-                    self.current_run.id,
+                    run.id,
                     str(datetime.now()),
                     run.last_error.code if run.last_error.code else "UNKNOWN_ERROR",
                     run.last_error.message if run.last_error.message else "No error message",
                     self._thread_name
                 )
 
-        if run.status == "completed":
-            # You could also handle the "on_end" logic here if so desired
+        elif run.status == "completed":
             logger.info(f"Run completed, run_id: {run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
             if not self._is_submit_tool_call:
                 self._parent._callbacks.on_run_end(
@@ -136,22 +146,24 @@ class AgentStreamEventHandler(AgentEventHandler):
                     self._thread_name
                 )
 
-        # If the run requires action (tool calls)
-        if run.status == "requires_action" and isinstance(run.required_action, SubmitToolOutputsAction):
-            logger.info(f"Run requires action for tool outputs, run_id: {run.id}")
-            # Potentially handle this directly, or call a helper method:
+        elif run.status == "requires_action" and isinstance(run.required_action, SubmitToolOutputsAction):
+            logger.info(f"Run requires submitting tool outputs, run_id: {run.id}")
             self._handle_required_tool_outputs(run)
 
-    def _handle_required_tool_outputs(self, run: "ThreadRun") -> None:
+        else:
+            # If there are additional statuses that are not handled explicitly:
+            logger.debug(f"Unhandled run status: {run.status}")
+
+    def _handle_required_tool_outputs(self, run: ThreadRun) -> None:
         """
-        If the run requires us to submit tool outputs, handle it here.
-        (Similar logic you had in old 'on_tool_call_done' or 'on_event' checks.)
+        If the run requires us to submit tool outputs, this method triggers the agent client
+        to gather and submit data for any outstanding tool calls.
         """
         if isinstance(run.required_action, SubmitToolOutputsAction):
             tool_calls = run.required_action.submit_tool_outputs.tool_calls
             logger.info(f"Handling required tool outputs for run_id: {run.id}")
 
-            # Let your parent figure out how to submit the outputs, or do it here:
+            # Let the parent handle the actual submission (similar to your old code).
             self._parent._handle_required_action(
                 self._name,
                 self._thread_id,
@@ -162,41 +174,39 @@ class AgentStreamEventHandler(AgentEventHandler):
             )
 
     def on_run_step(
-        self, step: "RunStep"  # type: ignore[name-defined]
+        self, step: RunStep
     ) -> None:
         """
-        Handle a RunStep event. This might replace on_tool_call_created / on_message_created, etc.
+        Called for each run step (e.g., creation/use of tools or partial status updates).
         """
         logger.info(f"on_run_step called. Type: {step.type}, Status: {step.status}")
-        # If you need to handle "tool_call_created" logic:
+        # Example: handling a function tool call creation
         if step.type == "function" and step.status == "created":
-            logger.info(f"Tool call created: {step}")
+            logger.info(f"Function tool call created: {step}")
+        elif step.type == "function" and step.status == "done":
+            logger.info(f"Function tool call done: {step}")
+
+            # If the run now requires action, respond to it (similar to on_thread_run logic).
             if self.current_run.required_action:
-                logger.info(f"run.required_action.type: {self.current_run.required_action.type}")
-        # If the step is done (similar to old on_tool_call_done)
-        if step.type == "function" and step.status == "done":
-            logger.info(f"Tool call done: {step}")
-            if self.current_run.required_action:
-                logger.info(f"done, run.required_action.type: {self.current_run.required_action.type}")
+                logger.info(f"Done; required_action.type: {self.current_run.required_action.type}")
                 if self.current_run.required_action.type == "submit_tool_outputs":
                     tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
                     self._parent._handle_required_action(
                         self._name,
                         self._thread_id,
-                        self.current_run.id,
+                        self._run_id,
                         tool_calls,
                         timeout=self._timeout,
                         stream=True
                     )
 
     def on_run_step_delta(
-        self, delta: "RunStepDeltaChunk"  # type: ignore[name-defined]
+        self, delta: RunStepDeltaChunk
     ) -> None:
         """
-        Handle run-step deltas (like partial tool call info, partial function name/args, etc.).
+        Called for incremental updates within a run step, such as partial function arguments.
         """
         logger.debug(f"on_run_step_delta called, delta: {delta}")
-        # If it's a function tool call with partial data:
         if delta.type == "function":
             if delta.function.name:
                 logger.debug(f"Function name: {delta.function.name}")
@@ -204,27 +214,25 @@ class AgentStreamEventHandler(AgentEventHandler):
                 logger.debug(f"Function arguments: {delta.function.arguments}")
             if delta.function.output:
                 logger.debug(f"Function output: {delta.function.output}")
-        if self.current_run.required_action:
-            logger.debug(f"delta, run.required_action.type: {self.current_run.required_action.type}")
 
-    def on_error(self, data: str) -> None:
+    def on_error(
+        self, data: str
+    ) -> None:
         """
-        Handle error events from the agent stream.
+        Called if an internal error or exception occurs on the agent stream.
         """
         logger.error(f"An error occurred in the agent stream. Data: {data}")
 
     def on_done(self) -> None:
         """
-        Called when the stream is fully completed.
-        (Equivalent to old `on_end` in prior code.)
+        Called when the agent stream is fully completed (no more events are expected).
         """
         logger.info(f"on_done called, run_id: {self.current_run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
-        # If you still want to call on_run_end (and haven't already in on_thread_run),
-        # you can do so here. Example:
+        # In some scenarios, you might confirm the run end callback here if not triggered earlier.
         if not self._is_submit_tool_call:
             self._parent._callbacks.on_run_end(
                 self._name,
-                self.current_run.id,
+                self._run_id,
                 str(datetime.now()),
                 self._thread_name
             )
@@ -233,6 +241,6 @@ class AgentStreamEventHandler(AgentEventHandler):
         self, event_type: str, event_data: Any
     ) -> None:
         """
-        Called for any event types that do not map to the known handlers.
+        Called if a raw event arrives that doesn't match known event types.
         """
         logger.warning(f"Unhandled event. Type: {event_type}, Data: {event_data}")
