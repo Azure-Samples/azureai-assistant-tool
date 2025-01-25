@@ -12,6 +12,7 @@ from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+#from azure.ai.assistant.management.agent_client import AgentClient
 from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
@@ -50,6 +51,11 @@ class AssistantsMenu:
             createChatAssistantAction = QAction('Create New / Edit Chat Assistant', self.main_window)
             createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
             self.assistants_menu.addAction(createChatAssistantAction)
+
+            # Add Azure AI Agent action
+            createAzureAIAgentAction = QAction('Create New / Edit Azure AI Agent', self.main_window)
+            createAzureAIAgentAction.triggered.connect(self.create_new_edit_azure_ai_agent)
+            self.assistants_menu.addAction(createAzureAIAgentAction)
         
         # Common export action
         exportAction = QAction('Export', self.main_window)
@@ -88,6 +94,15 @@ class AssistantsMenu:
         # Show the dialog non-modally
         self.dialog.show()
 
+    def create_new_edit_azure_ai_agent(self):
+        self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.AGENT.value, function_config_manager=self.function_config_manager)
+        
+        # Connect the custom signal to a method to process the submitted data
+        self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
+
+        # Show the dialog non-modally
+        self.dialog.show()
+
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
         try:
             realtime_audio = None
@@ -96,6 +111,10 @@ class AssistantsMenu:
 
             elif assistant_type == AssistantType.ASSISTANT.value:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+
+            elif assistant_type == AssistantType.AGENT.value:
+                #assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                pass
 
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)

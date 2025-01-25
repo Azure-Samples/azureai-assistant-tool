@@ -180,6 +180,7 @@ class AssistantConfigDialog(QDialog):
         else:
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI.name)
             self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI.name)
+            self.aiClientComboBox.addItem(AIClientType.AZURE_AI_AGENT.name)
             self.aiClientComboBox.setEnabled(True)  # Allow user selection for non-realtime
 
         active_ai_client_type = self.main_window.active_ai_client_type

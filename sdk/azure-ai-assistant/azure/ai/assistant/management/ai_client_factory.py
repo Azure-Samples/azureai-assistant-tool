@@ -22,7 +22,7 @@ class AIClientType(Enum):
     """Azure OpenAI client used with Realtime API"""
     OPEN_AI_REALTIME = auto()
     """OpenAI client used with Realtime API"""
-    AZURE_AI_AGENTS = auto()
+    AZURE_AI_AGENT = auto()
     """Azure AI Agents client"""
 
 
@@ -38,7 +38,7 @@ class AsyncAIClientType(Enum):
     """Azure OpenAI async client used with Realtime API"""
     OPEN_AI_REALTIME = auto()
     """OpenAI async client used with Realtime API"""
-    AZURE_AI_AGENTS = auto()
+    AZURE_AI_AGENT = auto()
     """Azure AI Agents async client"""
 
 
@@ -89,7 +89,7 @@ class AIClientFactory:
                 )
             elif client_type in {AIClientType.OPEN_AI, AIClientType.OPEN_AI_REALTIME}:
                 self._clients[client_key] = OpenAI(**client_args)
-            elif client_type == AIClientType.AZURE_AI_AGENTS:
+            elif client_type == AIClientType.AZURE_AI_AGENT:
                 from azure.ai.projects import AIProjectClient
                 from azure.identity import DefaultAzureCredential
                 conn_str = os.getenv("PROJECT_CONNECTION_STRING")
@@ -116,7 +116,7 @@ class AIClientFactory:
                 )
             elif client_type in {AsyncAIClientType.OPEN_AI, AsyncAIClientType.OPEN_AI_REALTIME}:
                 self._clients[client_key] = AsyncOpenAI(**client_args)
-            elif client_type == AsyncAIClientType.AZURE_AI_AGENTS:
+            elif client_type == AsyncAIClientType.AZURE_AI_AGENT:
                 from azure.ai.projects.aio import AIProjectClient
                 from azure.identity.aio import DefaultAzureCredential
                 conn_str = os.getenv("PROJECT_CONNECTION_STRING")

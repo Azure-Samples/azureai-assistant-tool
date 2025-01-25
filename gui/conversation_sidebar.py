@@ -344,11 +344,16 @@ class ConversationSidebar(QWidget):
             if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
 
+            elif assistant_config.assistant_type == AssistantType.AGENT.value:
+                #self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+                pass
+
             elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
 
             elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
+
             self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
             self.dialog.show()
 
@@ -361,6 +366,10 @@ class ConversationSidebar(QWidget):
             elif assistant_type == AssistantType.ASSISTANT.value:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
 
+            elif assistant_type == AssistantType.AGENT.value:
+                #assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                pass
+
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
                 realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
@@ -370,6 +379,7 @@ class ConversationSidebar(QWidget):
                 else:
                     assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
                     realtime_audio = RealtimeAudio(assistant_client)
+
             self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
             client_type = AIClientType[ai_client_type]
             self.main_window.conversation_sidebar.load_assistant_list(client_type)
@@ -390,7 +400,7 @@ class ConversationSidebar(QWidget):
 
             if reply == QMessageBox.Yes:
                 try:
-                    assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
+                    assistant_client = self.assistant_client_manager.get_client(assistant_name)
                     if assistant_client:
                         assistant_client.purge(self.main_window.connection_timeout)
                     self.assistant_client_manager.remove_client(assistant_name)
@@ -459,6 +469,10 @@ class ConversationSidebar(QWidget):
                     realtime_audio = None
                     if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+
+                    elif assistant_config.assistant_type == AssistantType.AGENT.value:
+                        #assistant_client = AgentClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                        pass
 
                     elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                         assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)

@@ -73,6 +73,7 @@ setup(
         "scipy",
         "onnxruntime",
         "resampy",
+        "azure-ai-projects",
     ],
     python_requires=">=3.8",
     project_urls={

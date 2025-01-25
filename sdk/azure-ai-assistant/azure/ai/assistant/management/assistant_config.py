@@ -13,6 +13,7 @@ class AssistantType(Enum):
     REALTIME_ASSISTANT = "realtime_assistant"
     CHAT_ASSISTANT = "chat_assistant"
     ASSISTANT = "assistant"
+    AGENT = "agent"
 
 
 class RealtimeConfig:
@@ -1048,7 +1049,7 @@ class AssistantConfig:
                     seed=None,
                     max_text_messages=completion_data['max_text_messages']
                 )
-            elif self._assistant_type == AssistantType.ASSISTANT.value:
+            elif self._assistant_type == AssistantType.ASSISTANT.value or self._assistant_type == AssistantType.AGENT.value:
                 completion_data = config_data.get('completion_settings', {
                     'temperature': 1.0,
                     'max_completion_tokens': 1000,

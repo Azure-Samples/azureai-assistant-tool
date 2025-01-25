@@ -142,6 +142,11 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                     AIClientType.AZURE_OPEN_AI_REALTIME,
                     api_version=self.system_api_version
                 )
+            elif self.system_client_type == AIClientType.AZURE_AI_AGENT.name:
+                self.system_client = AIClientFactory.get_instance().get_client(
+                    AIClientType.AZURE_AI_AGENT,
+                    api_version=self.system_api_version
+                )
         except Exception as e:
             logger.error(f"Error initializing system assistant client {self.system_client_type}: {e}")
             raise ValueError(f"Error initializing system assistant client {self.system_client_type}: {e}")
@@ -297,6 +302,10 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             elif self.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.AZURE_OPEN_AI_REALTIME
+                )
+            elif self.active_ai_client_type == AIClientType.AZURE_AI_AGENT:
+                client = AIClientFactory.get_instance().get_client(
+                    AIClientType.AZURE_AI_AGENT
                 )
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
