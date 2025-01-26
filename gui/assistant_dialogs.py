@@ -868,7 +868,8 @@ class AssistantConfigDialog(QDialog):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
         self.update_assistant_combobox()
         self.update_model_combobox()
-        self.update_voice_combo_box()
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+            self.update_voice_combo_box()
 
     def update_assistant_combobox(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
