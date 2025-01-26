@@ -1144,7 +1144,7 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        if self._assistant_type == AssistantType.ASSISTANT.value:
+        if self._assistant_type == AssistantType.ASSISTANT.value or self._assistant_type == AssistantType.AGENT.value:
             return ToolResourcesConfig()
         else:
             return None

@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont, QIcon, QAction
 import os, time
 
 from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
+from azure.ai.assistant.management.agent_client import AgentClient
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
@@ -367,7 +368,7 @@ class ConversationSidebar(QWidget):
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
 
             elif assistant_type == AssistantType.AGENT.value:
-                #assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
                 pass
 
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
@@ -471,7 +472,7 @@ class ConversationSidebar(QWidget):
                         assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
 
                     elif assistant_config.assistant_type == AssistantType.AGENT.value:
-                        #assistant_client = AgentClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+                        assistant_client = AgentClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
                         pass
 
                     elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:

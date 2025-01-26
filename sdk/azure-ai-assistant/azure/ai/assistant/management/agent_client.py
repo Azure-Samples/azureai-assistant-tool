@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.agent_stream_event_handler import AgentStreamEventHandler
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config import VectorStoreConfig
@@ -578,6 +577,8 @@ class AgentClient(BaseAssistantClient):
             timeout: Optional[float] = None
     ) -> None:
         try:
+            from azure.ai.assistant.management.agent_stream_event_handler import AgentStreamEventHandler
+
             logger.info(f"Creating and streaming a run for agent: {self._assistant_config.assistant_id} and thread: {thread_id}")
             text_completion_config = self._assistant_config.text_completion_config
 

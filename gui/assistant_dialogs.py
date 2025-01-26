@@ -174,12 +174,13 @@ class AssistantConfigDialog(QDialog):
         self.aiClientLabel = QLabel('AI Client:')
         self.aiClientComboBox = QComboBox()
         if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-            # Only add OPEN_AI_REALTIME for Realtime Assistants
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI_REALTIME.name)
             self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI_REALTIME.name)
-        else:
+        elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value or self.assistant_type == AssistantType.ASSISTANT.value:
             self.aiClientComboBox.addItem(AIClientType.OPEN_AI.name)
             self.aiClientComboBox.addItem(AIClientType.AZURE_OPEN_AI.name)
+            self.aiClientComboBox.setEnabled(True)  # Allow user selection for non-realtime
+        elif self.assistant_type == AssistantType.AGENT.value:
             self.aiClientComboBox.addItem(AIClientType.AZURE_AI_AGENT.name)
             self.aiClientComboBox.setEnabled(True)  # Allow user selection for non-realtime
 
@@ -325,7 +326,7 @@ class AssistantConfigDialog(QDialog):
                 list_widget = self.systemFunctionsList if function_type == 'system' else self.userFunctionsList
                 self.create_function_section(list_widget, function_type, funcs)
 
-        if self.assistant_type == AssistantType.ASSISTANT.value:
+        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             # Section for managing code interpreter files
             self.setup_code_interpreter_files(toolsLayout)
 
@@ -682,7 +683,7 @@ class AssistantConfigDialog(QDialog):
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
-        if self.assistant_type == AssistantType.ASSISTANT.value:
+        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             self.init_assistant_completion_settings(completionLayout)
         elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             self.init_chat_assistant_completion_settings(completionLayout)
@@ -845,7 +846,7 @@ class AssistantConfigDialog(QDialog):
         # Determine if controls should be enabled based on the checkbox and assistant type
         isEnabled = not self.useDefaultSettingsCheckBox.isChecked()
         
-        if self.assistant_type == AssistantType.ASSISTANT.value:
+        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             self.temperatureSlider.setEnabled(isEnabled)
             self.topPSlider.setEnabled(isEnabled)
             self.responseFormatComboBox.setEnabled(isEnabled)
@@ -869,7 +870,8 @@ class AssistantConfigDialog(QDialog):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
         self.update_assistant_combobox()
         self.update_model_combobox()
-        self.update_voice_combo_box()
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+            self.update_voice_combo_box()
 
     def update_assistant_combobox(self):
         self.ai_client_type = AIClientType[self.aiClientComboBox.currentText()]
@@ -948,7 +950,7 @@ class AssistantConfigDialog(QDialog):
         self.functions = []
         self.file_search = False
         self.code_interpreter = False
-        if self.assistant_type == AssistantType.ASSISTANT.value:
+        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             self.fileSearchCheckBox.setChecked(False)
             self.codeInterpreterCheckBox.setChecked(False)
         self.outputFolderPathEdit.clear()
@@ -1063,7 +1065,7 @@ class AssistantConfigDialog(QDialog):
             completion_settings = text_completion_config.to_dict()
 
             # Load settings into UI elements based on assistant type
-            if self.assistant_type == AssistantType.ASSISTANT.value:
+            if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
                 self.responseFormatComboBox.setCurrentText(completion_settings.get('response_format', 'text'))
@@ -1093,7 +1095,7 @@ class AssistantConfigDialog(QDialog):
         else:
             # Apply default settings if no config is found
             self.useDefaultSettingsCheckBox.setChecked(True)
-            if self.assistant_type == AssistantType.ASSISTANT.value:
+            if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
                 self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
                 self.responseFormatComboBox.setCurrentText("text")
@@ -1292,7 +1294,7 @@ class AssistantConfigDialog(QDialog):
                     'max_text_messages': self.maxMessagesEdit.value()
                 }
 
-        elif self.assistant_type == AssistantType.ASSISTANT.value:
+        elif self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
                 truncation_strategy = {
                     'type': self.truncationTypeComboBox.currentText(),
@@ -1365,10 +1367,10 @@ class AssistantConfigDialog(QDialog):
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())] if self.assistant_type != AssistantType.REALTIME_ASSISTANT.value else [],
-            'tool_resources': tool_resources.to_dict() if self.assistant_type == AssistantType.ASSISTANT.value else None,
+            'tool_resources': tool_resources.to_dict() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else None,
             'functions': self.functions,
-            'file_search': self.fileSearchCheckBox.isChecked() if self.assistant_type == "assistant" else False,
-            'code_interpreter': self.codeInterpreterCheckBox.isChecked() if self.assistant_type == AssistantType.ASSISTANT.value else False,
+            'file_search': self.fileSearchCheckBox.isChecked() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else False,
+            'code_interpreter': self.codeInterpreterCheckBox.isChecked() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else False,
             'output_folder_path': self.outputFolderPathEdit.text(),
             'ai_client_type': self.aiClientComboBox.currentText(),
             'assistant_type': self.assistant_type,

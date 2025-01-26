@@ -12,7 +12,7 @@ from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
-#from azure.ai.assistant.management.agent_client import AgentClient
+from azure.ai.assistant.management.agent_client import AgentClient
 from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger, add_broadcaster_to_logger
@@ -41,7 +41,8 @@ class AssistantsMenu:
             createRealtimeAssistantAction = QAction('Create New / Edit Realtime Assistant', self.main_window)
             createRealtimeAssistantAction.triggered.connect(self.create_new_edit_realtime_assistant)
             self.assistants_menu.addAction(createRealtimeAssistantAction)
-        else:
+
+        elif self.client_type == AIClientType.OPEN_AI or self.client_type == AIClientType.AZURE_OPEN_AI:
             # Add OpenAI Assistant action
             createAssistantAction = QAction('Create New / Edit OpenAI Assistant', self.main_window)
             createAssistantAction.triggered.connect(self.create_new_edit_assistant)
@@ -52,6 +53,7 @@ class AssistantsMenu:
             createChatAssistantAction.triggered.connect(self.create_new_edit_chat_assistant)
             self.assistants_menu.addAction(createChatAssistantAction)
 
+        elif self.client_type == AIClientType.AZURE_AI_AGENT:
             # Add Azure AI Agent action
             createAzureAIAgentAction = QAction('Create New / Edit Azure AI Agent', self.main_window)
             createAzureAIAgentAction.triggered.connect(self.create_new_edit_azure_ai_agent)
@@ -113,7 +115,7 @@ class AssistantsMenu:
                 assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
 
             elif assistant_type == AssistantType.AGENT.value:
-                #assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+                assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
                 pass
 
             elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
