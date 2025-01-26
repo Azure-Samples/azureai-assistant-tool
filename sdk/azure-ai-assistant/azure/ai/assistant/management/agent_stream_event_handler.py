@@ -148,31 +148,40 @@ class AgentStreamEventHandler(AgentEventHandler):
 
         elif run.status == "requires_action" and isinstance(run.required_action, SubmitToolOutputsAction):
             logger.info(f"Run requires submitting tool outputs, run_id: {run.id}")
-            self._handle_required_tool_outputs(run)
+            self._handle_required_action(run)
 
         else:
             # If there are additional statuses that are not handled explicitly:
             logger.debug(f"Unhandled run status: {run.status}")
 
-    def _handle_required_tool_outputs(self, run: ThreadRun) -> None:
+    def _handle_required_action(self, run: ThreadRun) -> None:
         """
         If the run requires us to submit tool outputs, this method triggers the agent client
         to gather and submit data for any outstanding tool calls.
         """
         if isinstance(run.required_action, SubmitToolOutputsAction):
             tool_calls = run.required_action.submit_tool_outputs.tool_calls
-            logger.info(f"Handling required tool outputs for run_id: {run.id}")
 
-            # Let the parent handle the actual submission (similar to your old code).
-            self._parent._handle_required_action(
-                self._name,
-                self._thread_id,
-                run.id,
-                tool_calls,
-                timeout=self._timeout,
-                stream=True
+            if not tool_calls:
+                logger.error(f"Run requires tool outputs but no tool calls provided. Cancelling run: {run.id}")
+                self._parent._ai_client.agents.cancel_run(thread_id=self._thread_id, run_id=run.id, timeout=self._timeout)
+                return
+
+            logger.info(f"Handling required action for run_id: {run.id}")
+            tool_outputs = self._parent._process_tool_calls(self._parent.name, self._run_id, tool_calls)
+
+            if not tool_outputs:
+                logger.warning(f"No tool outputs were generated for run_id: {run.id}")
+                return
+
+            logger.info("Submitting tool outputs with stream")
+            self._parent._ai_client.agents.submit_tool_outputs_to_stream(
+                thread_id=self._thread_id,
+                run_id=run.id,
+                tool_outputs=tool_outputs,
+                event_handler=self,
             )
-
+    
     def on_run_step(
         self, step: RunStep
     ) -> None:
@@ -180,25 +189,10 @@ class AgentStreamEventHandler(AgentEventHandler):
         Called for each run step (e.g., creation/use of tools or partial status updates).
         """
         logger.info(f"on_run_step called. Type: {step.type}, Status: {step.status}")
-        # Example: handling a function tool call creation
-        if step.type == "function" and step.status == "created":
-            logger.info(f"Function tool call created: {step}")
-        elif step.type == "function" and step.status == "done":
-            logger.info(f"Function tool call done: {step}")
-
-            # If the run now requires action, respond to it (similar to on_thread_run logic).
-            if self.current_run.required_action:
-                logger.info(f"Done; required_action.type: {self.current_run.required_action.type}")
-                if self.current_run.required_action.type == "submit_tool_outputs":
-                    tool_calls = self.current_run.required_action.submit_tool_outputs.tool_calls
-                    self._parent._handle_required_action(
-                        self._name,
-                        self._thread_id,
-                        self._run_id,
-                        tool_calls,
-                        timeout=self._timeout,
-                        stream=True
-                    )
+        if step.type == "tool_calls":
+            logger.info(f"Tool call step: {step}")
+        elif step.type == "message_creation":
+            logger.info(f"Message creation step: {step}")
 
     def on_run_step_delta(
         self, delta: RunStepDeltaChunk
@@ -207,13 +201,6 @@ class AgentStreamEventHandler(AgentEventHandler):
         Called for incremental updates within a run step, such as partial function arguments.
         """
         logger.debug(f"on_run_step_delta called, delta: {delta}")
-        if delta.type == "function":
-            if delta.function.name:
-                logger.debug(f"Function name: {delta.function.name}")
-            if delta.function.arguments:
-                logger.debug(f"Function arguments: {delta.function.arguments}")
-            if delta.function.output:
-                logger.debug(f"Function output: {delta.function.output}")
 
     def on_error(
         self, data: str
@@ -227,7 +214,7 @@ class AgentStreamEventHandler(AgentEventHandler):
         """
         Called when the agent stream is fully completed (no more events are expected).
         """
-        logger.info(f"on_done called, run_id: {self.current_run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
+        logger.info(f"on_done called, run_id: {self._run_id}, is_submit_tool_call: {self._is_submit_tool_call}")
         # In some scenarios, you might confirm the run end callback here if not triggered earlier.
         if not self._is_submit_tool_call:
             self._parent._callbacks.on_run_end(

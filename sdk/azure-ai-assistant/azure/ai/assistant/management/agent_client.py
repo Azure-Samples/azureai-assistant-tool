@@ -12,6 +12,7 @@ from azure.ai.assistant.management.base_assistant_client import BaseAssistantCli
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
+from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction
 
 from typing import Optional
 from datetime import datetime
@@ -541,7 +542,7 @@ class AgentClient(BaseAssistantClient):
                     self._handle_terminal_run_status(run, thread_name)
                     return
 
-                if run.status == "requires_action":
+                if run.status == "requires_action" and isinstance(run.required_action, SubmitToolOutputsAction):
                     tool_calls = run.required_action.submit_tool_outputs.tool_calls
                     if not self._handle_required_action(self._name, thread_id, run.id, tool_calls):
                         return
@@ -600,8 +601,7 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Error occurred during streaming processing run: {e}")
             raise EngineError(f"Error occurred during streaming processing run: {e}")
 
-    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout: Optional[float] = None, stream: Optional[bool] = None) -> bool:
-        logger.info("Handling required action")
+    def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout: Optional[float] = None) -> bool:
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
             self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run_id, timeout=timeout)
@@ -611,25 +611,15 @@ class AgentClient(BaseAssistantClient):
         if not tool_outputs:
             return False
 
-        if stream:
-            logger.info("Submitting tool outputs with stream")
-            self._ai_client.agents.submit_tool_outputs_to_stream(
-                thread_id=thread_id,
-                run_id=run_id,
-                tool_outputs=tool_outputs,
-                timeout=timeout,
-                event_handler=AgentStreamEventHandler(self, thread_id, is_submit_tool_call=True, timeout=timeout)
-            )
-        else:
-            self._ai_client.agents.submit_tool_outputs_to_run(
-                thread_id=thread_id,
-                run_id=run_id,
-                tool_outputs=tool_outputs,
-                timeout=timeout
-            )
+        self._ai_client.agents.submit_tool_outputs_to_run(
+            thread_id=thread_id,
+            run_id=run_id,
+            tool_outputs=tool_outputs,
+            timeout=timeout
+        )
         return True
 
-    def _process_tool_calls(self, name, run_id, tool_calls):
+    def _process_tool_calls(self, name, run_id, tool_calls: list[RequiredFunctionToolCall]) -> list[dict]:
         tool_outputs = []
         for tool_call in tool_calls:
             start_time = time.time()
