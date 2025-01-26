@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.agent_stream_event_handler import AgentStreamEventHandler
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
@@ -681,7 +680,6 @@ class AgentClient(BaseAssistantClient):
         for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
-                # Use a context manager to ensure files close properly
                 with open(file_path, "rb") as f:
                     file = self._ai_client.agents.create_vector_store_file_and_poll(
                         vector_store_id=vector_store_id,
@@ -713,7 +711,6 @@ class AgentClient(BaseAssistantClient):
         for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
-                # Use a context manager to ensure files close properly
                 with open(file_path, "rb") as f:
                     uploaded_file = self._ai_client.agents.upload_file(
                         file=f,
