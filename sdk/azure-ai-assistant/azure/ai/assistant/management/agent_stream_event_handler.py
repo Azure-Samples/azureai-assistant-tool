@@ -25,22 +25,18 @@ class AgentStreamEventHandler(AgentEventHandler):
     Handles the streaming events from the Assistant (such as message deltas, 
     tool calls, and run status updates), bridging them into the local logic
     of an AgentClient instance.
-    """
 
+    :param parent: The AgentClient instance that owns this event handler.
+    :param thread_id: The ID for the thread being processed.
+    :param is_submit_tool_call: True if these events are part of a tool call submission.
+    :param timeout: A timeout for API calls, if applicable.
+    """
     def __init__(
         self,
         parent: AgentClient,
         thread_id: str,
         timeout: Optional[float] = None
     ):
-        """
-        Initializes the event handler for streaming-based interactions.
-
-        :param parent: The AgentClient instance that owns this event handler.
-        :param thread_id: The ID for the thread being processed.
-        :param is_submit_tool_call: True if these events are part of a tool call submission.
-        :param timeout: A timeout for API calls, if applicable.
-        """
         super().__init__()
         self._parent = parent
         self._name = parent.assistant_config.name
@@ -61,14 +57,17 @@ class AgentStreamEventHandler(AgentEventHandler):
         """
         Called when a portion of a message is streamed back (text delta).
         Typically used to show partial/streamed response content to the user.
+
+        :param delta: The delta chunk of the message.
+        :type delta: MessageDeltaChunk
         """
         logger.debug(f"on_message_delta called, delta: {delta}")
-        # Create or update a ConversationMessage with the streamed content.
-        message = ConversationMessage(self._parent.ai_client, delta)
+        message = ConversationMessage(self._parent.ai_client)
         if delta.text:
+            message.role = "assistant"
+            message.sender = "assistant"
             message.text_message.content += delta.text
 
-        # Fire a run update callback, passing the message so the UI or logs can be updated.
         self._parent._callbacks.on_run_update(
             self._name,
             self._run_id,
@@ -85,11 +84,13 @@ class AgentStreamEventHandler(AgentEventHandler):
         """
         Called when a new message is added to the conversation thread.
         This may also be called when a message completes (status done/completed).
+
+        :param message: The message object.
+        :type message: ThreadMessage
         """
         logger.info(f"on_thread_message called, message.id: {message.id}, status: {message.status}")
 
-        if message.status in ["done", "completed"]:
-            # A completed message event. If you track final responses, handle here.
+        if message.status == "completed":
             logger.info(f"Message completed with ID: {message.id}")
             retrieved_msg = ConversationMessage(self._parent.ai_client, message)
             self._parent._callbacks.on_run_update(
@@ -102,7 +103,6 @@ class AgentStreamEventHandler(AgentEventHandler):
             )
             self._first_message = False
         else:
-            # Otherwise, it's a newly created or in-progress message.
             logger.info(f"New thread message created with ID: {message.id}")
 
     def on_thread_run(
@@ -110,6 +110,9 @@ class AgentStreamEventHandler(AgentEventHandler):
     ) -> None:
         """
         Called when any run-level event occurs, such as run creation, failure, or completion.
+
+        :param run: The run object.
+        :type run: ThreadRun
         """
         logger.info(f"on_thread_run called, run_id: {run.id}, status: {run.status}")
         self._run_id = run.id
@@ -150,10 +153,6 @@ class AgentStreamEventHandler(AgentEventHandler):
             logger.debug(f"Unhandled run status: {run.status}")
 
     def _handle_required_action(self, run: ThreadRun) -> None:
-        """
-        If the run requires us to submit tool outputs, this method triggers the agent client
-        to gather and submit data for any outstanding tool calls.
-        """
         if isinstance(run.required_action, SubmitToolOutputsAction):
             tool_calls = run.required_action.submit_tool_outputs.tool_calls
 
@@ -182,6 +181,9 @@ class AgentStreamEventHandler(AgentEventHandler):
     ) -> None:
         """
         Called for each run step (e.g., creation/use of tools or partial status updates).
+
+        :param step: The run step object.
+        :type step: RunStep
         """
         logger.info(f"on_run_step called. Type: {step.type}, Status: {step.status}")
         if step.type == "tool_calls":
@@ -194,6 +196,9 @@ class AgentStreamEventHandler(AgentEventHandler):
     ) -> None:
         """
         Called for incremental updates within a run step, such as partial function arguments.
+
+        :param delta: The delta chunk of the run step.
+        :type delta: RunStepDeltaChunk
         """
         logger.debug(f"on_run_step_delta called, delta: {delta}")
 
@@ -202,8 +207,11 @@ class AgentStreamEventHandler(AgentEventHandler):
     ) -> None:
         """
         Called if an internal error or exception occurs on the agent stream.
+
+        :param data: The error message.
+        :type data: str
         """
-        logger.error(f"An error occurred in the agent stream. Data: {data}")
+        logger.error(f"on_error called, data: {data}")
 
     def on_done(self) -> None:
         """
@@ -222,5 +230,10 @@ class AgentStreamEventHandler(AgentEventHandler):
     ) -> None:
         """
         Called if a raw event arrives that doesn't match known event types.
+
+        :param event_type: The type of the event.
+        :type event_type: str
+        :param event_data: The data associated with the event.
+        :type event_data: Any
         """
         logger.warning(f"Unhandled event. Type: {event_type}, Data: {event_data}")

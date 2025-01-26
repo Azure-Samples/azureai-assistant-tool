@@ -4,11 +4,13 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
+import uuid
+import os
+import time
+
 from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon, QAction
-
-import os, time
 
 from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
 from azure.ai.assistant.management.agent_client import AgentClient
@@ -57,10 +59,11 @@ class CustomListWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
-        self.itemToFileMap = {}  # Maps list items to attached file paths
+        # Instead of item → attachments, store id_string → attachments
+        self.itemIdToFileMap = {}  # {str: [attachment_dict, ...]}
 
     def clear_files(self):
-        self.itemToFileMap.clear()
+        self.itemIdToFileMap.clear()
 
     def contextMenuEvent(self, event):
         context_menu = QMenu(self)
@@ -70,14 +73,19 @@ class CustomListWidget(QListWidget):
 
         current_item = self.currentItem()
         remove_file_menu = None
-        if current_item:
-            row = self.row(current_item)
-            if row in self.itemToFileMap and self.itemToFileMap[row]:
-                remove_file_menu = context_menu.addMenu("Remove File")
-                for file_info in self.itemToFileMap[row]:
-                    actual_file_path = file_info['file_path']
-                    tool_type = file_info['tools'][0]['type'] if file_info['tools'] else "Image"
 
+        if current_item:
+            item_id = self._get_item_id(current_item)
+            file_list = self.itemIdToFileMap.get(item_id, [])
+            if file_list:
+                remove_file_menu = context_menu.addMenu("Remove File")
+                for file_info in file_list:
+                    actual_file_path = file_info["file_path"]
+                    tool_type = (
+                        file_info["tools"][0]["type"]
+                        if file_info["tools"]
+                        else "Image"
+                    )
                     file_label = f"{os.path.basename(actual_file_path)} ({tool_type})"
                     action = remove_file_menu.addAction(file_label)
                     action.setData(file_info)
@@ -92,43 +100,50 @@ class CustomListWidget(QListWidget):
             self.attach_file_to_selected_item(None, is_image=True)
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
-            self.remove_specific_file_from_selected_item(file_info, self.row(current_item))
+            self.remove_specific_file_from_selected_item(file_info, current_item)
 
     def attach_file_to_selected_item(self, mode, is_image=False):
         """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
         if is_image:
-            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.jpg *.jpeg *.gif *.webp)")
+            file_path, _ = file_dialog.getOpenFileName(
+                self,
+                "Select Image File",
+                filter="Images (*.png *.jpg *.jpeg *.gif *.webp)"
+            )
         else:
             file_path, _ = file_dialog.getOpenFileName(self, "Select File")
 
         if file_path:
             current_item = self.currentItem()
             if current_item:
-                row = self.row(current_item)
-                if row not in self.itemToFileMap:
-                    self.itemToFileMap[row] = []
+                item_id = self._get_item_id(current_item)
+                if item_id not in self.itemIdToFileMap:
+                    self.itemIdToFileMap[item_id] = []
 
                 file_info = {
                     "file_id": None,  # This will be updated later
                     "file_path": file_path,
                     "attachment_type": "image_file" if is_image else "document_file",
-                    "tools": [] if is_image else [{"type": mode}]  # No tools for image files
+                    "tools": [] if is_image else [{"type": mode}]
                 }
-                self.itemToFileMap[row].append(file_info)
-                self.update_item_icon(current_item, self.itemToFileMap[row])
+                self.itemIdToFileMap[item_id].append(file_info)
+                self.update_item_icon(current_item, self.itemIdToFileMap[item_id])
 
-    def remove_specific_file_from_selected_item(self, file_info, row):
+    def remove_specific_file_from_selected_item(self, file_info, item):
         """Removes a specific file from the selected item based on the file info provided."""
-        if row in self.itemToFileMap:
-            file_path_to_remove = file_info['file_path']
-            self.itemToFileMap[row] = [fi for fi in self.itemToFileMap[row] if fi['file_path'] != file_path_to_remove]
-
-            current_item = self.item(row)
-            if not self.itemToFileMap[row]:
-                current_item.setIcon(QIcon())
-            else:
-                self.update_item_icon(current_item, self.itemToFileMap[row])
+        if item:
+            item_id = self._get_item_id(item)
+            if item_id in self.itemIdToFileMap:
+                file_path_to_remove = file_info["file_path"]
+                self.itemIdToFileMap[item_id] = [
+                    fi for fi in self.itemIdToFileMap[item_id]
+                    if fi["file_path"] != file_path_to_remove
+                ]
+                if not self.itemIdToFileMap[item_id]:
+                    item.setIcon(QIcon())
+                else:
+                    self.update_item_icon(item, self.itemIdToFileMap[item_id])
 
     def update_item_icon(self, item, files):
         """Updates the list item's icon based on whether there are attached files."""
@@ -138,24 +153,22 @@ class CustomListWidget(QListWidget):
             item.setIcon(QIcon())
 
     def get_attachments_for_selected_item(self):
-        """Return the details of files attached to the currently selected item including file path and specific tool usage."""
+        """Return the details of files attached to the currently selected item."""
         current_item = self.currentItem()
         if current_item:
-            row = self.row(current_item)
-            attached_files_info = self.itemToFileMap.get(row, [])
+            item_id = self._get_item_id(current_item)
+            attached_files_info = self.itemIdToFileMap.get(item_id, [])
             attachments = []
             for file_info in attached_files_info:
-                file_path = file_info['file_path']
+                file_path = file_info["file_path"]
                 file_name = os.path.basename(file_path)
-                file_id = file_info.get('file_id', None)
-                tools = file_info.get('tools', [])
-                attachment_type = file_info.get('attachment_type', 'document_file')
-
-                # Create a structured entry for the attachments list including file_path
+                file_id = file_info.get("file_id", None)
+                tools = file_info.get("tools", [])
+                attachment_type = file_info.get("attachment_type", "document_file")
                 attachments.append({
                     "file_name": file_name,
                     "file_id": file_id,
-                    "file_path": file_path,  # Include the full file path for upload or further processing
+                    "file_path": file_path,
                     "attachment_type": attachment_type,
                     "tools": tools
                 })
@@ -166,48 +179,47 @@ class CustomListWidget(QListWidget):
         """Set the attachments for the currently selected item."""
         current_item = self.currentItem()
         if current_item is not None:
-            row = self.row(current_item)
-            self.itemToFileMap[row] = attachments[:]
+            item_id = self._get_item_id(current_item)
+            self.itemIdToFileMap[item_id] = attachments[:]
             self.update_item_icon(current_item, attachments)
         else:
-            logger.warning("No item is currently selected.")
+            # logger.warning("No item is currently selected.")
+            print("No item is currently selected.")
 
     def load_threads_with_attachments(self, threads):
         """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
-        self.clear_files()  # Clear itemToFileMap before loading new threads
+        self.clear_files()
         for thread in threads:
-            item = QListWidgetItem(thread['thread_name'])
+            item = QListWidgetItem(thread["thread_name"])
             self.addItem(item)
-            thread_tooltip_text = "You can add/remove files by right-clicking this item."
-            item.setToolTip(thread_tooltip_text)
-
-            # Get attachments from the thread data
-            attachments = thread.get('attachments', [])
-
-            # Update the item to reflect any attachments
+            # Provide a unique ID for the item so we can store attachments
+            self._get_item_id(item)
+            # Show a tooltip
+            item.setToolTip("You can add/remove files by right-clicking this item.")
+            attachments = thread.get("attachments", [])
             self.update_item_with_attachments(item, attachments)
 
     def update_item_with_attachments(self, item, attachments):
         """Update the given item with a paperclip icon if there are attachments."""
-        row = self.row(item)
         if attachments:
             item.setIcon(QIcon("gui/images/paperclip_icon.png"))
         else:
             item.setIcon(QIcon())
 
         # Store complete attachment information in the mapping
-        self.itemToFileMap[row] = attachments[:]
+        item_id = self._get_item_id(item)
+        self.itemIdToFileMap[item_id] = attachments[:]
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             current_item = self.currentItem()
             if current_item:
-                row = self.row(current_item)
                 item_text = current_item.text()
+                row = self.row(current_item)
                 self.takeItem(row)
-                # delete the attachments for the deleted item
-                if row in self.itemToFileMap:
-                    del self.itemToFileMap[row]
+                item_id = self._get_item_id(current_item)
+                if item_id in self.itemIdToFileMap:
+                    del self.itemIdToFileMap[item_id]
                 self.itemDeleted.emit(item_text)
         else:
             super().keyPressEvent(event)
@@ -248,6 +260,18 @@ class CustomListWidget(QListWidget):
         if self.count() > 0:
             return self.item(self.count() - 1).text()
         return ""
+
+    def _get_item_id(self, item):
+        """
+        Ensure the item has a unique ID stored in Qt.UserRole. Returns that ID.
+        If it doesn't have one yet, generate it.
+        """
+        existing_id = item.data(Qt.UserRole)
+        if existing_id is None:
+            new_id = str(uuid.uuid4())
+            item.setData(Qt.UserRole, new_id)
+            return new_id
+        return existing_id
 
 
 class ConversationSidebar(QWidget):
