@@ -31,7 +31,6 @@ class AgentStreamEventHandler(AgentEventHandler):
         self,
         parent: AgentClient,
         thread_id: str,
-        is_submit_tool_call: bool = False,
         timeout: Optional[float] = None
     ):
         """
@@ -48,7 +47,6 @@ class AgentStreamEventHandler(AgentEventHandler):
         self._first_message = True
         self._run_id = None
         self._started = False
-        self._is_submit_tool_call = is_submit_tool_call
         self._conversation_thread_client = ConversationThreadClient.get_instance(
             self._parent._ai_client_type
         )
@@ -116,16 +114,15 @@ class AgentStreamEventHandler(AgentEventHandler):
         logger.info(f"on_thread_run called, run_id: {run.id}, status: {run.status}")
         self._run_id = run.id
 
-        if run.status == "queued":
-            logger.info(f"ThreadRunCreated, run_id: {run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
-            if not self._started and not self._is_submit_tool_call:
-                conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
-                user_request = conversation.get_last_text_message("user").content
-                self._parent._callbacks.on_run_start(self._name, run.id, str(datetime.now()), user_request)
-                self._started = True
+        if run.status and not self._started:
+            logger.info(f"Run started, run_id: {run.id}")
+            conversation = self._conversation_thread_client.retrieve_conversation(self._thread_name)
+            user_request = conversation.get_last_text_message("user").content
+            self._parent._callbacks.on_run_start(self._name, run.id, str(datetime.now()), user_request)
+            self._started = True
 
         elif run.status == "failed":
-            logger.error(f"Run failed, last_error: {run.last_error}")
+            logger.error(f"Run failed, run_id: {run.id}, error: {run.last_error}")
             if run.last_error:
                 self._parent._callbacks.on_run_failed(
                     self._name,
@@ -137,21 +134,19 @@ class AgentStreamEventHandler(AgentEventHandler):
                 )
 
         elif run.status == "completed":
-            logger.info(f"Run completed, run_id: {run.id}, is_submit_tool_call: {self._is_submit_tool_call}")
-            if not self._is_submit_tool_call:
-                self._parent._callbacks.on_run_end(
-                    self._name,
-                    run.id,
-                    str(datetime.now()),
-                    self._thread_name
-                )
+            logger.info(f"Run completed, run_id: {run.id}")
+            self._parent._callbacks.on_run_end(
+                self._name,
+                run.id,
+                str(datetime.now()),
+                self._thread_name
+            )
 
         elif run.status == "requires_action" and isinstance(run.required_action, SubmitToolOutputsAction):
             logger.info(f"Run requires submitting tool outputs, run_id: {run.id}")
             self._handle_required_action(run)
 
         else:
-            # If there are additional statuses that are not handled explicitly:
             logger.debug(f"Unhandled run status: {run.status}")
 
     def _handle_required_action(self, run: ThreadRun) -> None:
@@ -168,7 +163,7 @@ class AgentStreamEventHandler(AgentEventHandler):
                 return
 
             logger.info(f"Handling required action for run_id: {run.id}")
-            tool_outputs = self._parent._process_tool_calls(self._parent.name, self._run_id, tool_calls)
+            tool_outputs = self._parent._process_tool_calls(self._name, self._run_id, tool_calls)
 
             if not tool_outputs:
                 logger.warning(f"No tool outputs were generated for run_id: {run.id}")
@@ -214,15 +209,13 @@ class AgentStreamEventHandler(AgentEventHandler):
         """
         Called when the agent stream is fully completed (no more events are expected).
         """
-        logger.info(f"on_done called, run_id: {self._run_id}, is_submit_tool_call: {self._is_submit_tool_call}")
-        # In some scenarios, you might confirm the run end callback here if not triggered earlier.
-        if not self._is_submit_tool_call:
-            self._parent._callbacks.on_run_end(
-                self._name,
-                self._run_id,
-                str(datetime.now()),
-                self._thread_name
-            )
+        logger.info(f"on_done called, run_id: {self._run_id}")
+        self._parent._callbacks.on_run_end(
+            self._name,
+            self._run_id,
+            str(datetime.now()),
+            self._thread_name
+        )
 
     def on_unhandled_event(
         self, event_type: str, event_data: Any
