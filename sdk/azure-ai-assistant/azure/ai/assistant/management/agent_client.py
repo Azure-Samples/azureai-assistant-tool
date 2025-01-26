@@ -11,7 +11,7 @@ from azure.ai.assistant.management.base_assistant_client import BaseAssistantCli
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction
+from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
 
 from typing import Optional
 from datetime import datetime
@@ -550,7 +550,7 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Error occurred during non-streaming processing run: {e}")
             raise EngineError(f"Error occurred during non-streaming processing run: {e}")
 
-    def _handle_terminal_run_status(self, run, thread_name):
+    def _handle_terminal_run_status(self, run : ThreadRun, thread_name):
         run_end_time = str(datetime.now())
 
         if run.status == "completed":
