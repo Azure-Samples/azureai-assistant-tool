@@ -370,8 +370,7 @@ class ConversationSidebar(QWidget):
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
 
             elif assistant_config.assistant_type == AssistantType.AGENT.value:
-                #self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-                pass
+                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.AGENT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
 
             elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
@@ -497,7 +496,6 @@ class ConversationSidebar(QWidget):
 
                     elif assistant_config.assistant_type == AssistantType.AGENT.value:
                         assistant_client = AgentClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                        pass
 
                     elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                         assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)

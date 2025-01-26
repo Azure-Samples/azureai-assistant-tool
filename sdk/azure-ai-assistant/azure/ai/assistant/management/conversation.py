@@ -2,19 +2,19 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from azure.ai.assistant.management.message import ConversationMessage, TextMessage, ImageMessage
+from azure.ai.assistant.management.ai_client_factory import AIClient
 
 from openai.types.beta.threads import Message
-from openai import AzureOpenAI, OpenAI
 
-from typing import Optional, List, Union
+from typing import Optional, List
 
 
 class Conversation:
     """
     A class representing a conversation.
 
-    :param ai_client: The type of AI client to use for the conversation.
-    :type ai_client: OpenAI, AzureOpenAI
+    :param ai_client: The AI client (OpenAI, AzureOpenAI, or AIProjectClient).
+    :type ai_client: AIClient
     :param messages: The list of messages in the conversation.
     :type messages: List[Message]
     :param max_text_messages: The maximum number of text messages to include in the conversation.
@@ -25,7 +25,7 @@ class Conversation:
     """
     def __init__(
             self, 
-            ai_client : Union[OpenAI, AzureOpenAI],
+            ai_client : AIClient,
             messages: List[Message], 
             max_text_messages: Optional[int] = None
     ) -> None:

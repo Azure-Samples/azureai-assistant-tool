@@ -104,7 +104,7 @@ class AIClientFactory:
         client_key = (client_type, api_version)
         
         if client_key in self._clients:
-            if self._clients[client_key].is_closed():
+            if hasattr(self._clients[client_key], "is_closed") and self._clients[client_key].is_closed():
                 logger.info(f"Recreating client for {client_key}")
                 del self._clients[client_key]
             else:
@@ -150,7 +150,7 @@ class AIClientFactory:
             elif client_type in {AsyncAIClientType.OPEN_AI, AsyncAIClientType.OPEN_AI_REALTIME}:
                 from openai import AsyncOpenAI
                 self._clients[client_key] = AsyncOpenAI(**client_args)
-            elif client_type == AsyncAIClientType.AZURE_AI_AGENTS:
+            elif client_type == AsyncAIClientType.AZURE_AI_AGENT:
                 from azure.ai.projects.aio import AIProjectClient
                 from azure.identity.aio import DefaultAzureCredential
                 conn_str = os.getenv("PROJECT_CONNECTION_STRING")

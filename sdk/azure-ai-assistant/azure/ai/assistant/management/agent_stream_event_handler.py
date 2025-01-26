@@ -3,7 +3,7 @@
 
 from azure.ai.assistant.management.agent_client import AgentClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
-from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.message import ConversationMessage, TextMessage
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.logger_module import logger
 
@@ -65,8 +65,8 @@ class AgentStreamEventHandler(AgentEventHandler):
         message = ConversationMessage(self._parent.ai_client)
         if delta.text:
             message.role = "assistant"
-            message.sender = "assistant"
-            message.text_message.content += delta.text
+            message.sender = self._name
+            message.text_message = TextMessage(delta.text)
 
         self._parent._callbacks.on_run_update(
             self._name,
@@ -218,12 +218,6 @@ class AgentStreamEventHandler(AgentEventHandler):
         Called when the agent stream is fully completed (no more events are expected).
         """
         logger.info(f"on_done called, run_id: {self._run_id}")
-        self._parent._callbacks.on_run_end(
-            self._name,
-            self._run_id,
-            str(datetime.now()),
-            self._thread_name
-        )
 
     def on_unhandled_event(
         self, event_type: str, event_data: Any

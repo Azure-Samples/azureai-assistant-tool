@@ -195,7 +195,7 @@ class AgentClient(BaseAssistantClient):
             file_search_vs_ids_cloud = []
             if assistant.tool_resources and assistant.tool_resources.file_search:
                 file_search_vs_ids_cloud = assistant.tool_resources.file_search.vector_store_ids
-                files_in_vs_cloud = list(self._ai_client.agents.list_vector_store_files(file_search_vs_ids_cloud[0], timeout=timeout))
+                files_in_vs_cloud = list(self._ai_client.agents.list_vector_store_files(file_search_vs_ids_cloud[0]))
                 file_search_file_ids_cloud = [file.id for file in files_in_vs_cloud]
 
             if assistant_config.tool_resources and assistant_config.tool_resources.file_search_vector_stores:
@@ -263,67 +263,77 @@ class AgentClient(BaseAssistantClient):
             raise EngineError(f"Failed to initialize agent instance: {e}")
 
     def _create_agent(
-            self, 
-            assistant_config: AssistantConfig,
-            timeout: Optional[float] = None
+        self, 
+        assistant_config: AssistantConfig,
+        timeout: Optional[float] = None
     ):
         try:
             logger.info(f"Creating new agent with name: {assistant_config.name}")
+            
             tools = self._update_tools(assistant_config)
+            tool_resources = self._create_tool_resources(assistant_config, timeout=timeout)
+            
+            if not tools:
+                tools = None
+
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._create_tool_resources(assistant_config, timeout=timeout)
 
             assistant = self._ai_client.agents.create_agent(
                 name=assistant_config.name,
                 instructions=instructions,
-                tool_resources=tools_resources,
+                tool_resources=tool_resources,
                 tools=tools,
                 model=assistant_config.model,
-                timeout=timeout
             )
+
             # Update the assistant_id in the assistant_config
             assistant_config.assistant_id = assistant.id
             logger.info(f"Created new assistant with ID: {assistant.id}")
+
         except Exception as e:
             logger.error(f"Failed to create new agent with name: {assistant_config.name}: {e}")
             raise EngineError(f"Failed to create new agent with name: {assistant_config.name}: {e}")
 
     def _create_tool_resources(
-            self,
-            assistant_config: AssistantConfig,
-            timeout: Optional[float] = None
-    ) -> dict:
+        self,
+        assistant_config: AssistantConfig,
+        timeout: Optional[float] = None
+    ) -> Optional[dict]:
         logger.info(f"Creating tool resources for agent: {assistant_config.name}")
 
+        # If no tool_resources in config, return None early
         if not assistant_config.tool_resources:
             logger.info("No tool resources provided for agent.")
             return None
 
-        # Upload the code interpreter files
-        code_interpreter_file_ids = []
-        ci_files = assistant_config.tool_resources.code_interpreter_files
-        if ci_files:
-            self._upload_files(assistant_config, ci_files, timeout=timeout)
-            code_interpreter_file_ids = list(ci_files.values())
+        tool_resources = {}
 
-        # Create the vector store for file search
-        file_search_vs = None
-        if assistant_config.tool_resources.file_search_vector_stores:
-            file_search_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-            self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
-            file_search_vs.id = self._create_vector_store_with_files(assistant_config, file_search_vs, timeout=timeout)
-
-        # Create the tool resources dictionary
-        tool_resources = {
-            "code_interpreter": {
+        # If code_interpreter is enabled, set up its resource
+        if assistant_config.code_interpreter:
+            code_interpreter_file_ids = []
+            ci_files = assistant_config.tool_resources.code_interpreter_files
+            if ci_files:
+                self._upload_files(assistant_config, ci_files, timeout=timeout)
+                code_interpreter_file_ids = list(ci_files.values())
+            tool_resources["code_interpreter"] = {
                 "file_ids": code_interpreter_file_ids
-            },
-            "file_search": {
+            }
+
+        # If file_search is enabled, set up its resource
+        if assistant_config.file_search:
+            file_search_vs = None
+            if assistant_config.tool_resources.file_search_vector_stores:
+                file_search_vs = assistant_config.tool_resources.file_search_vector_stores[0]
+                self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
+                file_search_vs.id = self._create_vector_store_with_files(assistant_config, file_search_vs, timeout=timeout)
+
+            tool_resources["file_search"] = {
                 "vector_store_ids": [file_search_vs.id] if file_search_vs else []
             }
-        }
-        logger.info(f"Created tool resources: {tool_resources}")
-        return tool_resources
+
+        # If empty (meaning code_interpreter and file_search were both false), return None
+        logger.info(f"Created tool resources: {tool_resources if tool_resources else None}")
+        return tool_resources if tool_resources else None
 
     def _create_vector_store_with_files(
             self,
@@ -337,7 +347,6 @@ class AgentClient(BaseAssistantClient):
                 file_ids=list(vector_store.files.values()),
                 metadata=vector_store.metadata,
                 expires_after=vector_store.expires_after,
-                timeout=timeout
             )
             return client_vs.id
         except Exception as e:
@@ -345,48 +354,65 @@ class AgentClient(BaseAssistantClient):
             raise EngineError(f"Failed to create vector store for agent: {assistant_config.name}: {e}")
 
     def _update_tool_resources(
-            self,
-            assistant_config: AssistantConfig,
-            timeout: Optional[float] = None
-    ) -> dict:
+        self,
+        assistant_config: AssistantConfig,
+        timeout: Optional[float] = None
+    ) -> Optional[dict]:
         try:
             logger.info(f"Updating tool resources for agent: {assistant_config.name}")
 
+            # If there's no tool_resources object in the config, we cannot update anything
             if not assistant_config.tool_resources:
                 logger.info("No tool resources provided for agent.")
                 return None
 
             assistant = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
-            # Code interpreter files
-            existing_file_ids = set()
-            if assistant.tool_resources.code_interpreter:
-                existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
+            
+            # We'll build this dictionary only with what is actually enabled in assistant_config.
+            tool_resources = {}
 
-            ci_files = assistant_config.tool_resources.code_interpreter_files
-            if ci_files:
-                self._delete_files(assistant_config, existing_file_ids, ci_files, timeout=timeout)
-                self._upload_files(assistant_config, ci_files, timeout=timeout)
+            if assistant_config.code_interpreter:
+                # Identify which files are already present
+                existing_file_ids = set()
+                if assistant.tool_resources.code_interpreter:
+                    existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
 
-            # File search resources
-            existing_vs_ids = []
-            existing_fs_file_ids = set()
-            if assistant.tool_resources.file_search:
-                existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids
-                if existing_vs_ids:
-                    all_files_in_vs = list(
-                        self._ai_client.agents.list_vector_store_files(existing_vs_ids[0], timeout=timeout)
-                    )
-                    existing_fs_file_ids = {file.id for file in all_files_in_vs}
+                # Files user wants attached for this interpreter
+                ci_files = assistant_config.tool_resources.code_interpreter_files
+                if ci_files:
+                    self._delete_files(assistant_config, existing_file_ids, ci_files, timeout=timeout)
+                    self._upload_files(assistant_config, ci_files, timeout=timeout)
 
-            # If there are new files to upload or delete, recreate or update the vector store
-            file_search_vs = None
-            if assistant_config.tool_resources.file_search_vector_stores:
-                file_search_vs = assistant_config.tool_resources.file_search_vector_stores[0]
-                if not existing_vs_ids and file_search_vs.id is None:
-                    self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
-                    file_search_vs.id = self._create_vector_store_with_files(assistant_config, file_search_vs, timeout=timeout)
-                elif set(file_search_vs.files.values()) != existing_fs_file_ids:
+                # Add code interpreter resources to dictionary
+                tool_resources["code_interpreter"] = {
+                    "file_ids": list(ci_files.values()) if ci_files else []
+                }
+
+            if assistant_config.file_search:
+                existing_vs_ids = []
+                existing_fs_file_ids = set()
+                if assistant.tool_resources.file_search:
+                    existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids or []
                     if existing_vs_ids:
+                        all_files_in_vs = list(
+                            self._ai_client.agents.list_vector_store_files(existing_vs_ids[0])
+                        )
+                        existing_fs_file_ids = {file.id for file in all_files_in_vs}
+
+                file_search_vs = None
+                vector_stores = assistant_config.tool_resources.file_search_vector_stores
+                if vector_stores:
+                    file_search_vs = vector_stores[0]
+                    # If there's no existing VS ID and we haven't created one yet, make it
+                    if not existing_vs_ids and file_search_vs.id is None:
+                        self._upload_files(assistant_config, file_search_vs.files, timeout=timeout)
+                        file_search_vs.id = self._create_vector_store_with_files(
+                            assistant_config, file_search_vs, timeout=timeout
+                        )
+                    # Otherwise, if files differ, update or remove the old ones
+                    elif file_search_vs.id in existing_vs_ids and (
+                        set(file_search_vs.files.values()) != existing_fs_file_ids
+                    ):
                         self._delete_files_from_vector_store(
                             assistant_config,
                             existing_vs_ids[0],
@@ -401,17 +427,14 @@ class AgentClient(BaseAssistantClient):
                             timeout=timeout
                         )
 
-            # Create the tool resources dictionary
-            tool_resources = {
-                "code_interpreter": {
-                    "file_ids": list(ci_files.values()) if ci_files else []
-                },
-                "file_search": {
+                # Add file search resources to dictionary
+                tool_resources["file_search"] = {
                     "vector_store_ids": [file_search_vs.id] if file_search_vs and file_search_vs.id else []
                 }
-            }
-            logger.info(f"Updated tool resources: {tool_resources}")
-            return tool_resources
+
+            # If we ended up with no tool resources to update, return None
+            logger.info(f"Updated tool resources: {tool_resources if tool_resources else None}")
+            return tool_resources if tool_resources else None
 
         except Exception as e:
             logger.error(f"Failed to update tool resources for agent: {assistant_config.name}: {e}")
@@ -450,8 +473,7 @@ class AgentClient(BaseAssistantClient):
         try:
             assistant_id = assistant_config.assistant_id
             self._ai_client.agents.delete_agent(
-                assistant_id=assistant_id,
-                timeout=timeout
+                assistant_id=assistant_id
             )
             logger.info(f"Deleted agent with ID: {assistant_id}")
         except Exception as e:
@@ -505,14 +527,14 @@ class AgentClient(BaseAssistantClient):
                 max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
                 top_p=None if text_completion_config is None else text_completion_config.top_p,
                 response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
-                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                timeout=timeout
+                truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy
             )
 
             run_start_time = str(datetime.now())
-            user_request = self._conversation_thread_client.retrieve_conversation(
+            conversation = self._conversation_thread_client.retrieve_conversation(
                 thread_name
-            ).get_last_text_message("user").content
+            )
+            user_request = conversation.get_last_text_message("user").content
             self._callbacks.on_run_start(self._name, run.id, run_start_time, user_request)
 
             if self._cancel_run_requested.is_set():
@@ -521,13 +543,13 @@ class AgentClient(BaseAssistantClient):
             is_first_message = True
             while True:
                 time.sleep(0.5)
-                run = self._ai_client.agents.get_run(thread_id=thread_id, run_id=run.id, timeout=timeout)
+                run = self._ai_client.agents.get_run(thread_id=thread_id, run_id=run.id)
                 if run is None:
                     logger.error("Retrieved run is None, exiting the loop.")
                     return
 
                 if self._cancel_run_requested.is_set():
-                    self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run.id, timeout=timeout)
+                    self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run.id)
                     self._cancel_run_requested.clear()
                     logger.info("Processing run cancelled by user, exiting the loop.")
                     return
@@ -592,8 +614,7 @@ class AgentClient(BaseAssistantClient):
                 top_p=None if text_completion_config is None else text_completion_config.top_p,
                 response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
                 truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                event_handler=AgentStreamEventHandler(self, thread_id, timeout=timeout),
-                timeout=timeout
+                event_handler=AgentStreamEventHandler(self, thread_id),
             ) as stream:
                 stream.until_done()
 
@@ -604,7 +625,7 @@ class AgentClient(BaseAssistantClient):
     def _handle_required_action(self, name, thread_id, run_id, tool_calls, timeout: Optional[float] = None) -> bool:
         if tool_calls is None:
             logger.error("Processing run requires tool call action but no tool calls provided.")
-            self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run_id, timeout=timeout)
+            self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run_id)
             return False
 
         tool_outputs = self._process_tool_calls(name, run_id, tool_calls)
@@ -615,7 +636,6 @@ class AgentClient(BaseAssistantClient):
             thread_id=thread_id,
             run_id=run_id,
             tool_outputs=tool_outputs,
-            timeout=timeout
         )
         return True
 
@@ -644,7 +664,7 @@ class AgentClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Retrieving agent with ID: {assistant_id}")
-            return self._ai_client.agents.get_agent(assistant_id=assistant_id, timeout=timeout)
+            return self._ai_client.agents.get_agent(assistant_id=assistant_id)
         except Exception as e:
             logger.error(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
@@ -665,10 +685,9 @@ class AgentClient(BaseAssistantClient):
             self._ai_client.agents.delete_vector_store_file(
                 vector_store_id=vector_store_id,
                 file_id=file_id,
-                timeout=timeout
             )
             if delete_from_service:
-                self._ai_client.agents.delete_file(file_id=file_id, timeout=timeout)
+                self._ai_client.agents.delete_file(file_id=file_id)
 
     def _upload_files_to_vector_store(
             self,
@@ -685,7 +704,6 @@ class AgentClient(BaseAssistantClient):
                     file = self._ai_client.agents.create_vector_store_file_and_poll(
                         vector_store_id=vector_store_id,
                         file=f,
-                        timeout=timeout
                     )
                 updated_files[file_path] = file.id
 
@@ -700,7 +718,7 @@ class AgentClient(BaseAssistantClient):
         file_ids_to_delete = existing_file_ids - updated_file_ids
         logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
         for file_id in file_ids_to_delete:
-            self._ai_client.agents.delete_file(file_id=file_id, timeout=timeout)
+            self._ai_client.agents.delete_file(file_id=file_id)
 
     def _upload_files(
             self, 
@@ -716,7 +734,6 @@ class AgentClient(BaseAssistantClient):
                     uploaded_file = self._ai_client.agents.upload_file(
                         file=f,
                         purpose='assistants',
-                        timeout=timeout
                     )
                 updated_files[file_path] = uploaded_file.id
 
@@ -729,7 +746,7 @@ class AgentClient(BaseAssistantClient):
             logger.info(f"Updating agent with ID: {assistant_config.assistant_id}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._update_tool_resources(assistant_config, timeout=timeout)
+            tools_resources = self._update_tool_resources(assistant_config)
 
             self._ai_client.agents.update_agent(
                 assistant_id=assistant_config.assistant_id,
@@ -738,7 +755,6 @@ class AgentClient(BaseAssistantClient):
                 tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
-                timeout=timeout
             )
         except Exception as e:
             logger.error(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")

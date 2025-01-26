@@ -317,13 +317,13 @@ class ConversationThreadClient:
 
     def _create_thread_impl(self, timeout: Optional[float] = None):
         if self._ai_client_type == AIClientType.AZURE_AI_AGENT:
-            return self._ai_client.agents.create_thread(timeout=timeout)
+            return self._ai_client.agents.create_thread()
         else:
             return self._ai_client.beta.threads.create(timeout=timeout)
 
     def _delete_thread_impl(self, thread_id: str, timeout: Optional[float] = None):
         if self._ai_client_type == AIClientType.AZURE_AI_AGENT:
-            self._ai_client.agents.delete_thread(thread_id=thread_id, timeout=timeout)
+            self._ai_client.agents.delete_thread(thread_id=thread_id)
         else:
             self._ai_client.beta.threads.delete(thread_id=thread_id, timeout=timeout)
 
@@ -341,7 +341,7 @@ class ConversationThreadClient:
 
     def _list_messages_impl(self, thread_id: str, timeout: Optional[float] = None) -> List[Message]:
         if self._ai_client_type == AIClientType.AZURE_AI_AGENT:
-            resp = self._ai_client.agents.list_messages(thread_id=thread_id, timeout=timeout)
+            resp = self._ai_client.agents.list_messages(thread_id=thread_id)
             return resp.data
         else:
             resp = self._ai_client.beta.threads.messages.list(thread_id=thread_id, timeout=timeout)
@@ -362,8 +362,7 @@ class ConversationThreadClient:
                 role=role,
                 content=content,
                 attachments=attachments,
-                metadata=metadata,
-                timeout=timeout
+                metadata=metadata
             )
         else:
             self._ai_client.beta.threads.messages.create(
@@ -435,6 +434,6 @@ class ConversationThreadClient:
 
     def _create_file_impl(self, file_path: str, purpose: str, timeout: Optional[float] = None):
         if self._ai_client_type == AIClientType.AZURE_AI_AGENT:
-            return self._ai_client.agents.upload_file(file=open(file_path, "rb"), purpose=purpose, timeout=timeout)
+            return self._ai_client.agents.upload_file(file=open(file_path, "rb"), purpose=purpose)
         else:
             return self._ai_client.files.create(file=open(file_path, "rb"), purpose=purpose, timeout=timeout)

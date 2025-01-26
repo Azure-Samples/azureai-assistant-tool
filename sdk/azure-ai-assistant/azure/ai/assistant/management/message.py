@@ -67,7 +67,7 @@ class ConversationMessage:
                 self._sender = self._get_sender_name_openai(original_message)
                 self._process_openai_message_contents(original_message)
             elif isinstance(original_message, ThreadMessage):
-                self._role = original_message.role or "assistant"
+                self._role = original_message.role.value or "assistant"
                 self._sender = self._get_sender_name_azure(original_message)
                 self._process_azure_thread_message_contents(original_message)
 
@@ -195,7 +195,14 @@ class ConversationMessage:
         return citations, file_citations
 
     def _get_sender_name_azure(self, thread_message: ThreadMessage) -> str:
-        return thread_message.role or "assistant"
+        if thread_message.role.value == "assistant":
+            # Optionally use assistant name from config manager
+            name = self._assistant_config_manager.get_assistant_name_by_assistant_id(
+                thread_message.assistant_id
+            )
+            return name if name else "assistant"
+        else:
+            return "user"
 
     @property
     def text_message(self) -> Optional[TextMessage]:
