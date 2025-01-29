@@ -35,7 +35,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 - **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
-## 🧱 What is Assistants from Azure OpenAI service?
+## 🧱 What is Assistants from Azure OpenAI Service?
 
 🌟**Assistants**, API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and File Search. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
 
@@ -140,7 +140,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 
 ### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
 
-To successfully make a call against the Azure OpenAI service, you'll need the following:
+To successfully make a call against the Azure OpenAI Service, you'll need the following:
 
 **- ENDPOINT:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. Alternatively, you can find the value in Azure OpenAI Studio > Playground > View code. An example endpoint is: https://docs-test-001.openai.azure.com/.
 
