@@ -69,7 +69,7 @@ class ConversationInputView(QTextEdit):
             # Call on_user_input on the main window reference
             self.main_window.on_user_input_complete(self.toPlainText())
             self.clear()
-        elif event.key() == Qt.Key_Enter:
+        elif event.key() == Qt.Key_Enter and not (event.modifiers() & Qt.ShiftModifier):
             # Call on_user_input on the main window reference
             self.main_window.on_user_input_complete(self.toPlainText())
             self.clear()
