@@ -11,6 +11,7 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
+from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet
 
 from typing import Optional
 from datetime import datetime
@@ -273,8 +274,8 @@ class AgentClient(BaseAssistantClient):
             tools = self._update_tools(assistant_config)
             tool_resources = self._create_tool_resources(assistant_config, timeout=timeout)
             
-            if not tools:
-                tools = None
+            # Build the ToolSet from the above dictionary
+            toolset = self._build_toolset(assistant_config, tool_resources)
 
             instructions = self._replace_file_references_with_content(assistant_config)
 
@@ -282,7 +283,7 @@ class AgentClient(BaseAssistantClient):
                 name=assistant_config.name,
                 instructions=instructions,
                 tool_resources=tool_resources,
-                tools=tools,
+                toolset=toolset,
                 model=assistant_config.model,
             )
 
@@ -364,6 +365,11 @@ class AgentClient(BaseAssistantClient):
             # If there's no tool_resources object in the config, we cannot update anything
             if not assistant_config.tool_resources:
                 logger.info("No tool resources provided for agent.")
+                return None
+
+            # If neither code_interpreter_files nor file_search_vector_stores is provided, return None
+            if not assistant_config.tool_resources.code_interpreter_files and not assistant_config.tool_resources.file_search_vector_stores:
+                logger.info("Neither code interpreter nor file search resources found. Returning None.")
                 return None
 
             assistant = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
@@ -746,16 +752,50 @@ class AgentClient(BaseAssistantClient):
             logger.info(f"Updating agent with ID: {assistant_config.assistant_id}")
             tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
-            tools_resources = self._update_tool_resources(assistant_config)
+            tool_resources = self._update_tool_resources(assistant_config)
+
+            # Build the ToolSet from the above dictionary
+            toolset = self._build_toolset(assistant_config, tool_resources)
 
             self._ai_client.agents.update_agent(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=instructions,
-                tool_resources=tools_resources,
-                tools=tools,
+                toolset=toolset,
                 model=assistant_config.model,
             )
+
         except Exception as e:
             logger.error(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
             raise EngineError(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
+
+    def _build_toolset(
+        self,
+        assistant_config: AssistantConfig,
+        tool_resources: Optional[dict]
+    ) -> ToolSet:
+
+        toolset = ToolSet()
+
+        if tool_resources is not None:
+            # Code Interpreter Tool
+            if "code_interpreter" in tool_resources:
+                ci_data = tool_resources["code_interpreter"]
+                file_ids = ci_data.get("file_ids", [])
+                code_interpreter_tool = CodeInterpreterTool(file_ids=file_ids)
+                toolset.add(code_interpreter_tool)
+
+            # File Search Tool
+            if "file_search" in tool_resources:
+                fs_data = tool_resources["file_search"]
+                vector_store_ids = fs_data.get("vector_store_ids", [])
+                file_search_tool = FileSearchTool(vector_store_ids=vector_store_ids)
+                toolset.add(file_search_tool)
+        else:
+            # If there are no tool resources but the assistant config says
+            # a code interpreter is enabled, include an empty CodeInterpreterTool.
+            if assistant_config.code_interpreter:
+                code_interpreter_tool = CodeInterpreterTool()
+                toolset.add(code_interpreter_tool)
+
+        return toolset
