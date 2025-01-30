@@ -271,13 +271,9 @@ class AgentClient(BaseAssistantClient):
         try:
             logger.info(f"Creating new agent with name: {assistant_config.name}")
             
-            tools = self._update_tools(assistant_config)
-            tool_resources = self._create_tool_resources(assistant_config, timeout=timeout)
-            
-            # Build the ToolSet from the above dictionary
-            toolset = self._build_toolset(assistant_config, tool_resources)
-
             instructions = self._replace_file_references_with_content(assistant_config)
+            tool_resources = self._create_tool_resources(assistant_config, timeout=timeout)
+            toolset = self._build_toolset(assistant_config, tool_resources)
 
             assistant = self._ai_client.agents.create_agent(
                 name=assistant_config.name,
@@ -750,11 +746,8 @@ class AgentClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Updating agent with ID: {assistant_config.assistant_id}")
-            tools = self._update_tools(assistant_config)
             instructions = self._replace_file_references_with_content(assistant_config)
             tool_resources = self._update_tool_resources(assistant_config)
-
-            # Build the ToolSet from the above dictionary
             toolset = self._build_toolset(assistant_config, tool_resources)
 
             self._ai_client.agents.update_agent(
