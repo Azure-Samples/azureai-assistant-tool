@@ -11,13 +11,14 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
-from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet
+from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources
 
 from typing import Optional
 from datetime import datetime
 import json
 import time
 import yaml
+import copy
 
 
 class AgentClient(BaseAssistantClient):
@@ -270,16 +271,15 @@ class AgentClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Creating new agent with name: {assistant_config.name}")
-            
             instructions = self._replace_file_references_with_content(assistant_config)
             tool_resources = self._create_tool_resources(assistant_config, timeout=timeout)
-            toolset = self._build_toolset(assistant_config, tool_resources)
+            tools, resources = self._build_tools_and_resources(assistant_config, tool_resources)
 
             assistant = self._ai_client.agents.create_agent(
                 name=assistant_config.name,
                 instructions=instructions,
-                tool_resources=tool_resources,
-                toolset=toolset,
+                tools=tools,
+                tool_resources=resources,
                 model=assistant_config.model,
             )
 
@@ -716,11 +716,15 @@ class AgentClient(BaseAssistantClient):
             updated_files: Optional[dict] = None,
             timeout: Optional[float] = None
     ):
-        updated_file_ids = set(updated_files.values())
-        file_ids_to_delete = existing_file_ids - updated_file_ids
-        logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
-        for file_id in file_ids_to_delete:
-            self._ai_client.agents.delete_file(file_id=file_id)
+        try:
+            updated_file_ids = set(updated_files.values())
+            file_ids_to_delete = existing_file_ids - updated_file_ids
+            logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
+            for file_id in file_ids_to_delete:
+                self._ai_client.agents.delete_file(file_id=file_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete files for agent: {assistant_config.name}: {e}")
+            # ignore the error and continue
 
     def _upload_files(
             self, 
@@ -748,13 +752,14 @@ class AgentClient(BaseAssistantClient):
             logger.info(f"Updating agent with ID: {assistant_config.assistant_id}")
             instructions = self._replace_file_references_with_content(assistant_config)
             tool_resources = self._update_tool_resources(assistant_config)
-            toolset = self._build_toolset(assistant_config, tool_resources)
+            tools, resources = self._build_tools_and_resources(assistant_config, tool_resources)
 
             self._ai_client.agents.update_agent(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=instructions,
-                toolset=toolset,
+                tools=tools,
+                tool_resources=resources,
                 model=assistant_config.model,
             )
 
@@ -762,33 +767,52 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
             raise EngineError(f"Failed to update agent with ID: {assistant_config.assistant_id}: {e}")
 
-    def _build_toolset(
+    def _build_tools_and_resources(
         self,
         assistant_config: AssistantConfig,
         tool_resources: Optional[dict]
-    ) -> ToolSet:
+    ) -> tuple[list[dict], ToolResources]:
 
-        toolset = ToolSet()
-
+        tools = []
+        resources = {}
         if tool_resources is not None:
             # Code Interpreter Tool
             if "code_interpreter" in tool_resources:
                 ci_data = tool_resources["code_interpreter"]
                 file_ids = ci_data.get("file_ids", [])
                 code_interpreter_tool = CodeInterpreterTool(file_ids=file_ids)
-                toolset.add(code_interpreter_tool)
-
+                tools.extend(code_interpreter_tool.definitions)
+                resources = code_interpreter_tool.resources
             # File Search Tool
             if "file_search" in tool_resources:
                 fs_data = tool_resources["file_search"]
                 vector_store_ids = fs_data.get("vector_store_ids", [])
                 file_search_tool = FileSearchTool(vector_store_ids=vector_store_ids)
-                toolset.add(file_search_tool)
+                tools.extend(file_search_tool.definitions)
+                resources.update(file_search_tool.resources)
         else:
-            # If there are no tool resources but the assistant config says
-            # a code interpreter is enabled, include an empty CodeInterpreterTool.
+            # if code interpreter is enabled without tool resources, include an empty CodeInterpreterTool.
             if assistant_config.code_interpreter:
                 code_interpreter_tool = CodeInterpreterTool()
-                toolset.add(code_interpreter_tool)
+                tools.extend(code_interpreter_tool.definitions)
+                resources = code_interpreter_tool.resources
 
-        return toolset
+        # if functions are enabled, include the function specs in the tools list
+        if assistant_config.functions:
+            modified_functions = []
+            for function in assistant_config.functions:
+                # Create a copy of the function spec to avoid modifying the original
+                modified_function = copy.deepcopy(function)
+                # Remove the module field from the function spec
+                if "function" in modified_function and "module" in modified_function["function"]:
+                    del modified_function["function"]["module"]
+                modified_functions.append(modified_function)
+            tools.extend(modified_functions)
+
+        if not resources:
+            resources = None
+        else:
+            toolset = ToolSet()
+            resources = toolset._create_tool_resources_from_dict(resources)
+
+        return tools, resources
