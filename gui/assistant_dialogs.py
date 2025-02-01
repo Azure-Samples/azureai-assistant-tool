@@ -1005,7 +1005,7 @@ class AssistantConfigDialog(QDialog):
         self.status_bar.stop_animation(status)
         try:
             # Open new dialog with the checked instructions
-            if self.reviewed_instructions:
+            if hasattr(self, 'reviewed_instructions') and self.reviewed_instructions:
                 contentDialog = ContentDisplayDialog(self.reviewed_instructions, "AI Reviewed Instructions", self)
                 contentDialog.show()
                 self.reviewed_instructions = None
