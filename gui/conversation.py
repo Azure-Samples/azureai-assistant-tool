@@ -318,10 +318,10 @@ class ConversationView(QWidget):
             # Determine the color based on the role and the theme
             if self.is_dark_mode():
                 # Colors for dark mode
-                color = 'blue' if message.role != "assistant" else '#D3D3D3'
+                color = 'blue' if message.sender == "user" else '#D3D3D3'
             else:
                 # Colors for light mode
-                color = 'blue' if message.role != "assistant" else 'black'
+                color = 'blue' if message.sender == "user" else 'black'
 
             # Append the formatted text message
             self.append_message(message.sender, text_message.content, color=color, full_messages_append=full_messages_append)
