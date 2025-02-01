@@ -23,39 +23,7 @@ AIClient = Union[
 ]
 
 from azure.ai.assistant.management.logger_module import logger
-from azure.ai.assistant.management.exceptions import EngineError
-
-
-class AIClientType(Enum):
-    """
-    An enum for the different types of AI clients.
-    """
-    AZURE_OPEN_AI = auto()
-    """Azure OpenAI client"""
-    OPEN_AI = auto()
-    """OpenAI client"""
-    AZURE_OPEN_AI_REALTIME = auto()
-    """Azure OpenAI client used with Realtime API"""
-    OPEN_AI_REALTIME = auto()
-    """OpenAI client used with Realtime API"""
-    AZURE_AI_AGENT = auto()
-    """Azure AI Agents client"""
-
-
-class AsyncAIClientType(Enum):
-    """
-    An enum for the different types of AI clients.
-    """
-    AZURE_OPEN_AI = auto()
-    """Azure OpenAI async client"""
-    OPEN_AI = auto()
-    """OpenAI async client"""
-    AZURE_OPEN_AI_REALTIME = auto()
-    """Azure OpenAI async client used with Realtime API"""
-    OPEN_AI_REALTIME = auto()
-    """OpenAI async client used with Realtime API"""
-    AZURE_AI_AGENT = auto()
-    """Azure AI Agents async client"""
+from azure.ai.assistant.management.ai_client_type import AIClientType, AsyncAIClientType
 
 
 class AIClientFactory:

@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config import VectorStoreConfig
@@ -14,7 +13,7 @@ from azure.ai.assistant.management.logger_module import logger
 
 from typing import Optional
 from datetime import datetime
-import json, time, yaml, contextlib
+import json, time, yaml
 
 
 class AssistantClient(BaseAssistantClient):

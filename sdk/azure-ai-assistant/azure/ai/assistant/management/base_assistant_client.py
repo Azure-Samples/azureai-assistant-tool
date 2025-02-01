@@ -1,6 +1,15 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+import os
+import sys
+import json
+import importlib
+import re, yaml, copy
+from typing import Union
+from typing import Optional
+import threading
+
 from azure.ai.assistant.functions.system_function_mappings import system_functions
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantConfig
@@ -8,18 +17,10 @@ from azure.ai.assistant.management.assistant_client_callbacks import AssistantCl
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
-from azure.ai.assistant.management.ai_client_factory import AIClientType, AsyncAIClientType, AIClient
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory
+from azure.ai.assistant.management.ai_client_factory import AIClient, AIClientFactory
+from azure.ai.assistant.management.ai_client_type import AIClientType, AsyncAIClientType
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
-
-from openai import AzureOpenAI, OpenAI, AsyncAzureOpenAI, AsyncOpenAI
-from typing import Union
-
-import re, yaml, copy
-import json, importlib, sys, os
-from typing import Optional
-import threading
 
 
 class BaseAssistantClient:

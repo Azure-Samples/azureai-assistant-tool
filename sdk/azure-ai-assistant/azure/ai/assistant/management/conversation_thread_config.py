@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientType
-from azure.ai.assistant.management.attachment import Attachment
-from azure.ai.assistant.management.logger_module import logger
-
 import json, os
 from typing import Optional, List
+
+from azure.ai.assistant.management.ai_client_type import AIClientType
+from azure.ai.assistant.management.attachment import Attachment
+from azure.ai.assistant.management.logger_module import logger
 
 
 class ConversationThreadConfig:

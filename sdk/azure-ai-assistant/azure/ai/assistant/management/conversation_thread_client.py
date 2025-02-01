@@ -4,20 +4,18 @@
 import threading
 from typing import Union, List, Optional, Tuple
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory
+from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.conversation import Conversation
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
-from azure.ai.assistant.management.message import ConversationMessage
 from azure.ai.assistant.management.message_utils import _extract_image_urls
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.exceptions import EngineError
 from azure.ai.assistant.management.logger_module import logger
 
 from azure.ai.projects.models import ThreadMessage
-from openai import AzureOpenAI, OpenAI
 from openai.types.beta.threads import Message
-
 
 
 class ConversationThreadClient:
@@ -331,7 +329,7 @@ class ConversationThreadClient:
             self, 
             thread_name: str,
             timeout: Optional[float] = None
-    ) -> List[Message]:
+    ) -> List[Union[ThreadMessage, Message]]:
         try:
             thread_id = self._thread_config.get_thread_id_by_name(thread_name)
             return self._list_messages_impl(thread_id, timeout)
@@ -339,7 +337,7 @@ class ConversationThreadClient:
             logger.error(f"Failed to retrieve thread messages for thread name {thread_name}: {e}")
             raise EngineError(f"Failed to retrieve thread messages or thread name {thread_name}: {e}")
 
-    def _list_messages_impl(self, thread_id: str, timeout: Optional[float] = None) -> List[Message]:
+    def _list_messages_impl(self, thread_id: str, timeout: Optional[float] = None) -> List[Union[ThreadMessage, Message]]:
         if self._ai_client_type == AIClientType.AZURE_AI_AGENT:
             resp = self._ai_client.agents.list_messages(thread_id=thread_id)
             return resp.data
