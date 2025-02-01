@@ -20,6 +20,7 @@ from gui.settings_dialogs import ClientSettingsDialog, GeneralSettingsDialog
 from gui.assistant_client_manager import AssistantClientManager
 from gui.log_broadcaster import LogBroadcaster
 from gui.assistant_gui_workers import open_assistant_config_dialog, ProcessAssistantWorker
+from gui.status_bar import ActivityStatus
 
 
 class AssistantsMenu:
@@ -103,6 +104,7 @@ class AssistantsMenu:
         worker.signals.finished.connect(self.on_assistant_config_submit_finished)
         worker.signals.error.connect(self.on_assistant_config_submit_error)
 
+        self.dialog.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
         # Execute the worker in a separate thread using QThreadPool
         QThreadPool.globalInstance().start(worker)
 
@@ -113,12 +115,14 @@ class AssistantsMenu:
             assistant_client=assistant_client,
             realtime_audio=realtime_audio
         )
+        self.dialog.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
         client_type = AIClientType[ai_client_type]
         # UI update runs on the main thread.
         self.main_window.conversation_sidebar.load_assistant_list(client_type)
         self.dialog.update_assistant_combobox()
 
     def on_assistant_config_submit_error(self, error_msg):
+        self.dialog.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
         # Show error using a message box on the main thread.
         QMessageBox.warning(self.main_window, "Error",
                             f"An error occurred while creating/updating the assistant: {error_msg}")
