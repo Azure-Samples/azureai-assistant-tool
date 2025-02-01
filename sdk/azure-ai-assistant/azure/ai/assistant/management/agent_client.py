@@ -308,10 +308,10 @@ class AgentClient(BaseAssistantClient):
         # If code_interpreter is enabled, set up its resource
         if assistant_config.code_interpreter:
             code_interpreter_file_ids = []
-            ci_files = assistant_config.tool_resources.code_interpreter_files
-            if ci_files:
-                self._upload_files(assistant_config, ci_files, timeout=timeout)
-                code_interpreter_file_ids = list(ci_files.values())
+            local_files = assistant_config.tool_resources.code_interpreter_files
+            if local_files:
+                self._upload_files(assistant_config, local_files, timeout=timeout)
+                code_interpreter_file_ids = list(local_files.values())
             tool_resources["code_interpreter"] = {
                 "file_ids": code_interpreter_file_ids
             }
@@ -363,38 +363,32 @@ class AgentClient(BaseAssistantClient):
                 logger.info("No tool resources provided for agent.")
                 return None
 
-            # If neither code_interpreter_files nor file_search_vector_stores is provided, return None
-            if not assistant_config.tool_resources.code_interpreter_files and not assistant_config.tool_resources.file_search_vector_stores:
-                logger.info("Neither code interpreter nor file search resources found. Returning None.")
-                return None
-
-            assistant = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
+            cloud_agent = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
             
             # We'll build this dictionary only with what is actually enabled in assistant_config.
             tool_resources = {}
 
             if assistant_config.code_interpreter:
                 # Identify which files are already present
-                existing_file_ids = set()
-                if assistant.tool_resources.code_interpreter:
-                    existing_file_ids = set(assistant.tool_resources.code_interpreter.file_ids)
+                cloud_file_ids = set()
+                if cloud_agent.tool_resources.code_interpreter:
+                    cloud_file_ids = set(cloud_agent.tool_resources.code_interpreter.file_ids)
 
                 # Files user wants attached for this interpreter
-                ci_files = assistant_config.tool_resources.code_interpreter_files
-                if ci_files:
-                    self._delete_files(assistant_config, existing_file_ids, ci_files, timeout=timeout)
-                    self._upload_files(assistant_config, ci_files, timeout=timeout)
+                local_files = assistant_config.tool_resources.code_interpreter_files
+                self._delete_files(assistant_config, cloud_file_ids, local_files, timeout=timeout)
+                self._upload_files(assistant_config, local_files, timeout=timeout)
 
                 # Add code interpreter resources to dictionary
                 tool_resources["code_interpreter"] = {
-                    "file_ids": list(ci_files.values()) if ci_files else []
+                    "file_ids": list(local_files.values()) if local_files else []
                 }
 
             if assistant_config.file_search:
                 existing_vs_ids = []
                 existing_fs_file_ids = set()
-                if assistant.tool_resources.file_search:
-                    existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids or []
+                if cloud_agent.tool_resources.file_search:
+                    existing_vs_ids = cloud_agent.tool_resources.file_search.vector_store_ids or []
                     if existing_vs_ids:
                         vs_files = self._ai_client.agents.list_vector_store_files(existing_vs_ids[0])
                         all_files_in_vs = vs_files.data
@@ -716,13 +710,13 @@ class AgentClient(BaseAssistantClient):
     def _delete_files(
             self,
             assistant_config: AssistantConfig,
-            existing_file_ids: set,
-            updated_files: Optional[dict] = None,
+            cloud_file_ids: set,
+            local_files: Optional[dict] = None,
             timeout: Optional[float] = None
     ):
         try:
-            updated_file_ids = set(updated_files.values())
-            file_ids_to_delete = existing_file_ids - updated_file_ids
+            local_file_ids = set(local_files.values())
+            file_ids_to_delete = cloud_file_ids - local_file_ids
             logger.info(f"Deleting files: {file_ids_to_delete} for agent: {assistant_config.name}")
             for file_id in file_ids_to_delete:
                 self._ai_client.agents.delete_file(file_id=file_id)
@@ -733,11 +727,11 @@ class AgentClient(BaseAssistantClient):
     def _upload_files(
             self, 
             assistant_config: AssistantConfig,
-            updated_files: Optional[dict] = None,
+            local_files: Optional[dict] = None,
             timeout: Optional[float] = None
     ):
         logger.info(f"Uploading files for agent: {assistant_config.name}")
-        for file_path, file_id in updated_files.items():
+        for file_path, file_id in local_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
                 with open(file_path, "rb") as f:
@@ -745,7 +739,7 @@ class AgentClient(BaseAssistantClient):
                         file=f,
                         purpose='assistants',
                     )
-                updated_files[file_path] = uploaded_file.id
+                local_files[file_path] = uploaded_file.id
 
     def _update_agent(
             self, 
