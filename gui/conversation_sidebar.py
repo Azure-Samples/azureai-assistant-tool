@@ -24,8 +24,7 @@ from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssi
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
-from gui.assistant_dialogs import AssistantConfigDialog
-from gui.utils import resource_path
+from gui.assistant_dialog_utils import open_assistant_config_dialog, process_assistant_config_submission
 
 
 class AssistantItemWidget(QWidget):
@@ -285,58 +284,54 @@ class ConversationSidebar(QWidget):
         self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.assistant_client_manager = AssistantClientManager.get_instance()
 
-        # Create a button for adding new threads
         self.addThreadButton = QPushButton("Add Thread", self)
         self.addThreadButton.setFixedHeight(23)
         self.addThreadButton.setFont(QFont("Arial", 11))
 
-        # Create a button for canceling the current run
         self.cancelRunButton = QPushButton("Cancel Run", self)
         self.cancelRunButton.setFixedHeight(23)
         self.cancelRunButton.setFont(QFont("Arial", 11))
 
-        # Horizontal layout to hold both buttons
         buttonLayout = QHBoxLayout()
         buttonLayout.addWidget(self.addThreadButton)
         buttonLayout.addWidget(self.cancelRunButton)
-        buttonLayout.setSpacing(10)  # Adjust spacing as needed
+        buttonLayout.setSpacing(10)
 
-        # Create a list widget for displaying the threads
         self.threadList = CustomListWidget(self)
-        self.threadList.setStyleSheet("QListWidget {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
-            "  padding: 1px;"
-            "}")
+        self.threadList.setStyleSheet("""
+            QListWidget {
+                border-style: solid;
+                border-width: 1px;
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.threadList.setFont(QFont("Arial", 11))
 
-        # Create connections for the thread and button
         self.addThreadButton.clicked.connect(self.on_add_thread_button_clicked)
         self.cancelRunButton.clicked.connect(self.main_window.on_cancel_run_button_clicked)
         self.threadList.itemClicked.connect(self.select_conversation_thread_by_item)
         self.threadList.itemDeleted.connect(self.on_selected_thread_delete)
 
-        # Create a list widget for displaying assistants
         self.assistantList = QListWidget(self)
         self.assistantList.setFont(QFont("Arial", 11))
         self.assistantList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.assistantList.setStyleSheet("QListWidget {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
-            "  padding: 1px;"
-            "}")
+        self.assistantList.setStyleSheet("""
+            QListWidget {
+                border-style: solid;
+                border-width: 1px;
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.assistantList.itemDoubleClicked.connect(self.on_assistant_double_clicked)
         self.assistantList.setToolTip("Select assistants to use in the conversation or double-click to edit the selected assistant.")
-        self.threadList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.aiClientComboBox = QComboBox()
         ai_client_type_names = [client_type.name for client_type in AIClientType]
         self.aiClientComboBox.addItems(ai_client_type_names)
         self.aiClientComboBox.currentIndexChanged.connect(self.on_ai_client_type_changed)
 
-        # Layout for the sidebar
         layout = QVBoxLayout(self)
         layout.addWidget(self.aiClientComboBox)
         layout.addWidget(self.assistantList, 1)
@@ -344,13 +339,12 @@ class ConversationSidebar(QWidget):
         layout.addLayout(buttonLayout)
         layout.setAlignment(Qt.AlignTop)
 
-        # Set the style for the sidebar
-        self.setStyleSheet(
-            "QWidget {"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
-            "  padding: 1px;"
-            "}"
-        )
+        self.setStyleSheet("""
+            QWidget {
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.on_ai_client_type_changed(self.aiClientComboBox.currentIndex())
         self.assistant_checkbox_toggled.connect(self.main_window.handle_assistant_checkbox_toggled)
 
@@ -366,50 +360,25 @@ class ConversationSidebar(QWidget):
         assistant_name = widget.label.text()
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         if assistant_config:
-            if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            elif assistant_config.assistant_type == AssistantType.AGENT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.AGENT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
-            self.dialog.show()
+            self.dialog = open_assistant_config_dialog(
+                parent=self.main_window,
+                assistant_type=assistant_config.assistant_type,
+                assistant_name=assistant_name,
+                function_config_manager=self.main_window.function_config_manager,
+                callback=self.on_assistant_config_submitted
+            )
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
-        try:
-            realtime_audio = None
-            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-
-            elif assistant_type == AssistantType.ASSISTANT.value:
-                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-
-            elif assistant_type == AssistantType.AGENT.value:
-                assistant_client = AgentClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-                pass
-
-            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
-                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
-                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                    assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
-                    realtime_audio.update(assistant_client.assistant_config)
-                else:
-                    assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-                    realtime_audio = RealtimeAudio(assistant_client)
-
-            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
-            client_type = AIClientType[ai_client_type]
-            self.main_window.conversation_sidebar.load_assistant_list(client_type)
-            self.dialog.update_assistant_combobox()
-        except Exception as e:
-            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
+        process_assistant_config_submission(
+            assistant_config_json,
+            ai_client_type,
+            assistant_type,
+            assistant_name,
+            self.main_window,
+            self.assistant_client_manager,
+            self.main_window.connection_timeout,
+            self.dialog
+        )
 
     def delete_selected_assistant(self):
         current_item = self.assistantList.currentItem()

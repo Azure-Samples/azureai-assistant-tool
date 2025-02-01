@@ -396,9 +396,8 @@ class AgentClient(BaseAssistantClient):
                 if assistant.tool_resources.file_search:
                     existing_vs_ids = assistant.tool_resources.file_search.vector_store_ids or []
                     if existing_vs_ids:
-                        all_files_in_vs = list(
-                            self._ai_client.agents.list_vector_store_files(existing_vs_ids[0])
-                        )
+                        vs_files = self._ai_client.agents.list_vector_store_files(existing_vs_ids[0])
+                        all_files_in_vs = vs_files.data
                         existing_fs_file_ids = {file.id for file in all_files_in_vs}
 
                 file_search_vs = None
@@ -702,12 +701,17 @@ class AgentClient(BaseAssistantClient):
         for file_path, file_id in updated_files.items():
             if file_id is None:
                 logger.info(f"Uploading file: {file_path} for agent: {assistant_config.name}")
+
                 with open(file_path, "rb") as f:
+                    uploaded_file = self._ai_client.agents.upload_file_and_poll(
+                        file=f,
+                        purpose='assistants',
+                    )
                     file = self._ai_client.agents.create_vector_store_file_and_poll(
                         vector_store_id=vector_store_id,
-                        file=f,
+                        file_id=uploaded_file.id,
                     )
-                updated_files[file_path] = file.id
+                    updated_files[file_path] = file.id
 
     def _delete_files(
             self,

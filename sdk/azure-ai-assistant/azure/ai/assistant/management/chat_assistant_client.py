@@ -226,7 +226,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                     break
 
                 try:
-                    if not model.startswith("o1"):
+                    if not (model.startswith("o1") or model.startswith("o3")):
                         response = self._ai_client.chat.completions.create(
                             model=model,
                             messages=self._messages,
