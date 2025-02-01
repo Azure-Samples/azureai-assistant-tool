@@ -9,7 +9,7 @@ import os
 import time
 
 from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QThreadPool
 from PySide6.QtGui import QFont, QIcon, QAction
 
 from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
@@ -24,7 +24,7 @@ from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssi
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
-from gui.assistant_dialog_utils import open_assistant_config_dialog, process_assistant_config_submission
+from gui.assistant_dialog_utils import open_assistant_config_dialog, process_assistant_config_submission, LoadAssistantWorker
 
 
 class AssistantItemWidget(QWidget):
@@ -451,33 +451,30 @@ class ConversationSidebar(QWidget):
         """Return the AI client type selected in the combo box."""
         return self._ai_client_type
 
-    def load_assistant_list(self, ai_client_type : AIClientType):
+    def load_assistant_list(self, ai_client_type: AIClientType):
         """Populate the assistant list with the given assistant names."""
-        try:
-            assistant_names = self.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
-            for name in assistant_names:
-                if not self.assistant_client_manager.get_client(name):
-                    assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
-                    assistant_config.config_folder = "config"
-                    realtime_audio = None
-                    if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
-                        assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+        worker = LoadAssistantWorker(
+            ai_client_type=ai_client_type,
+            assistant_config_manager=self.assistant_config_manager,
+            assistant_client_manager=self.assistant_client_manager,
+            main_window=self.main_window
+        )
+        worker.signals.finished.connect(self.on_load_assistant_list_finished)
+        worker.signals.error.connect(self.on_load_assistant_list_error)
+        QThreadPool.globalInstance().start(worker)
 
-                    elif assistant_config.assistant_type == AssistantType.AGENT.value:
-                        assistant_client = AgentClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+    def on_load_assistant_list_finished(self, assistant_names):
+        """
+        Callback on successful load; update the assistant list in the UI.
+        """
+        self.populate_assistants(assistant_names)
 
-                    elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                        assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-
-                    elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                        assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                        realtime_audio = RealtimeAudio(assistant_client)
-
-                    self.assistant_client_manager.register_client(name=name, assistant_client=assistant_client, realtime_audio=realtime_audio)
-        except Exception as e:
-            logger.error(f"Error while loading assistant list: {e}")
-        finally:
-            self.populate_assistants(assistant_names)
+    def on_load_assistant_list_error(self, error_msg, assistant_names):
+        """
+        Callback on error; display a warning message.
+        """
+        self.populate_assistants(assistant_names)
+        QMessageBox.warning(self, "Error", f"Error loading assistants: {error_msg}")
 
     def on_ai_client_type_changed(self, index):
         """Handle changes in the selected AI client type."""
