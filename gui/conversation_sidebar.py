@@ -12,19 +12,13 @@ from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidget
 from PySide6.QtCore import Qt, Signal, QThreadPool
 from PySide6.QtGui import QFont, QIcon, QAction
 
-from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
-from azure.ai.assistant.management.agent_client import AgentClient
-from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
-from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
-from gui.assistant_dialog_utils import open_assistant_config_dialog, process_assistant_config_submission, LoadAssistantWorker
+from gui.assistant_gui_workers import open_assistant_config_dialog, LoadAssistantWorker, ProcessAssistantWorker
 
 
 class AssistantItemWidget(QWidget):
@@ -369,16 +363,36 @@ class ConversationSidebar(QWidget):
             )
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
-        process_assistant_config_submission(
-            assistant_config_json,
-            ai_client_type,
-            assistant_type,
-            assistant_name,
-            self.main_window,
-            self.assistant_client_manager,
-            self.main_window.connection_timeout,
-            self.dialog
+        worker = ProcessAssistantWorker(
+            assistant_config_json=assistant_config_json,
+            ai_client_type=ai_client_type,
+            assistant_type=assistant_type,
+            assistant_name=assistant_name,
+            main_window=self.main_window,
+            assistant_client_manager=self.assistant_client_manager
         )
+        worker.signals.finished.connect(self.on_assistant_config_submit_finished)
+        worker.signals.error.connect(self.on_assistant_config_submit_error)
+
+        # Execute the worker in a separate thread using QThreadPool
+        QThreadPool.globalInstance().start(worker)
+
+    def on_assistant_config_submit_finished(self, result):
+        assistant_client, realtime_audio, assistant_name, ai_client_type = result
+        self.assistant_client_manager.register_client(
+            name=assistant_name,
+            assistant_client=assistant_client,
+            realtime_audio=realtime_audio
+        )
+        client_type = AIClientType[ai_client_type]
+        # UI update runs on the main thread.
+        self.main_window.conversation_sidebar.load_assistant_list(client_type)
+        self.dialog.update_assistant_combobox()
+
+    def on_assistant_config_submit_error(self, error_msg):
+        # Show error using a message box on the main thread.
+        QMessageBox.warning(self.main_window, "Error",
+                            f"An error occurred while creating/updating the assistant: {error_msg}")
 
     def delete_selected_assistant(self):
         current_item = self.assistantList.currentItem()

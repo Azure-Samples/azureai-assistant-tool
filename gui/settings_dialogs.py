@@ -8,7 +8,8 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButt
 
 import os, json
 
-from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory
+from azure.ai.assistant.management.ai_client_type import AIClientType
 
 
 class GeneralSettingsDialog(QDialog):

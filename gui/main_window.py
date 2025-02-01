@@ -118,7 +118,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def init_system_assistant_settings(self):
         self.load_system_assistant_settings()
-
         self.system_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
         self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
