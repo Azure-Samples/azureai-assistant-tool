@@ -4,12 +4,13 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
+import json
+import threading
+
 from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox
 from PySide6.QtCore import Qt
 
-import json, re
-import threading
-
+from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
@@ -23,7 +24,7 @@ class CreateFunctionDialog(QDialog):
         if hasattr(main_window, 'function_spec_creator') and hasattr(main_window, 'function_impl_creator'):
             self.function_spec_creator = main_window.function_spec_creator
             self.function_impl_creator = main_window.function_impl_creator
-        self.function_config_manager : FunctionConfigManager = main_window.function_config_manager
+        self.function_config_manager: FunctionConfigManager = main_window.function_config_manager
         self.init_UI()
         self.previousSize = self.size()
 
@@ -38,13 +39,18 @@ class CreateFunctionDialog(QDialog):
         self.userSpecEdit = self.create_text_edit()
         self.userImplEdit = self.create_text_edit()
 
-        # Tabs for System and User Functions
+        # Tabs for System, User, and (optionally) Azure Logic Apps functions
         self.tabs = QTabWidget(self)
         self.systemFunctionsTab = self.create_system_functions_tab()
         self.userFunctionsTab = self.create_user_functions_tab()
 
         self.tabs.addTab(self.systemFunctionsTab, "System Functions")
         self.tabs.addTab(self.userFunctionsTab, "User Functions")
+        
+        # Add Azure Logic Apps tab if active AI client is AZURE_AI_AGENT
+        if getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT:
+            self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
+            self.tabs.addTab(self.azureLogicAppsTab, "Azure Logic Apps")
 
         mainLayout.addWidget(self.tabs)
 
@@ -77,6 +83,48 @@ class CreateFunctionDialog(QDialog):
         self.stop_processing_signal.stop_signal.connect(self.stop_processing)
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
+    def create_azure_logic_apps_tab(self):
+        """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
+           a button to generate the user function and a text edit to display the generated function."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Label and Drop down for Azure Logic Apps
+        layout.addWidget(QLabel("Select Azure Logic App:"))
+        self.azureLogicAppSelector = QComboBox(self)
+        self.azureLogicAppSelector.addItems(self.list_logic_app_names())
+        layout.addWidget(self.azureLogicAppSelector)
+
+        # Generate User Function Button for Azure Logic Apps
+        self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
+        self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generateUserFunctionFromLogicApp)
+        layout.addWidget(self.generateUserFunctionFromLogicAppButton)
+
+        # Text edit for showing the generated user function spec (similar to userSpecEdit)
+        self.azureUserFunctionEdit = self.create_text_edit()
+        azureFunctionWidget = self.create_text_edit_labeled("Generated User Function:", self.azureUserFunctionEdit)
+        layout.addWidget(azureFunctionWidget)
+
+        return tab
+
+    def list_logic_app_names(self):
+        """
+        Placeholder function to list connected Azure logic app names.
+        Replace this with your actual implementation.
+        """
+        # Example list; you might get this list from a client or a configuration.
+        return ["LogicApp1 (HTTP Trigger)", "LogicApp2 (HTTP Trigger)", "LogicApp3 (HTTP Trigger)"]
+
+    def generateUserFunctionFromLogicApp(self):
+        """
+        Placeholder function that generates a user function based on the selected logic app.
+        Replace with your own implementation.
+        """
+        logic_app_name = self.azureLogicAppSelector.currentText()
+        # Example generated function based on the selected logic app.
+        generated_function = f"def function_from_{logic_app_name.replace(' ', '_').lower()}(params):\n    # Your implementation here\n    pass\n"
+        self.azureUserFunctionEdit.setText(generated_function)
+
     def toggleMaxHeight(self):
         if not self.isMaximized():
             self.previousSize = self.size()  # Store the current size
@@ -93,7 +141,8 @@ class CreateFunctionDialog(QDialog):
 
     def onTabChanged(self, index):
         # Enable the Remove button only for the User Functions tab
-        self.removeButton.setEnabled(index == 1) 
+        # (Assumes index 1 is for User Functions; adjust index logic if necessary when adding the Azure tab)
+        self.removeButton.setEnabled(self.tabs.tabText(index) == "User Functions")
 
     def create_system_functions_tab(self):
         tab = QWidget()
@@ -314,7 +363,7 @@ class CreateFunctionDialog(QDialog):
     def removeFunction(self):
         # remove function is only available for user functions
         current_tab = self.tabs.currentIndex()
-        if current_tab != 1:
+        if self.tabs.tabText(current_tab) != "User Functions":
             QMessageBox.warning(self, "Error", "Invalid tab selected")
             return
         

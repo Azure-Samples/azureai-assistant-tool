@@ -1,6 +1,13 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
+import json
+import time
+import yaml
+import copy
+from typing import Optional
+from datetime import datetime
+
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantConfig
 from azure.ai.assistant.management.assistant_config import VectorStoreConfig
@@ -12,13 +19,6 @@ from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONErr
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
 from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources
-
-from typing import Optional
-from datetime import datetime
-import json
-import time
-import yaml
-import copy
 
 
 class AgentClient(BaseAssistantClient):
@@ -365,9 +365,7 @@ class AgentClient(BaseAssistantClient):
 
             cloud_agent = self._retrieve_agent(assistant_config.assistant_id, timeout=timeout)
             
-            # We'll build this dictionary only with what is actually enabled in assistant_config.
             tool_resources = {}
-
             if assistant_config.code_interpreter:
                 # Identify which files are already present
                 cloud_file_ids = set()
