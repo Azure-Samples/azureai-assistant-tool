@@ -74,6 +74,8 @@ setup(
         "onnxruntime",
         "resampy",
         "azure-ai-projects",
+        "azure-identity",
+        "azure-mgmt-logic",
     ],
     python_requires=">=3.8",
     project_urls={
