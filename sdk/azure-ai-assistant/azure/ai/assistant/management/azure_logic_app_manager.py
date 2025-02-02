@@ -2,6 +2,7 @@
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.logic import LogicManagementClient
@@ -131,3 +132,37 @@ class AzureLogicAppManager:
         except Exception as e:
             logger.error(f"Error getting HTTP trigger schema for '{logic_app_name}': {e}")
             return {}
+    
+    def get_logic_app_details(self, logic_app_name: str) -> Dict[str, Any]:
+        """
+        Retrieves detailed information for the specified Logic App, including workflow metadata,
+        callback URL, HTTP trigger schema, parameters, triggers information, and other relevant properties.
+        
+        :param logic_app_name: The name of the logic app.
+        :return: A dictionary containing the Logic App's details.
+        """
+        try:
+            workflow = self.logic_client.workflows.get(self.resource_group, logic_app_name)
+            # Retrieve the workflow definition which may include parameters and triggers.
+            definition = getattr(workflow, "definition", {}) or {}
+            
+            details = {
+                "name": workflow.name,
+                "id": getattr(workflow, "id", "N/A"),
+                "type": getattr(workflow, "type", "N/A"),
+                "location": getattr(workflow, "location", "N/A"),
+                "provisioning_state": getattr(workflow, "provisioning_state", "Unknown"),
+                "state": getattr(workflow, "state", "Unknown"),
+                # If creation and changed timestamps are not available, fallback to current time.
+                "created_time": getattr(workflow, "created_time", datetime.now()),
+                "changed_time": getattr(workflow, "changed_time", datetime.now()),
+                "access_endpoint": self.get_callback_url(logic_app_name) or "Not Registered",
+                "tags": workflow.tags if hasattr(workflow, "tags") and workflow.tags is not None else {},
+                "parameters": definition.get("parameters", {}),
+                "triggers": definition.get("triggers", {}),
+                "actions": definition.get("actions", {}),
+            }
+            return details
+        except Exception as e:
+            logger.error(f"Error getting details for logic app '{logic_app_name}': {e}")
+            return {"error": str(e)}

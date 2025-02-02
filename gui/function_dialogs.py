@@ -85,41 +85,71 @@ class CreateFunctionDialog(QDialog):
 
     def create_azure_logic_apps_tab(self):
         """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
-           an uneditable text box to display the HTTP trigger schema,
-           a button to generate the user function, and a text edit to display the generated function."""
+        a 'Details..' button next to the selector, a button to generate the user function, 
+        and a text edit to display the generated user function."""
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        main_layout = QVBoxLayout(tab)
 
-        layout.addWidget(QLabel("Select Azure Logic App:"))
+        selector_label = QLabel("Select Azure Logic App:", self)
+        main_layout.addWidget(selector_label)
+        
+        # Create a horizontal layout for the selector and the new Details button.
+        selector_layout = QHBoxLayout()
+
         self.azureLogicAppSelector = QComboBox(self)
         self.azureLogicAppSelector.addItems(self.list_logic_app_names())
-        layout.addWidget(self.azureLogicAppSelector)
-        self.azureLogicAppSelector.currentIndexChanged.connect(self.update_logic_app_schema)
+        # Give the combo box a greater stretch so it will expand.
+        selector_layout.addWidget(self.azureLogicAppSelector, stretch=3)
 
-        self.azureLogicAppSchemaEdit = QTextEdit(self)
-        self.azureLogicAppSchemaEdit.setReadOnly(True)
-        self.azureLogicAppSchemaEdit.setStyleSheet("""
-            QTextEdit {
-                background-color: #f0f0f0;
-                color: #000000;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 10pt;
-            }
-        """)
-        schemaWidget = self.create_text_edit_labeled("HTTP Trigger Schema:", self.azureLogicAppSchemaEdit)
-        layout.addWidget(schemaWidget)
+        # Create the Details button on the right side.
+        self.viewLogicAppDetailsButton = QPushButton("Details..", self)
+        self.viewLogicAppDetailsButton.clicked.connect(self.open_logic_app_details_dialog)
+        # Set a fixed width for the Details button, making it smaller than the combo box.
+        self.viewLogicAppDetailsButton.setFixedWidth(100)
+        selector_layout.addWidget(self.viewLogicAppDetailsButton, stretch=1)
 
+        main_layout.addLayout(selector_layout)
+
+        # Button to generate user function from the Logic App.
         self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
         self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generate_user_function_for_logic_app)
-        layout.addWidget(self.generateUserFunctionFromLogicAppButton)
+        main_layout.addWidget(self.generateUserFunctionFromLogicAppButton)
 
+        # Text edit to display the generated user function.
         self.azureUserFunctionEdit = self.create_text_edit()
         azureFunctionWidget = self.create_text_edit_labeled("Generated User Function:", self.azureUserFunctionEdit)
-        layout.addWidget(azureFunctionWidget)
-
-        self.update_logic_app_schema()
+        main_layout.addWidget(azureFunctionWidget)
 
         return tab
+
+    def open_logic_app_details_dialog(self):
+        """
+        Opens a dialog displaying the full details of the selected Azure Logic App.
+        """
+        from PySide6.QtWidgets import QMessageBox
+        try:
+            # Check if the main window contains the azure_logic_app_manager attribute.
+            if hasattr(self.main_window, 'azure_logic_app_manager'):
+                azure_manager : AzureLogicAppManager = self.main_window.azure_logic_app_manager
+                logic_app_name = self.azureLogicAppSelector.currentText()
+                if logic_app_name:
+                    # Remove any suffix if it exists (e.g., " (HTTP Trigger)")
+                    base_name = logic_app_name.split(" (HTTP Trigger)")[0]
+                    
+                    # Retrieve the complete details for the selected Logic App.
+                    logic_app_details = azure_manager.get_logic_app_details(base_name)
+                    
+                    # Create and execute the details dialog (assuming LogicAppDetailsDialog is defined elsewhere).
+                    dialog = LogicAppDetailsDialog(details=logic_app_details, parent=self)
+                    dialog.exec()
+                else:
+                    QMessageBox.warning(self, "Warning", "No Logic App selected.")
+            else:
+                QMessageBox.warning(self, "Warning", "Azure Logic App Manager is not available.")
+        except Exception as e:
+            from azure.ai.assistant.management.logger_module import logger
+            logger.error(f"Error retrieving logic app details: {e}")
+            QMessageBox.warning(self, "Error", "Error retrieving logic app details.")
 
     def list_logic_app_names(self) -> List[str]:
         """
@@ -133,26 +163,6 @@ class CreateFunctionDialog(QDialog):
         except Exception as e:
             logger.error(f"Error listing logic apps: {e}")
         return names
-
-    def update_logic_app_schema(self):
-        """
-        Updates the uneditable text box with the JSON schema for the HTTP trigger of the currently selected logic app.
-        """
-        try:
-            if hasattr(self.main_window, 'azure_logic_app_manager'):
-                azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
-                logic_app_name = self.azureLogicAppSelector.currentText()
-                if logic_app_name:
-                    # Remove the suffix "(HTTP Trigger)" if present.
-                    base_name = logic_app_name.split(" (HTTP Trigger)")[0]
-                    schema = azure_manager.get_http_trigger_schema(base_name, trigger_name="When_a_HTTP_request_is_received")
-                    formatted_schema = json.dumps(schema, indent=4)
-                    self.azureLogicAppSchemaEdit.setPlainText(formatted_schema)
-                else:
-                    self.azureLogicAppSchemaEdit.clear()
-        except Exception as e:
-            logger.error(f"Error updating logic app schema: {e}")
-            self.azureLogicAppSchemaEdit.setPlainText("Error retrieving schema.")
 
     def generate_user_function_for_logic_app(self):
         """
@@ -569,3 +579,48 @@ class FunctionErrorsDialog(QDialog):
             self.function_config_manager.save_function_error_specs(self.error_specs)
         except Exception as e:
             logger.error(f"Error saving error specs: {e}")
+
+
+def format_logic_app_details(details: dict) -> str:
+    from datetime import datetime
+    """
+    Formats the given logic app details dictionary into a pretty JSON string,
+    converting datetime objects into ISO strings.
+    """
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, datetime):
+                return o.isoformat()
+            return super().default(o)
+    return json.dumps(details, indent=4, cls=DateTimeEncoder)
+
+
+class LogicAppDetailsDialog(QDialog):
+    def __init__(self, details: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Logic App Details")
+        self.resize(600, 400)
+        
+        # Set up the layout.
+        layout = QVBoxLayout(self)
+        
+        # Read-only text widget to display the formatted details.
+        self.details_text = QTextEdit(self)
+        self.details_text.setReadOnly(True)
+        self.details_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f0f0f0;
+                color: #000000;
+                font-family: Consolas, Monaco, monospace;
+                font-size: 10pt;
+            }
+        """)
+        
+        formatted_details = format_logic_app_details(details)
+        self.details_text.setPlainText(formatted_details)
+        layout.addWidget(self.details_text)
+        
+        # "Close" button to dismiss the dialog.
+        close_button = QPushButton("Close", self)
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button)
