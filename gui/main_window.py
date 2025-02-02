@@ -10,17 +10,19 @@ from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
 
 from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
-from azure.ai.assistant.management.attachment import Attachment, AttachmentType
-from azure.ai.assistant.management.task_manager import TaskManager
-from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantType
-from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
+from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
+from azure.ai.assistant.management.task_manager import TaskManager
+from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
+
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.assistant_client_manager import AssistantClientManager
@@ -306,6 +308,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 client = AIClientFactory.get_instance().get_client(
                     AIClientType.AZURE_AI_AGENT
                 )
+                subscription_id = client.scope["subscription_id"]
+                resource_group = client.scope["resource_group_name"]
+                self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
 

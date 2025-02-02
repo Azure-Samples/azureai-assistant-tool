@@ -6,11 +6,13 @@
 
 import json
 import threading
+from typing import List
 
 from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox
 from PySide6.QtCore import Qt
 
 from azure.ai.assistant.management.ai_client_type import AIClientType
+from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
@@ -47,8 +49,9 @@ class CreateFunctionDialog(QDialog):
         self.tabs.addTab(self.systemFunctionsTab, "System Functions")
         self.tabs.addTab(self.userFunctionsTab, "User Functions")
         
-        # Add Azure Logic Apps tab if active AI client is AZURE_AI_AGENT
-        if getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT:
+        # Add Azure Logic Apps tab if the active AI client is AZURE_AI_AGENT and azure_logic_app_manager is set
+        if (getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT and
+            hasattr(self.main_window, 'azure_logic_app_manager')):
             self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
             self.tabs.addTab(self.azureLogicAppsTab, "Azure Logic Apps")
 
@@ -56,21 +59,16 @@ class CreateFunctionDialog(QDialog):
 
         # Buttons layout
         buttonLayout = QHBoxLayout()
-
-        # Shared Save Button
         self.saveButton = QPushButton("Save Function", self)
         self.saveButton.clicked.connect(self.saveFunction)
         buttonLayout.addWidget(self.saveButton)
 
-        # Remove Button
         self.removeButton = QPushButton("Remove Function", self)
         self.removeButton.clicked.connect(self.removeFunction)
-        self.removeButton.setEnabled(False)  # Disabled by default
+        self.removeButton.setEnabled(False)
         buttonLayout.addWidget(self.removeButton)
-
         mainLayout.addLayout(buttonLayout)
 
-        # Connect tab changed signal
         self.tabs.currentChanged.connect(self.onTabChanged)
 
         self.status_bar = StatusBar(self)
@@ -84,53 +82,60 @@ class CreateFunctionDialog(QDialog):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
     def create_azure_logic_apps_tab(self):
-        """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
-           a button to generate the user function and a text edit to display the generated function."""
+        """Creates the Azure Logic Apps tab with a combo box to list the connected logic apps,
+           a button to generate the user function, and a text edit to display the generated function."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # Label and Drop down for Azure Logic Apps
         layout.addWidget(QLabel("Select Azure Logic App:"))
         self.azureLogicAppSelector = QComboBox(self)
         self.azureLogicAppSelector.addItems(self.list_logic_app_names())
         layout.addWidget(self.azureLogicAppSelector)
 
-        # Generate User Function Button for Azure Logic Apps
         self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
         self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generateUserFunctionFromLogicApp)
         layout.addWidget(self.generateUserFunctionFromLogicAppButton)
 
-        # Text edit for showing the generated user function spec (similar to userSpecEdit)
         self.azureUserFunctionEdit = self.create_text_edit()
         azureFunctionWidget = self.create_text_edit_labeled("Generated User Function:", self.azureUserFunctionEdit)
         layout.addWidget(azureFunctionWidget)
 
         return tab
 
-    def list_logic_app_names(self):
+    def list_logic_app_names(self) -> List[str]:
         """
-        Placeholder function to list connected Azure logic app names.
-        Replace this with your actual implementation.
+        Retrieves the names of Azure Logic Apps from the AzureLogicAppManager instance available in main_window.
+        Returns a list of names formatted with an HTTP trigger indicator.
         """
-        # Example list; you might get this list from a client or a configuration.
-        return ["LogicApp1 (HTTP Trigger)", "LogicApp2 (HTTP Trigger)", "LogicApp3 (HTTP Trigger)"]
+        names = []
+        try:
+            azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
+            names = azure_manager.list_logic_apps()
+        except Exception as e:
+            logger.error(f"Error listing logic apps: {e}")
+        return names
 
     def generateUserFunctionFromLogicApp(self):
         """
-        Placeholder function that generates a user function based on the selected logic app.
-        Replace with your own implementation.
+        Generates a user function based on the selected Azure Logic App.
+        Replace or extend this logic to integrate with your application's flow.
         """
         logic_app_name = self.azureLogicAppSelector.currentText()
-        # Example generated function based on the selected logic app.
-        generated_function = f"def function_from_{logic_app_name.replace(' ', '_').lower()}(params):\n    # Your implementation here\n    pass\n"
+        # Create a function name by sanitizing the logic app name
+        function_name = logic_app_name.replace(" ", "_").replace("(", "").replace(")", "").lower()
+        generated_function = (
+            f"def function_from_{function_name}(params):\n"
+            f"    # TODO: Add logic to invoke Azure Logic App '{logic_app_name}' using the callback URL\n"
+            f"    pass\n"
+        )
         self.azureUserFunctionEdit.setText(generated_function)
 
     def toggleMaxHeight(self):
         if not self.isMaximized():
-            self.previousSize = self.size()  # Store the current size
-            self.showMaximized()  # Maximize the window
+            self.previousSize = self.size()
+            self.showMaximized()
         else:
-            self.showNormal()  # Restore to the previous size
+            self.showNormal()
             self.resize(self.previousSize) 
 
     def keyPressEvent(self, event):
@@ -140,20 +145,17 @@ class CreateFunctionDialog(QDialog):
             super().keyPressEvent(event)
 
     def onTabChanged(self, index):
-        # Enable the Remove button only for the User Functions tab
-        # (Assumes index 1 is for User Functions; adjust index logic if necessary when adding the Azure tab)
+        # Enable the Remove button only for the User Functions tab.
         self.removeButton.setEnabled(self.tabs.tabText(index) == "User Functions")
 
     def create_system_functions_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # System Functions Selector
         self.systemFunctionSelector = self.create_function_selector("system")
         layout.addWidget(QLabel("Select System Function:"))
         layout.addWidget(self.systemFunctionSelector)
 
-        # System Function Spec Edit
         layout.addWidget(QLabel("Function Specification:"))
         layout.addWidget(self.systemSpecEdit)
 
@@ -163,12 +165,10 @@ class CreateFunctionDialog(QDialog):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # User Functions Selector
         self.userFunctionSelector = self.create_function_selector("user")
         layout.addWidget(QLabel("Select User Function:"))
         layout.addWidget(self.userFunctionSelector)
 
-        # Function requirements
         self.userRequestLabel = QLabel("Function Requirements:")
         self.userRequest = QTextEdit(self)
         self.userRequest.setText("Create a function that...")
@@ -184,18 +184,15 @@ class CreateFunctionDialog(QDialog):
         layout.addWidget(self.userRequestLabel)
         layout.addWidget(self.userRequest)
 
-        # Button to generate specification with AI
         self.generateSpecButton = QPushButton("Generate Specification with AI...", self)
         self.generateSpecButton.clicked.connect(self.generateFunctionSpec)
         layout.addWidget(self.generateSpecButton)
 
-        # QSplitter for resizable userSpecEdit and userImplEdit
         splitter = QSplitter(Qt.Vertical, self)
         splitter.addWidget(self.create_text_edit_labeled("Function Specification:", self.userSpecEdit))
         splitter.addWidget(self.create_text_edit_labeled("Function Implementation:", self.userImplEdit))
         layout.addWidget(splitter)
 
-        # Button to generate implementation with AI
         self.generateImplButton = QPushButton("Generate Implementation with AI...", self)
         self.generateImplButton.clicked.connect(self.generateFunctionImpl)
         layout.addWidget(self.generateImplButton)
@@ -214,10 +211,10 @@ class CreateFunctionDialog(QDialog):
         textEdit = QTextEdit(self)
         textEdit.setStyleSheet("""
             QTextEdit {
-            background-color: #2b2b2b;
-            color: #e0e0e0;
-            font-family: 'Consolas', 'Monaco', 'monospace';
-            font-size: 10pt;
+                background-color: #2b2b2b;
+                color: #e0e0e0;
+                font-family: 'Consolas', 'Monaco', 'monospace';
+                font-size: 10pt;
             }
         """)
         textEdit.setAcceptRichText(False)
@@ -226,7 +223,11 @@ class CreateFunctionDialog(QDialog):
     def create_function_selector(self, function_type):
         function_selector = QComboBox(self)
         function_selector.currentIndexChanged.connect(
-            lambda: self.on_function_selected(function_selector, self.systemSpecEdit if function_type == "system" else self.userSpecEdit, self.userImplEdit if function_type == "user" else None)
+            lambda: self.on_function_selected(
+                function_selector,
+                self.systemSpecEdit if function_type == "system" else self.userSpecEdit,
+                self.userImplEdit if function_type == "user" else None
+            )
         )
         self.load_functions(function_selector, function_type)
         return function_selector
@@ -234,13 +235,9 @@ class CreateFunctionDialog(QDialog):
     def load_functions(self, function_selector, function_type):
         functions_data = self.function_config_manager.get_all_functions_data()
         function_selector.clear()
-
-        # Add "New Function" option only for user functions
         if function_type == "user":
             function_selector.addItem("New Function", None)
-
         for f_type, function_spec, _ in functions_data:
-            # Filter functions based on the specified type ('system' or 'user')
             if f_type == function_type:
                 try:
                     func_name = function_spec['function']['name']
@@ -250,17 +247,14 @@ class CreateFunctionDialog(QDialog):
 
     def on_function_selected(self, function_selector, spec_edit, impl_edit=None):
         function_data = function_selector.currentData()
-
         if function_data:
             function_type, function_spec = function_data
             spec_edit.setText(json.dumps(function_spec, indent=4))
-
             if impl_edit and function_type == "user":
                 impl_edit.setText(self.function_config_manager.get_user_function_code(function_spec['function']['name']))
             elif impl_edit:
                 impl_edit.clear()
         else:
-            # "New Function" selected, clear inputs for new function
             spec_edit.clear()
             if impl_edit:
                 impl_edit.clear()
@@ -309,11 +303,11 @@ class CreateFunctionDialog(QDialog):
 
     def saveFunction(self):
         current_tab = self.tabs.currentIndex()
-        if current_tab == 0:  # System Functions Tab
+        if current_tab == 0:
             functionSpec = self.systemSpecEdit.toPlainText()
             functionImpl = None
             function_selector = self.systemFunctionSelector
-        elif current_tab == 1:  # User Functions Tab
+        elif current_tab == 1:
             functionSpec = self.userSpecEdit.toPlainText()
             functionImpl = self.userImplEdit.toPlainText()
             function_selector = self.userFunctionSelector
@@ -321,7 +315,6 @@ class CreateFunctionDialog(QDialog):
             QMessageBox.warning(self, "Error", "Invalid tab selected")
             return
 
-        # Validate the function spec and (if applicable) implementation
         try:
             is_valid, message = self.function_config_manager.validate_function(functionSpec, functionImpl)
             if not is_valid:
@@ -329,6 +322,7 @@ class CreateFunctionDialog(QDialog):
                 return
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while validating the function: {e}")
+            return
 
         new_function_name = None
         current_function_name = function_selector.currentText()
@@ -341,7 +335,7 @@ class CreateFunctionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"An error occurred while saving the function spec: {e}")
             return
 
-        if functionImpl:  # Only for user functions
+        if functionImpl:
             try:
                 file_path = self.function_config_manager.save_function_impl(functionImpl, current_function_name, new_function_name)
             except Exception as e:
@@ -361,7 +355,6 @@ class CreateFunctionDialog(QDialog):
         QMessageBox.information(self, "Success", success_message)
 
     def removeFunction(self):
-        # remove function is only available for user functions
         current_tab = self.tabs.currentIndex()
         if self.tabs.tabText(current_tab) != "User Functions":
             QMessageBox.warning(self, "Error", "Invalid tab selected")
@@ -381,7 +374,6 @@ class CreateFunctionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"An error occurred while removing the function: {e}")
 
     def refresh_dropdown(self):
-        # Reloads the functions into the user and system function selector comboboxes
         self.load_functions(self.userFunctionSelector, "user")
         self.load_functions(self.systemFunctionSelector, "system")
 
