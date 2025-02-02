@@ -26,6 +26,8 @@ class CreateFunctionDialog(QDialog):
         if hasattr(main_window, 'function_spec_creator') and hasattr(main_window, 'function_impl_creator'):
             self.function_spec_creator = main_window.function_spec_creator
             self.function_impl_creator = main_window.function_impl_creator
+        if hasattr(main_window, 'azure_logic_app_function_creator'):
+            self.azure_logic_app_function_creator = main_window.azure_logic_app_function_creator
         self.function_config_manager: FunctionConfigManager = main_window.function_config_manager
         self.init_UI()
         self.previousSize = self.size()
@@ -60,11 +62,11 @@ class CreateFunctionDialog(QDialog):
         # Buttons layout
         buttonLayout = QHBoxLayout()
         self.saveButton = QPushButton("Save Function", self)
-        self.saveButton.clicked.connect(self.saveFunction)
+        self.saveButton.clicked.connect(self.save_function)
         buttonLayout.addWidget(self.saveButton)
 
         self.removeButton = QPushButton("Remove Function", self)
-        self.removeButton.clicked.connect(self.removeFunction)
+        self.removeButton.clicked.connect(self.remove_function)
         self.removeButton.setEnabled(False)
         buttonLayout.addWidget(self.removeButton)
         mainLayout.addLayout(buttonLayout)
@@ -108,7 +110,7 @@ class CreateFunctionDialog(QDialog):
         layout.addWidget(schemaWidget)
 
         self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
-        self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generateUserFunctionFromLogicApp)
+        self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generate_user_function_for_logic_app)
         layout.addWidget(self.generateUserFunctionFromLogicAppButton)
 
         self.azureUserFunctionEdit = self.create_text_edit()
@@ -152,22 +154,55 @@ class CreateFunctionDialog(QDialog):
             logger.error(f"Error updating logic app schema: {e}")
             self.azureLogicAppSchemaEdit.setPlainText("Error retrieving schema.")
 
-    def generateUserFunctionFromLogicApp(self):
+    def generate_user_function_for_logic_app(self):
         """
-        Generates a user function based on the selected Azure Logic App.
-        Replace or extend this logic to integrate with your application's flow.
+        Generates a user function for the selected Azure Logic App by using the function_impl_creator.
+        The function name is derived from the Logic App's name, and the function implementation
+        is built based on the provided HTTP trigger schema.
         """
-        logic_app_name = self.azureLogicAppSelector.currentText()
-        # Create a function name by sanitizing the logic app name.
-        function_name = logic_app_name.replace(" ", "_").replace("(", "").replace(")", "").lower()
-        generated_function = (
-            f"def function_from_{function_name}(params):\n"
-            f"    # TODO: Add logic to invoke Azure Logic App '{logic_app_name}' using its callback URL\n"
-            f"    pass\n"
-        )
-        self.azureUserFunctionEdit.setText(generated_function)
+        try:
+            if not hasattr(self, 'azure_logic_app_function_creator'):
+                raise Exception("Azure Logic App function creator not available, check the system assistant settings")
 
-    def toggleMaxHeight(self):
+            logic_app_name = self.azureLogicAppSelector.currentText()
+            base_name = logic_app_name.split(" (HTTP Trigger)")[0]
+            schema_text = self.azureLogicAppSchemaEdit.toPlainText()
+            if not schema_text:
+                raise ValueError("Schema is empty. Please ensure the schema is loaded correctly.")
+
+            # Construct the request message.
+            request_message = (
+                f"Logic App Name: {base_name}\n"
+                f"JSON Schema: {schema_text}\n"
+                "Please generate a Python function that accepts input parameters based on the JSON schema "
+                "and invokes the Logic App via the service.invoke_logic_app() call. "
+                "The function name should be derived from the Logic App name with snake_case format."
+            )
+
+            # Start the processing signal.
+            self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
+            
+            # Run the function generation on a separate thread.
+            threading.Thread(target=self._generate_logic_app_user_function_thread, args=(request_message,)).start()
+        except Exception as e:
+            self.error_signal.error_signal.emit(
+                f"An error occurred while generating the user function for the Logic App: {e}"
+            )
+
+    def _generate_logic_app_user_function_thread(self, request_message):
+        try:
+            self.code = self.azure_logic_app_function_creator.process_messages(user_request=request_message, stream=False)
+            from azure.ai.assistant.management.logger_module import logger
+            logger.info("User function implementation generated successfully.")
+        except Exception as e:
+            self.error_signal.error_signal.emit(
+                f"An error occurred while generating the user function for the Logic App: {e}"
+            )
+        finally:
+            # Signal to stop processing.
+            self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
+
+    def toggle_max_height(self):
         if not self.isMaximized():
             self.previousSize = self.size()
             self.showMaximized()
@@ -177,7 +212,7 @@ class CreateFunctionDialog(QDialog):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_F11:
-            self.toggleMaxHeight()
+            self.toggle_max_height()
         else:
             super().keyPressEvent(event)
 
@@ -222,7 +257,7 @@ class CreateFunctionDialog(QDialog):
         layout.addWidget(self.userRequest)
 
         self.generateSpecButton = QPushButton("Generate Specification with AI...", self)
-        self.generateSpecButton.clicked.connect(self.generateFunctionSpec)
+        self.generateSpecButton.clicked.connect(self.generate_function_spec)
         layout.addWidget(self.generateSpecButton)
 
         splitter = QSplitter(Qt.Vertical, self)
@@ -231,7 +266,7 @@ class CreateFunctionDialog(QDialog):
         layout.addWidget(splitter)
 
         self.generateImplButton = QPushButton("Generate Implementation with AI...", self)
-        self.generateImplButton.clicked.connect(self.generateFunctionImpl)
+        self.generateImplButton.clicked.connect(self.generate_function_impl)
         layout.addWidget(self.generateImplButton)
 
         return tab
@@ -310,16 +345,20 @@ class CreateFunctionDialog(QDialog):
 
     def stop_processing(self, status):
         self.status_bar.stop_animation(status)
-        if hasattr(self, 'spec_json') and self.spec_json is not None:
-            self.userSpecEdit.setText(self.spec_json)
-        if hasattr(self, 'code') and self.code is not None:
-            self.userImplEdit.setText(self.code)
+        if self.tabs.tabText(self.tabs.currentIndex()) == "User Functions":
+            if hasattr(self, 'spec_json') and self.spec_json is not None:
+                self.userSpecEdit.setText(self.spec_json)
+            if hasattr(self, 'code') and self.code is not None:
+                self.userImplEdit.setText(self.code)
+        elif self.tabs.tabText(self.tabs.currentIndex()) == "Azure Logic Apps":
+            if hasattr(self, 'code') and self.code is not None:
+                self.azureUserFunctionEdit.setText(self.code)
 
-    def generateFunctionSpec(self):
+    def generate_function_spec(self):
         user_request = self.userRequest.toPlainText()
-        threading.Thread(target=self._generateFunctionSpec, args=(user_request,)).start()
+        threading.Thread(target=self._generate_function_spec, args=(user_request,)).start()
 
-    def _generateFunctionSpec(self, user_request):
+    def _generate_function_spec(self, user_request):
         try:
             if not hasattr(self, 'function_spec_creator'):
                 raise Exception("Function spec creator not available, check the system assistant settings")
@@ -330,12 +369,12 @@ class CreateFunctionDialog(QDialog):
         finally:
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
 
-    def generateFunctionImpl(self):
+    def generate_function_impl(self):
         user_request = self.userRequest.toPlainText()
         spec_json = self.userSpecEdit.toPlainText()
-        threading.Thread(target=self._generateFunctionImpl, args=(user_request, spec_json)).start()
+        threading.Thread(target=self._generate_function_impl, args=(user_request, spec_json)).start()
 
-    def _generateFunctionImpl(self, user_request, spec_json):
+    def _generate_function_impl(self, user_request, spec_json):
         try:
             if not hasattr(self, 'function_impl_creator'):
                 raise Exception("Function impl creator not available, check the system assistant settings")
@@ -347,7 +386,7 @@ class CreateFunctionDialog(QDialog):
         finally:
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
 
-    def saveFunction(self):
+    def save_function(self):
         current_tab = self.tabs.currentIndex()
         if current_tab == 0:
             functionSpec = self.systemSpecEdit.toPlainText()
@@ -400,7 +439,7 @@ class CreateFunctionDialog(QDialog):
             success_message += f" Impl file: {file_path}"
         QMessageBox.information(self, "Success", success_message)
 
-    def removeFunction(self):
+    def remove_function(self):
         current_tab = self.tabs.currentIndex()
         if self.tabs.tabText(current_tab) != "User Functions":
             QMessageBox.warning(self, "Error", "Invalid tab selected")

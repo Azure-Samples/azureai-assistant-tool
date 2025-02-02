@@ -93,6 +93,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         init_system_assistant(self, "FunctionImplCreator")
         init_system_assistant(self, "TaskRequestsCreator")
         init_system_assistant(self, "InstructionsReviewer")
+        init_system_assistant(self, "AzureLogicAppFunctionCreator")
 
     def initialize_variables(self):
         self.scheduled_task_threads = {}
