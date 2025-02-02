@@ -86,14 +86,13 @@ class CreateFunctionDialog(QDialog):
     def create_azure_logic_apps_tab(self):
         """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
         a 'Details..' button next to the selector, a button to generate the user function, 
-        and a text edit to display the generated user function."""
+        and a splitter containing text edits for the generated function specification and implementation."""
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
 
         selector_label = QLabel("Select Azure Logic App:", self)
         main_layout.addWidget(selector_label)
         
-        # Create a horizontal layout for the selector and the new Details button.
         selector_layout = QHBoxLayout()
 
         self.azureLogicAppSelector = QComboBox(self)
@@ -101,7 +100,6 @@ class CreateFunctionDialog(QDialog):
         # Give the combo box a greater stretch so it will expand.
         selector_layout.addWidget(self.azureLogicAppSelector, stretch=3)
 
-        # Create the Details button on the right side.
         self.viewLogicAppDetailsButton = QPushButton("Details..", self)
         self.viewLogicAppDetailsButton.clicked.connect(self.open_logic_app_details_dialog)
         # Set a fixed width for the Details button, making it smaller than the combo box.
@@ -110,17 +108,29 @@ class CreateFunctionDialog(QDialog):
 
         main_layout.addLayout(selector_layout)
 
-        # Button to generate user function from the Logic App.
-        self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
+        buttons_layout = QHBoxLayout()
+        self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App", self)
         self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generate_user_function_for_logic_app)
-        main_layout.addWidget(self.generateUserFunctionFromLogicAppButton)
+        buttons_layout.addWidget(self.generateUserFunctionFromLogicAppButton)
+        self.clearImplementationButton = QPushButton("Clear Implementation", self)
+        self.clearImplementationButton.clicked.connect(self.clear_azure_user_function_impl)
+        buttons_layout.addWidget(self.clearImplementationButton)
+        main_layout.addLayout(buttons_layout)
 
-        # Text edit to display the generated user function.
-        self.azureUserFunctionEdit = self.create_text_edit()
-        azureFunctionWidget = self.create_text_edit_labeled("Generated User Function:", self.azureUserFunctionEdit)
-        main_layout.addWidget(azureFunctionWidget)
+        self.azureUserFunctionSpecEdit = self.create_text_edit()
+        self.azureUserFunctionImplEdit = self.create_text_edit()
+
+        # Create a vertical splitter and add labeled text edit widgets.
+        splitter = QSplitter(Qt.Vertical, self)
+        splitter.addWidget(self.create_text_edit_labeled("Function Specification:", self.azureUserFunctionSpecEdit))
+        splitter.addWidget(self.create_text_edit_labeled("Function Implementation:", self.azureUserFunctionImplEdit))
+        main_layout.addWidget(splitter)
 
         return tab
+
+    def clear_azure_user_function_impl(self):
+        self.azureUserFunctionSpecEdit.clear()
+        self.azureUserFunctionImplEdit.clear()
 
     def open_logic_app_details_dialog(self):
         """
@@ -176,7 +186,9 @@ class CreateFunctionDialog(QDialog):
 
             logic_app_name = self.azureLogicAppSelector.currentText()
             base_name = logic_app_name.split(" (HTTP Trigger)")[0]
-            schema_text = self.azureLogicAppSchemaEdit.toPlainText()
+            azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
+            schema = azure_manager.get_http_trigger_schema(logic_app_name=base_name, trigger_name="When_a_HTTP_request_is_received")
+            schema_text = json.dumps(schema, indent=4)
             if not schema_text:
                 raise ValueError("Schema is empty. Please ensure the schema is loaded correctly.")
 
@@ -192,7 +204,7 @@ class CreateFunctionDialog(QDialog):
             # Start the processing signal.
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             
-            # Run the function generation on a separate thread.
+            threading.Thread(target=self._generate_function_spec, args=(request_message,)).start()
             threading.Thread(target=self._generate_logic_app_user_function_thread, args=(request_message,)).start()
         except Exception as e:
             self.error_signal.error_signal.emit(
@@ -361,8 +373,10 @@ class CreateFunctionDialog(QDialog):
             if hasattr(self, 'code') and self.code is not None:
                 self.userImplEdit.setText(self.code)
         elif self.tabs.tabText(self.tabs.currentIndex()) == "Azure Logic Apps":
+            if hasattr(self, 'spec_json') and self.spec_json is not None:
+                self.azureUserFunctionSpecEdit.setText(self.spec_json)
             if hasattr(self, 'code') and self.code is not None:
-                self.azureUserFunctionEdit.setText(self.code)
+                self.azureUserFunctionImplEdit.setText(self.code)
 
     def generate_function_spec(self):
         user_request = self.userRequest.toPlainText()
