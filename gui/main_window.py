@@ -312,6 +312,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 subscription_id = client.scope["subscription_id"]
                 resource_group = client.scope["resource_group_name"]
                 self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
+                self.azure_logic_app_manager.initialize_logic_apps(trigger_name="When_a_HTTP_request_is_received")
         except Exception as e:
             logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
 

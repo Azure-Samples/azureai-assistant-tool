@@ -17,6 +17,7 @@ from azure.ai.assistant.management.function_config_manager import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
+from gui.utils import camel_to_snake
 
 
 class CreateFunctionDialog(QDialog):
@@ -31,6 +32,12 @@ class CreateFunctionDialog(QDialog):
         self.function_config_manager: FunctionConfigManager = main_window.function_config_manager
         self.init_UI()
         self.previousSize = self.size()
+
+        # Separate variables for each tab's results.
+        self.user_spec_json = None
+        self.user_code = None
+        self.azure_spec_json = None
+        self.azure_code = None
 
     def init_UI(self):
         self.setWindowTitle("Create/Edit Functions")
@@ -84,9 +91,6 @@ class CreateFunctionDialog(QDialog):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
     def create_azure_logic_apps_tab(self):
-        """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
-        a 'Details..' button next to the selector, a button to generate the user function, 
-        and a splitter containing text edits for the generated function specification and implementation."""
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
 
@@ -97,12 +101,10 @@ class CreateFunctionDialog(QDialog):
 
         self.azureLogicAppSelector = QComboBox(self)
         self.azureLogicAppSelector.addItems(self.list_logic_app_names())
-        # Give the combo box a greater stretch so it will expand.
         selector_layout.addWidget(self.azureLogicAppSelector, stretch=3)
 
         self.viewLogicAppDetailsButton = QPushButton("Details..", self)
         self.viewLogicAppDetailsButton.clicked.connect(self.open_logic_app_details_dialog)
-        # Set a fixed width for the Details button, making it smaller than the combo box.
         self.viewLogicAppDetailsButton.setFixedWidth(100)
         selector_layout.addWidget(self.viewLogicAppDetailsButton, stretch=1)
 
@@ -120,7 +122,6 @@ class CreateFunctionDialog(QDialog):
         self.azureUserFunctionSpecEdit = self.create_text_edit()
         self.azureUserFunctionImplEdit = self.create_text_edit()
 
-        # Create a vertical splitter and add labeled text edit widgets.
         splitter = QSplitter(Qt.Vertical, self)
         splitter.addWidget(self.create_text_edit_labeled("Function Specification:", self.azureUserFunctionSpecEdit))
         splitter.addWidget(self.create_text_edit_labeled("Function Implementation:", self.azureUserFunctionImplEdit))
@@ -133,23 +134,14 @@ class CreateFunctionDialog(QDialog):
         self.azureUserFunctionImplEdit.clear()
 
     def open_logic_app_details_dialog(self):
-        """
-        Opens a dialog displaying the full details of the selected Azure Logic App.
-        """
         from PySide6.QtWidgets import QMessageBox
         try:
-            # Check if the main window contains the azure_logic_app_manager attribute.
             if hasattr(self.main_window, 'azure_logic_app_manager'):
-                azure_manager : AzureLogicAppManager = self.main_window.azure_logic_app_manager
+                azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
                 logic_app_name = self.azureLogicAppSelector.currentText()
                 if logic_app_name:
-                    # Remove any suffix if it exists (e.g., " (HTTP Trigger)")
                     base_name = logic_app_name.split(" (HTTP Trigger)")[0]
-                    
-                    # Retrieve the complete details for the selected Logic App.
                     logic_app_details = azure_manager.get_logic_app_details(base_name)
-                    
-                    # Create and execute the details dialog (assuming LogicAppDetailsDialog is defined elsewhere).
                     dialog = LogicAppDetailsDialog(details=logic_app_details, parent=self)
                     dialog.exec()
                 else:
@@ -157,15 +149,10 @@ class CreateFunctionDialog(QDialog):
             else:
                 QMessageBox.warning(self, "Warning", "Azure Logic App Manager is not available.")
         except Exception as e:
-            from azure.ai.assistant.management.logger_module import logger
             logger.error(f"Error retrieving logic app details: {e}")
             QMessageBox.warning(self, "Error", "Error retrieving logic app details.")
 
     def list_logic_app_names(self) -> List[str]:
-        """
-        Retrieves the names of Azure Logic Apps from the AzureLogicAppManager instance available in main_window.
-        Returns a list of names formatted with an HTTP trigger indicator.
-        """
         names = []
         try:
             azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
@@ -175,15 +162,9 @@ class CreateFunctionDialog(QDialog):
         return names
 
     def generate_user_function_for_logic_app(self):
-        """
-        Generates a user function for the selected Azure Logic App by using the function_impl_creator.
-        The function name is derived from the Logic App's name, and the function implementation
-        is built based on the provided HTTP trigger schema.
-        """
         try:
             if not hasattr(self, 'azure_logic_app_function_creator'):
                 raise Exception("Azure Logic App function creator not available, check the system assistant settings")
-
             logic_app_name = self.azureLogicAppSelector.currentText()
             base_name = logic_app_name.split(" (HTTP Trigger)")[0]
             azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
@@ -192,19 +173,16 @@ class CreateFunctionDialog(QDialog):
             if not schema_text:
                 raise ValueError("Schema is empty. Please ensure the schema is loaded correctly.")
 
-            # Construct the request message.
             request_message = (
-                f"Logic App Name: {base_name}\n"
+                f"Function name: {camel_to_snake(base_name)}\n"
+                f"Logic App Name for the invoke method inside the function: {base_name}\n"
                 f"JSON Schema: {schema_text}\n"
-                "Please generate a Python function that accepts input parameters based on the JSON schema "
-                "and invokes the Logic App via the service.invoke_logic_app() call. "
-                "The function name should be derived from the Logic App name with snake_case format."
+                "Please generate a Python function which name is given logic app name and that accepts input parameters based on the given JSON schema."
             )
 
-            # Start the processing signal.
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            
-            threading.Thread(target=self._generate_function_spec, args=(request_message,)).start()
+            # When generating for Azure Logic Apps, pass the target tab info.
+            threading.Thread(target=self._generate_function_spec, args=(request_message, "Azure Logic Apps")).start()
             threading.Thread(target=self._generate_logic_app_user_function_thread, args=(request_message,)).start()
         except Exception as e:
             self.error_signal.error_signal.emit(
@@ -213,15 +191,13 @@ class CreateFunctionDialog(QDialog):
 
     def _generate_logic_app_user_function_thread(self, request_message):
         try:
-            self.code = self.azure_logic_app_function_creator.process_messages(user_request=request_message, stream=False)
-            from azure.ai.assistant.management.logger_module import logger
+            self.azure_code = self.azure_logic_app_function_creator.process_messages(user_request=request_message, stream=False)
             logger.info("User function implementation generated successfully.")
         except Exception as e:
             self.error_signal.error_signal.emit(
                 f"An error occurred while generating the user function for the Logic App: {e}"
             )
         finally:
-            # Signal to stop processing.
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
 
     def toggle_max_height(self):
@@ -239,7 +215,6 @@ class CreateFunctionDialog(QDialog):
             super().keyPressEvent(event)
 
     def onTabChanged(self, index):
-        # Enable the Remove button only for the User Functions tab.
         self.removeButton.setEnabled(self.tabs.tabText(index) == "User Functions")
 
     def create_system_functions_tab(self):
@@ -295,7 +270,7 @@ class CreateFunctionDialog(QDialog):
 
     def create_text_edit_labeled(self, label_text, text_edit_widget):
         widget = QWidget()
-        widget.setStyleSheet("background-color: #2b2b2b;")  # matching background with create_text_edit
+        widget.setStyleSheet("background-color: #2b2b2b;")
         layout = QVBoxLayout(widget)
         label = QLabel(label_text)
         label.setStyleSheet("""
@@ -335,6 +310,10 @@ class CreateFunctionDialog(QDialog):
         self.load_functions(function_selector, function_type)
         return function_selector
 
+    def get_user_function_names(self):
+        functions_data = self.function_config_manager.get_all_functions_data()
+        return [f_spec['function']['name'] for f_type, f_spec, _ in functions_data if f_type == "user"]
+
     def load_functions(self, function_selector, function_type):
         functions_data = self.function_config_manager.get_all_functions_data()
         function_selector.clear()
@@ -367,27 +346,34 @@ class CreateFunctionDialog(QDialog):
 
     def stop_processing(self, status):
         self.status_bar.stop_animation(status)
-        if self.tabs.tabText(self.tabs.currentIndex()) == "User Functions":
-            if hasattr(self, 'spec_json') and self.spec_json is not None:
-                self.userSpecEdit.setText(self.spec_json)
-            if hasattr(self, 'code') and self.code is not None:
-                self.userImplEdit.setText(self.code)
-        elif self.tabs.tabText(self.tabs.currentIndex()) == "Azure Logic Apps":
-            if hasattr(self, 'spec_json') and self.spec_json is not None:
-                self.azureUserFunctionSpecEdit.setText(self.spec_json)
-            if hasattr(self, 'code') and self.code is not None:
-                self.azureUserFunctionImplEdit.setText(self.code)
+        # Based on the current active tab, update only its controls.
+        current_tab = self.tabs.tabText(self.tabs.currentIndex())
+        if current_tab == "User Functions":
+            if self.user_spec_json is not None:
+                self.userSpecEdit.setText(self.user_spec_json)
+            if self.user_code is not None:
+                self.userImplEdit.setText(self.user_code)
+        elif current_tab == "Azure Logic Apps":
+            if self.azure_spec_json is not None:
+                self.azureUserFunctionSpecEdit.setText(self.azure_spec_json)
+            if self.azure_code is not None:
+                self.azureUserFunctionImplEdit.setText(self.azure_code)
 
     def generate_function_spec(self):
         user_request = self.userRequest.toPlainText()
-        threading.Thread(target=self._generate_function_spec, args=(user_request,)).start()
+        # When generating for user functions, indicate target as "User Functions".
+        threading.Thread(target=self._generate_function_spec, args=(user_request, "User Functions")).start()
 
-    def _generate_function_spec(self, user_request):
+    def _generate_function_spec(self, user_request, target_tab):
         try:
             if not hasattr(self, 'function_spec_creator'):
                 raise Exception("Function spec creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            self.spec_json = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
+            result = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
+            if target_tab == "User Functions":
+                self.user_spec_json = result
+            elif target_tab == "Azure Logic Apps":
+                self.azure_spec_json = result
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
         finally:
@@ -404,22 +390,28 @@ class CreateFunctionDialog(QDialog):
                 raise Exception("Function impl creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             request = user_request + " that follows the following spec: " + spec_json
-            self.code = self.function_impl_creator.process_messages(user_request=request, stream=False)
+            self.user_code = self.function_impl_creator.process_messages(user_request=request, stream=False)
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function implementation: {e}")
         finally:
             self.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
 
     def save_function(self):
-        current_tab = self.tabs.currentIndex()
-        if current_tab == 0:
+        current_tab_text = self.tabs.tabText(self.tabs.currentIndex())
+        
+        if current_tab_text == "System Functions":
             functionSpec = self.systemSpecEdit.toPlainText()
             functionImpl = None
             function_selector = self.systemFunctionSelector
-        elif current_tab == 1:
+        elif current_tab_text == "User Functions":
             functionSpec = self.userSpecEdit.toPlainText()
             functionImpl = self.userImplEdit.toPlainText()
             function_selector = self.userFunctionSelector
+        elif current_tab_text == "Azure Logic Apps":
+            functionSpec = self.azureUserFunctionSpecEdit.toPlainText()
+            functionImpl = self.azureUserFunctionImplEdit.toPlainText()
+            # There is no selector for Azure Logic Apps, so we'll derive the name from the spec
+            function_selector = None
         else:
             QMessageBox.warning(self, "Error", "Invalid tab selected")
             return
@@ -434,8 +426,25 @@ class CreateFunctionDialog(QDialog):
             return
 
         new_function_name = None
-        current_function_name = function_selector.currentText()
-        if current_function_name == "New Function":
+
+        # Determine the current function name for saving.
+        if current_tab_text == "Azure Logic Apps":
+            try:
+                spec_dict = json.loads(functionSpec)
+                current_user_function_names = self.get_user_function_names()
+                logic_app_function_name = spec_dict["function"]["name"]
+                if logic_app_function_name in current_user_function_names:
+                    QMessageBox.warning(self, "Error", f"Function '{logic_app_function_name}' already exists.")
+                    return
+                current_function_name = None
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Error extracting function name from the spec: {e}")
+                return
+        elif function_selector is not None:
+            current_function_name = function_selector.currentText()
+            if current_function_name == "New Function":
+                current_function_name = None
+        else:
             current_function_name = None
 
         try:
