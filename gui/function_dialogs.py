@@ -82,7 +82,8 @@ class CreateFunctionDialog(QDialog):
         self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
     def create_azure_logic_apps_tab(self):
-        """Creates the Azure Logic Apps tab with a combo box to list the connected logic apps,
+        """Creates the Azure Logic Apps tab with a combo box to list connected logic apps,
+           an uneditable text box to display the HTTP trigger schema,
            a button to generate the user function, and a text edit to display the generated function."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -91,6 +92,20 @@ class CreateFunctionDialog(QDialog):
         self.azureLogicAppSelector = QComboBox(self)
         self.azureLogicAppSelector.addItems(self.list_logic_app_names())
         layout.addWidget(self.azureLogicAppSelector)
+        self.azureLogicAppSelector.currentIndexChanged.connect(self.update_logic_app_schema)
+
+        self.azureLogicAppSchemaEdit = QTextEdit(self)
+        self.azureLogicAppSchemaEdit.setReadOnly(True)
+        self.azureLogicAppSchemaEdit.setStyleSheet("""
+            QTextEdit {
+                background-color: #f0f0f0;
+                color: #000000;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 10pt;
+            }
+        """)
+        schemaWidget = self.create_text_edit_labeled("HTTP Trigger Schema:", self.azureLogicAppSchemaEdit)
+        layout.addWidget(schemaWidget)
 
         self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App...", self)
         self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generateUserFunctionFromLogicApp)
@@ -99,6 +114,8 @@ class CreateFunctionDialog(QDialog):
         self.azureUserFunctionEdit = self.create_text_edit()
         azureFunctionWidget = self.create_text_edit_labeled("Generated User Function:", self.azureUserFunctionEdit)
         layout.addWidget(azureFunctionWidget)
+
+        self.update_logic_app_schema()
 
         return tab
 
@@ -115,17 +132,37 @@ class CreateFunctionDialog(QDialog):
             logger.error(f"Error listing logic apps: {e}")
         return names
 
+    def update_logic_app_schema(self):
+        """
+        Updates the uneditable text box with the JSON schema for the HTTP trigger of the currently selected logic app.
+        """
+        try:
+            if hasattr(self.main_window, 'azure_logic_app_manager'):
+                azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
+                logic_app_name = self.azureLogicAppSelector.currentText()
+                if logic_app_name:
+                    # Remove the suffix "(HTTP Trigger)" if present.
+                    base_name = logic_app_name.split(" (HTTP Trigger)")[0]
+                    schema = azure_manager.get_http_trigger_schema(base_name, trigger_name="When_a_HTTP_request_is_received")
+                    formatted_schema = json.dumps(schema, indent=4)
+                    self.azureLogicAppSchemaEdit.setPlainText(formatted_schema)
+                else:
+                    self.azureLogicAppSchemaEdit.clear()
+        except Exception as e:
+            logger.error(f"Error updating logic app schema: {e}")
+            self.azureLogicAppSchemaEdit.setPlainText("Error retrieving schema.")
+
     def generateUserFunctionFromLogicApp(self):
         """
         Generates a user function based on the selected Azure Logic App.
         Replace or extend this logic to integrate with your application's flow.
         """
         logic_app_name = self.azureLogicAppSelector.currentText()
-        # Create a function name by sanitizing the logic app name
+        # Create a function name by sanitizing the logic app name.
         function_name = logic_app_name.replace(" ", "_").replace("(", "").replace(")", "").lower()
         generated_function = (
             f"def function_from_{function_name}(params):\n"
-            f"    # TODO: Add logic to invoke Azure Logic App '{logic_app_name}' using the callback URL\n"
+            f"    # TODO: Add logic to invoke Azure Logic App '{logic_app_name}' using its callback URL\n"
             f"    pass\n"
         )
         self.azureUserFunctionEdit.setText(generated_function)
@@ -201,8 +238,17 @@ class CreateFunctionDialog(QDialog):
 
     def create_text_edit_labeled(self, label_text, text_edit_widget):
         widget = QWidget()
+        widget.setStyleSheet("background-color: #2b2b2b;")  # matching background with create_text_edit
         layout = QVBoxLayout(widget)
         label = QLabel(label_text)
+        label.setStyleSheet("""
+            QLabel {
+                color: #e0e0e0;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 10pt;
+                background-color: #2b2b2b;
+            }
+        """)
         layout.addWidget(label)
         layout.addWidget(text_edit_widget)
         return widget
@@ -213,7 +259,7 @@ class CreateFunctionDialog(QDialog):
             QTextEdit {
                 background-color: #2b2b2b;
                 color: #e0e0e0;
-                font-family: 'Consolas', 'Monaco', 'monospace';
+                font-family: 'Consolas', 'Monaco', monospace;
                 font-size: 10pt;
             }
         """)
