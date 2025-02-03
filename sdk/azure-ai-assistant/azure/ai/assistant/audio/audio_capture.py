@@ -138,36 +138,6 @@ class AudioCapture:
 
         self.is_running = False
 
-    def _setup_mac_voice_processing(self):
-        if sys.platform != 'darwin':
-            return
-
-        try:
-            import objc
-            from objc import lookUpClass
-
-            # Look up the AVAudioEngine class from AVFoundation
-            AVAudioEngine = lookUpClass("AVAudioEngine")
-
-            # Initialize an AVAudioEngine instance
-            engine = AVAudioEngine.alloc().init()
-
-            # Retrieve the input node
-            input_node = engine.inputNode()
-            
-            # Attempt to enable voice processing if supported
-            if hasattr(input_node, "setVoiceProcessingEnabled_error_"):
-                success, error = input_node.setVoiceProcessingEnabled_error_(True, None)
-                if success:
-                    logger.info("Voice processing enabled on macOS.")
-                else:
-                    logger.error("Failed to enable voice processing on macOS: %s", error)
-            else:
-                logger.info("Voice processing is not supported on this input node.")
-
-        except Exception as e:
-            logger.error("Exception while setting up voice processing on macOS: %s", e)
-
     def start(self):
         """
         Starts the audio capture stream and initializes necessary components.
@@ -214,9 +184,6 @@ class AudioCapture:
             logger.error(f"Failed to initialize PyAudio Input Stream: {e}")
             self.is_running = False
             raise
-
-        # Call the macOS-specific voice processing setup if running on macOS
-        self._setup_mac_voice_processing()
 
     def stop(self, terminate: bool = False):
         """
