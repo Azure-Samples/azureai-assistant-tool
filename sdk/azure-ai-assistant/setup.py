@@ -76,6 +76,8 @@ setup(
         "azure-ai-projects",
         "azure-identity",
         "azure-mgmt-logic",
+        # The following line installs PyObjC only on macOS
+        "pyobjc-framework-AVFoundation; sys_platform=='darwin'"
     ],
     python_requires=">=3.8",
     project_urls={
