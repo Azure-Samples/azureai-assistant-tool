@@ -127,29 +127,12 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
 
         try:
-            if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI,
-                    api_version=self.system_api_version
-                )
-            elif self.system_client_type == AIClientType.OPEN_AI.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI
-                )
-            elif self.system_client_type == AIClientType.OPEN_AI_REALTIME.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI_REALTIME
-                )
-            elif self.system_client_type == AIClientType.AZURE_OPEN_AI_REALTIME.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI_REALTIME,
-                    api_version=self.system_api_version
-                )
-            elif self.system_client_type == AIClientType.AZURE_AI_AGENT.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_AI_AGENT,
-                    api_version=self.system_api_version
-                )
+            resolved_client_type = AIClientType[self.system_client_type]
+            self.system_client = get_ai_client(resolved_client_type, self.system_api_version)
+
+            if self.system_client is None:
+                raise ValueError(f"Unable to initialize AI client of type {self.system_client_type}. Check your keys or config.")
+
         except Exception as e:
             logger.error(f"Error initializing system assistant client {self.system_client_type}: {e}")
             raise ValueError(f"Error initializing system assistant client {self.system_client_type}: {e}")

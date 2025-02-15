@@ -76,23 +76,32 @@ def init_system_assistant(instance, assistant_name: str):
         QMessageBox.warning(instance, "Error", error_message)
 
 
-def get_ai_client(ai_client_type: AIClientType) -> Optional[object]:
+def get_ai_client(ai_client_type: AIClientType, api_version: Optional[str] = None) -> Optional[object]:
     """
-    Returns an AI client instance for the given AIClientType, or None if unavailable.
+    Returns an AI client instance for the given AIClientType, optionally using a specified api_version.
     Logs an error if any exception occurs during creation.
     """
     client_factory = AIClientFactory.get_instance()
 
     client_map = {
-        AIClientType.AZURE_OPEN_AI:           lambda: client_factory.get_client(AIClientType.AZURE_OPEN_AI),
-        AIClientType.OPEN_AI:                 lambda: client_factory.get_client(AIClientType.OPEN_AI),
-        AIClientType.OPEN_AI_REALTIME:        lambda: client_factory.get_client(AIClientType.OPEN_AI_REALTIME),
-        AIClientType.AZURE_OPEN_AI_REALTIME:  lambda: client_factory.get_client(AIClientType.AZURE_OPEN_AI_REALTIME),
-        AIClientType.AZURE_AI_AGENT:          lambda: client_factory.get_client(AIClientType.AZURE_AI_AGENT),
+        AIClientType.AZURE_OPEN_AI: lambda: client_factory.get_client(
+            AIClientType.AZURE_OPEN_AI, api_version=api_version
+        ),
+        AIClientType.OPEN_AI: lambda: client_factory.get_client(
+            AIClientType.OPEN_AI
+        ),
+        AIClientType.OPEN_AI_REALTIME: lambda: client_factory.get_client(
+            AIClientType.OPEN_AI_REALTIME
+        ),
+        AIClientType.AZURE_OPEN_AI_REALTIME: lambda: client_factory.get_client(
+            AIClientType.AZURE_OPEN_AI_REALTIME, api_version=api_version
+        ),
+        AIClientType.AZURE_AI_AGENT: lambda: client_factory.get_client(
+            AIClientType.AZURE_AI_AGENT
+        ),
     }
 
     try:
-        # Use a default of None if the type isn’t recognized
         return client_map.get(ai_client_type, lambda: None)()
     except Exception as e:
         logger.error(f"[get_ai_client] Error getting client for {ai_client_type.name}: {e}")
