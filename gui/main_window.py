@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantType

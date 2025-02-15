@@ -297,7 +297,8 @@ def take_screenshot() -> str:
 def generate_image(image_description: str) -> str:
     """
     Generates an image from given information using DALL·E via OpenAI's Python API
-    and attaches it to the conversation.
+    and attaches it to the conversation. If the thread is locked for new messages,
+    returns a link to the locally saved image instead.
 
     :param image_description: Information details to generate the image.
     :type image_description: str
@@ -328,11 +329,10 @@ def generate_image(image_description: str) -> str:
 
         # Call OpenAI to generate an image using DALL·E
         try:
-            # NOTE: This usage may differ based on your openai library version
             response = openai.images.generate(
                 prompt=prompt,
                 model="dall-e-3",
-                n=1,                # number of images
+                n=1,                 # number of images
                 size="1024x1024",    # resolution of the generated image
                 response_format="b64_json"  # requesting base64 to avoid ephemeral URLs
             )
@@ -341,8 +341,7 @@ def generate_image(image_description: str) -> str:
             logger.error(error_msg)
             return json.dumps({"function_error": error_msg})
 
-         # Extract the base64 image data from the response
-        # For n=1, the result is typically in response.data[0].b64_json
+        # Extract the base64 image data from the response
         if not response.data or not response.data[0].b64_json:
             error_msg = "No valid base64 image data found in the response."
             logger.error(error_msg)
@@ -360,7 +359,7 @@ def generate_image(image_description: str) -> str:
         output_dir = os.path.abspath("output")
         os.makedirs(output_dir, exist_ok=True)
 
-        # Construct a file name (you can adapt _create_identifier to your needs)
+        # Construct a file name
         file_name = f"{_create_identifier('generated_image')}.png"
         img_path = os.path.join(output_dir, file_name)
 
@@ -372,14 +371,30 @@ def generate_image(image_description: str) -> str:
         current_thread_id = thread_client.get_config().get_current_thread_id()
         thread_name = thread_client.get_config().get_thread_name_by_id(current_thread_id)
 
-        thread_client.create_conversation_thread_message(
-            message="Here’s a generated image based on the given information",
-            thread_name=thread_name,
-            attachments=[attachment],
-            metadata={"chat_assistant": "function"}
-        )
-
-        return json.dumps({"result": "Image generated and displayed."})
+        # Try to create the thread message with the attachment
+        try:
+            thread_client.create_conversation_thread_message(
+                message="Here’s a generated image based on the given information",
+                thread_name=thread_name,
+                attachments=[attachment],
+                metadata={"chat_assistant": "function"}
+            )
+            return json.dumps({"result": "Image generated and displayed."})
+        except Exception as post_msg_exception:
+            # if the image was saved successfully in case of error, return the link to the image
+            if os.path.isfile(img_path):
+                file_name = os.path.basename(img_path)
+                return json.dumps({
+                    "result": (
+                        f"Thread is currently running, so the image could not be attached to thread.\n"
+                        f"Please open the image using this link: [Download {file_name}]({file_name})"
+                    )
+                })
+            else:
+                # If some other error occurred, return it
+                error_msg = f"Failed to create a conversation message with the image: {str(post_msg_exception)}"
+                logger.error(error_msg)
+                return json.dumps({"function_error": error_msg})
 
     except Exception as e:
         error_message = f"Unexpected error generating image: {str(e)}"

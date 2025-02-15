@@ -471,40 +471,58 @@ class ConversationView(QWidget):
         return url_pattern.sub(replace_with_link, text)
 
     def format_file_links(self, text):
-        # Pattern to find citations in the form [Download text]( [index])
-        citation_link_pattern = r'\[([^\]]+)\]\(\s*\[(\d+)\]\s*\)'
-        # Dictionary to store file paths indexed by the citation index
+        # 1) Build a map from citation index to filename (for lines like "[0] something.png")
         citation_to_filename = {}
-
-        # First, extract all file citations like "[0] finance_sector_revenue_chart.png"
-        file_citations = re.findall(r'\[(\d+)\]\s*(.+)', text)
-        for index, filename in file_citations:
+        citation_pattern = re.compile(r'\[(\d+)\]\s*(\S+)')  # e.g. [0] file.png
+        for index, filename in citation_pattern.findall(text):
             citation_to_filename[index] = filename
 
-        # Function to replace citation links with clickable HTML links
+        # 2) Pattern to find bracketed links of the form [some text](some link)
+        link_pattern = re.compile(r'\[([^\]]+)\]\(([^\)]+)\)')
+
         def replace_with_clickable_text(match):
-            link_text = match.group(1)
-            citation_index = match.group(2)
-            file_name = citation_to_filename.get(citation_index)
+            link_text = match.group(1).strip()  # e.g. "Download my_image.png"
+            link_target = match.group(2).strip()  # either "[0]" or "my_image.png"
+
+            # If link_target is of the form "[N]", look up the actual filename from citation_to_filename
+            index_match = re.match(r'^\[(\d+)\]$', link_target)
+            if index_match:
+                citation_index = index_match.group(1)
+                file_name = citation_to_filename.get(citation_index)
+            else:
+                # Otherwise, assume it's a direct filename/path
+                file_name = link_target
 
             if file_name:
+                # Normalize to get a local file path
                 local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))
 
-                if link_text in self.text_to_url_map:
-                    link_text = f"{link_text} {len(self.text_to_url_map) + 1}"
-                
-                # Store the file path
-                self.text_to_url_map[link_text] = {"path": local_file_path}
+                # Prevent collisions in self.text_to_url_map
+                final_link_text = link_text
+                if final_link_text in self.text_to_url_map:
+                    final_link_text = f"{final_link_text} {len(self.text_to_url_map) + 1}"
 
-                # Return the HTML link and the local file path in separate inline-block divs
-                return (f'<div style="display: inline-block;"><a href="{local_file_path}" style="color:green; text-decoration: underline;" download="{file_name}">{link_text}</a></div>'
-                        f'<div style="display: inline-block; color:gray;">{local_file_path}</div>')
+                # Store the path
+                self.text_to_url_map[final_link_text] = {"path": local_file_path}
 
-        # Replace links in the original text
-        updated_text = re.sub(citation_link_pattern, replace_with_clickable_text, text)
+                # Return clickable HTML
+                return (
+                    f'<div style="display: inline-block;">'
+                    f'<a href="{local_file_path}" '
+                    f'style="color:green; text-decoration: underline;" '
+                    f'download="{file_name}">{final_link_text}</a></div>'
+                    f'<div style="display: inline-block; color:gray;">{local_file_path}</div>'
+                )
 
-        # Remove the original citation lines
-        updated_text = re.sub(r'\[\d+\]\s*[^ ]+\.png', '', updated_text)
+            # If no filename found (should be rare), return the original text unmodified
+            return match.group(0)
+
+        # 3) Replace bracketed links with clickable HTML
+        updated_text = link_pattern.sub(replace_with_clickable_text, text)
+
+        # 4) Remove leftover citation lines (like "[0] file.png")
+        #    Adjust the extension pattern if you support other file types:
+        updated_text = re.sub(r'\[\d+\]\s*\S+\.(png|jpg|jpeg|gif|bmp)', '', updated_text, flags=re.IGNORECASE)
 
         return updated_text
 
