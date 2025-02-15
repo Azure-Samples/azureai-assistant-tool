@@ -208,34 +208,6 @@ def _create_identifier(prefix: str) -> str:
     return f"{prefix}_{short_id}"
 
 
-def generate_o1_response(prompt: str, model: str = "o1-mini") -> str:
-    """
-    Generates a chat completion response for the given prompt using the specified OpenAI model.
-
-    :param prompt: The prompt for which the chat completion is to be generated.
-    :type prompt: str
-    :param model: The model to be used for generating the chat completion.
-    :type model: str
-
-    :return: JSON formatted string containing the result or an error message.
-    :rtype: str
-    """
-    current_client_type = AIClientFactory.get_instance().current_client_type
-    ai_client, thread_client = _initialize_clients(current_client_type)
-    if not ai_client or not thread_client:
-        return json.dumps({"function_error": "Failed to initialize AI or thread client."})
-
-    if model not in ["o1-mini", "o1-preview"]:
-        return json.dumps({"function_error": "Invalid model specified."})
-    
-    messages = _retrieve_and_parse_conversation(thread_client)
-    if messages is None:
-        return json.dumps({"function_error": "Failed to retrieve or parse conversation."})
-
-    messages = _update_messages_with_prompt(messages, prompt)
-    return _generate_chat_completion(ai_client, model, messages)
-
-
 def look_at_screen(focus_topic: str) -> str:
     """
     Analyze the current screen by capturing a screenshot and returning an analysis of it. The analysis focuses on highlighted areas if present.
