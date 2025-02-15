@@ -397,14 +397,31 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.assistants_processing[assistant_name]['user_input'] = False
                 self.status_bar.stop_animation(ActivityStatus.PROCESSING_USER_INPUT)
 
-    def on_user_input_complete(self, user_input):
+    def on_user_input_complete(self, user_input, pasted_image_file_paths=None):
+        if pasted_image_file_paths is None:
+            pasted_image_file_paths = []
+
         try:
             assistants = self.conversation_sidebar.get_selected_assistants()
             if not assistants:
                 QMessageBox.warning(self, "Error", "Please select an assistant first.")
                 return
 
-            # Check if the assistant is realtime assistant
+            sidebar_attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item() or []
+
+            pasted_image_attachments = []
+            for image_path in pasted_image_file_paths:
+                attachment_info = {
+                    "file_id": None,
+                    "file_name": os.path.basename(image_path),
+                    "file_path": image_path,
+                    "attachment_type": "image_file",
+                    "tools": []
+                }
+                pasted_image_attachments.append(attachment_info)
+
+            all_attachments = sidebar_attachments + pasted_image_attachments
+
             if not self.is_realtime_assistant(assistants[0]):
                 thread_name = self.setup_conversation_thread()
                 self.append_conversation_signal.update_signal.emit("user", user_input, "blue")
@@ -415,10 +432,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                     self.update_conversation_title_signal.update_signal.emit(thread_name, updated_thread_name)
                     thread_name = updated_thread_name
 
-                # Get files from conversation thread list
-                attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-
-                self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments_dicts)
+                self.executor.submit(self.process_input, user_input, assistants, thread_name, False, all_attachments)
                 self.conversation_view.inputField.clear()
             else:
                 thread_name = self.setup_conversation_thread()
@@ -482,7 +496,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             self.update_attachments_from_ui_to_thread(thread_client, thread_id, attachments_dicts)
             self.create_thread_message(thread_client, user_input, thread_name, attachments_dicts)
-            self.update_attachments_in_ui_from_thread(thread_client, thread_id)
+            self.update_attachments_to_sidebar_from_thread(thread_client, thread_id)
 
             updated_conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
             self.update_conversation_messages(updated_conversation)
@@ -517,38 +531,43 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def update_attachments_from_ui_to_thread(self, thread_client : ConversationThreadClient, thread_id, attachments_dicts):
         # Synchronize the thread configuration and cloud client for deleted attachments
-        existing_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-        all_attachment_ids = [att["file_id"] for att in attachments_dicts]
-        attachments_to_remove = [att for att in existing_attachments if att.file_id not in all_attachment_ids]
+        existing_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        all_attachment_file_ids = [att["file_id"] for att in attachments_dicts]
+        attachments_to_remove = [att for att in existing_thread_attachments if att.file_id not in all_attachment_file_ids]
         
         for attachment in attachments_to_remove:
-            thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)
+            thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)          
+            # Optionally remove from cloud thread if not an image. 
+            # Do not remove images from cloud thread due to issue with OpenAI bug if image is removed.
             if attachment.attachment_type != AttachmentType.IMAGE_FILE:
                 thread_client._ai_client.files.delete(file_id=attachment.file_id)
 
         logger.debug("Attachments synchronized from UI to thread")
 
     def create_thread_message(self, thread_client : ConversationThreadClient, user_input, thread_name, attachments_dicts = None):
-        conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
-        if attachments_dicts is None:
-            attachments = None
-        else:
-            attachments = [
-                Attachment.from_dict(att_dict) 
-                for att_dict in attachments_dicts 
-                if not conversation.contains_file_id(att_dict["file_id"])
-            ]
+        thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
+        local_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        existing_file_ids = {att.file_id for att in local_thread_attachments}
+        new_attachments = []
+        for att_dict in attachments_dicts:
+            if att_dict["file_id"] not in existing_file_ids:
+                new_attachment = Attachment.from_dict(att_dict)
+                new_attachments.append(new_attachment)
+
+        cleaned_input = user_input.strip() if user_input else ""
+        if not cleaned_input:
+            cleaned_input = "…"
+
         thread_client.create_conversation_thread_message(
-            user_input, thread_name, 
-            attachments=attachments, 
+            cleaned_input, thread_name, 
+            attachments=new_attachments if new_attachments else None,
             timeout=self.connection_timeout
         )
 
-    def update_attachments_in_ui_from_thread(self, thread_client : ConversationThreadClient, thread_id):
-        # Refresh the attachments list in the UI after message creation
-        updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-        attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
-        logger.debug(f"process_input: attachments updated: {attachments_dicts}")
+    def update_attachments_to_sidebar_from_thread(self, thread_client : ConversationThreadClient, thread_id):
+        # Refresh the attachments in the sidebar
+        thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        attachments_dicts = [attachment.to_dict() for attachment in thread_attachments]
         self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
 
     def process_assistant_input(self, assistant_name, thread_name, is_scheduled_task):
@@ -580,21 +599,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def update_conversation_messages(self, conversation):
         self.conversation_view_clear_signal.update_signal.emit()
         self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
-
-    def add_image_to_selected_thread(self, image_path):
-        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-        attachments_dicts.append({
-            "file_name": os.path.basename(image_path),
-            "file_path": image_path,
-            "attachment_type": "image_file",
-            "tools": []  # No specific tools for images
-        })
-        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
-
-    def remove_image_from_selected_thread(self, image_path):
-        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-        attachments_dicts = [att for att in attachments_dicts if att["file_path"] != image_path]
-        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
 
     def is_realtime_assistant(self, assistant_name):
         assistant_client = self.assistant_client_manager.get_client(assistant_name)

@@ -31,9 +31,13 @@ class ConversationInputView(QTextEdit):
 
     def __init__(self, parent, main_window):
         super().__init__(parent)
-        self.main_window = main_window  # Store a reference to the main window
+        self.main_window = main_window  # reference to the main window
         self.setInitialPlaceholderText()
-        self.image_file_paths = {}  # Dictionary to track image file paths
+
+        # A list to keep track of image attachments (file paths) pasted in this text editor
+        self.pasted_attachments = []
+        # A dictionary to map file_path -> the HTML snippet inserted for that image
+        self.pasted_images_html = {}
 
     def setInitialPlaceholderText(self):
         self.setText(self.PLACEHOLDER_TEXT)
@@ -51,84 +55,72 @@ class ConversationInputView(QTextEdit):
 
         cursor = self.textCursor()
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            # Check if the cursor is positioned at an image
-            cursor_pos = cursor.position()
-            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
-            if cursor.charFormat().isImageFormat():
-                logger.debug("Image found at cursor position, deleting image...")
-                html_before = self.toHtml()
-                cursor.removeSelectedText()
-                html_after = self.toHtml()
-                self.check_for_deleted_images(html_before, html_after)
-            else:
-                # Let the parent class handle other delete/backspace operations
-                cursor.setPosition(cursor_pos)
-                super().keyPressEvent(event)
-        # Check if Enter key is pressed
-        elif event.key() == Qt.Key_Return and not event.modifiers():
-            # Call on_user_input on the main window reference
-            self.main_window.on_user_input_complete(self.toPlainText())
-            self.clear()
-        elif event.key() == Qt.Key_Enter:
-            # Call on_user_input on the main window reference
-            self.main_window.on_user_input_complete(self.toPlainText())
-            self.clear()
-        else:
-            # Let the parent class handle all other key events
+            # Save the HTML before
+            html_before = self.toHtml()
+
+            # Let the parent handle the actual deletion
             super().keyPressEvent(event)
 
+            # Compare the HTML after
+            html_after = self.toHtml()
+            self.check_for_deleted_images(html_before, html_after)
+
+        # Detect Enter/Return (no modifiers) to send the message
+        elif event.key() in (Qt.Key_Return, Qt.Key_Enter) and not (event.modifiers() & Qt.ShiftModifier):
+            user_text = self.toPlainText()
+            # Gather the pasted image file paths
+            pasted_images = list(self.pasted_attachments)
+            # Clear them out locally
+            self.pasted_attachments.clear()
+
+            self.main_window.on_user_input_complete(user_text, pasted_image_file_paths=pasted_images)
+
+            self.clear()
+        else:
+            super().keyPressEvent(event)
+
+    def get_and_clear_pasted_attachments(self):
+        images = list(self.pasted_attachments)  # make a copy
+        self.pasted_attachments.clear()
+        return images
+
     def insertFromMimeData(self, mimeData: QMimeData):
-        IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+        IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+
         if mimeData.hasImage():
             image = QImage(mimeData.imageData())
             if not image.isNull():
                 logger.debug("Inserting image from clipboard...")
                 temp_dir = tempfile.gettempdir()
-                mime_file_name = self.generate_unique_filename("image.png")
-                temp_file_path = os.path.join(temp_dir, mime_file_name)
-                image.save(temp_file_path)
-                self.add_image_thumbnail(image, temp_file_path)
-                self.main_window.add_image_to_selected_thread(temp_file_path)
+                file_name = self.generate_unique_filename("pasted_image.png")
+                temp_path = os.path.join(temp_dir, file_name)
+                image.save(temp_path)
+                self.add_image_thumbnail(image, temp_path)
+            else:
+                logger.warning("Pasted image data was null.")
         elif mimeData.hasUrls():
-            logger.debug("Inserting image from URL...")
             for url in mimeData.urls():
                 if url.isLocalFile():
-                    file_path = url.toLocalFile()
-                    logger.debug(f"Local file path: {file_path}")
-                    if file_path.lower().endswith(IMAGE_FORMATS):
-                        image = QImage(file_path)
-                        temp_dir = tempfile.gettempdir()
-                        file_name = self.generate_unique_filename(os.path.basename(file_path))
-                        temp_file_path = os.path.join(temp_dir, file_name)
-                        image.save(temp_file_path)
+                    local_path = url.toLocalFile()
+                    ext = os.path.splitext(local_path)[1].lower()
+                    if ext in IMAGE_EXTENSIONS:
+                        image = QImage(local_path)
                         if not image.isNull():
-                            self.add_image_thumbnail(image, temp_file_path)
-                            self.main_window.add_image_to_selected_thread(temp_file_path)
+                            temp_dir = tempfile.gettempdir()
+                            file_name = self.generate_unique_filename(os.path.basename(local_path))
+                            temp_path = os.path.join(temp_dir, file_name)
+                            image.save(temp_path)
+                            self.add_image_thumbnail(image, temp_path)
                         else:
-                            logger.error(f"Could not load image from file: {file_path}")
+                            logger.warning(f"Could not load image from {local_path}")
                     else:
-                        logger.warning(f"Unsupported file type: {file_path}")
-                        QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
+                        logger.info(f"Unsupported file type pasted: {local_path}")
+                        super().insertFromMimeData(mimeData)
                 else:
                     super().insertFromMimeData(mimeData)
         elif mimeData.hasText():
-            text = mimeData.text()
-            # Convert URL to local file path
-            file_url = QUrl(text)
-            if file_url.isLocalFile():
-                file_path = file_url.toLocalFile()
-                if os.path.isfile(file_path):
-                    try:
-                        with open(file_path, 'r') as file:
-                            content = file.read()
-                            self.insertPlainText(content)
-                    except Exception as e:
-                        logger.error(f"Error reading file {file_path}: {e}")
-                else:
-                    logger.error(f"File {file_path} does not exist")
-            else:
-                # If it's not a file URL, proceed with the default paste operation
-                super().insertFromMimeData(mimeData)
+            # Plain text fallback
+            super().insertFromMimeData(mimeData)
         else:
             super().insertFromMimeData(mimeData)
 
@@ -138,7 +130,7 @@ class ConversationInputView(QTextEdit):
         return unique_name
 
     def add_image_thumbnail(self, image: QImage, file_path: str):
-        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio)  # Resize to 100x100 pixels
+        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         buffer = QBuffer()
         buffer.open(QIODevice.WriteOnly)
         image_thumbnail.save(buffer, "PNG")
@@ -147,23 +139,27 @@ class ConversationInputView(QTextEdit):
         
         cursor = self.textCursor()
         cursor.insertHtml(html)
-        self.image_file_paths[file_path] = html
+        self.pasted_images_html[file_path] = html
+        if file_path not in self.pasted_attachments:
+            self.pasted_attachments.append(file_path)
 
     def check_for_deleted_images(self, html_before: str, html_after: str):
         soup_before = BeautifulSoup(html_before, 'html.parser')
         soup_after = BeautifulSoup(html_after, 'html.parser')
 
-        file_paths_before = {img['alt'] for img in soup_before.find_all('img') if 'alt' in img.attrs}
-        file_paths_after = {img['alt'] for img in soup_after.find_all('img') if 'alt' in img.attrs}
+        file_paths_before = {img.get('alt', '') for img in soup_before.find_all('img')}
+        file_paths_after = {img.get('alt', '') for img in soup_after.find_all('img')}
 
         # Identify which images are missing
         missing_file_paths = file_paths_before - file_paths_after
+        if missing_file_paths:
+            logger.debug(f"User removed images: {missing_file_paths}")
 
-        # Remove missing images from tracked paths and attachments
         for file_path in missing_file_paths:
-            if file_path in self.image_file_paths:
-                del self.image_file_paths[file_path]
-                self.main_window.remove_image_from_selected_thread(file_path)
+            if file_path in self.pasted_images_html:
+                del self.pasted_images_html[file_path]
+            if file_path in self.pasted_attachments:
+                self.pasted_attachments.remove(file_path)
 
     def mouseReleaseEvent(self, event):
         cursor = self.cursorForPosition(event.pos())
