@@ -4,6 +4,11 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
+import os
+import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
@@ -43,11 +48,7 @@ from gui.signals import (
     ConversationAppendMessagesSignal,
     ConversationAppendImageSignal
 )
-from gui.utils import init_system_assistant
-
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import os, time, json
+from gui.utils import init_system_assistant, get_ai_client
 
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -287,44 +288,22 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if self.assistants_menu is not None:
             self.assistants_menu.update_client_type(new_client_type)  # Update the menu for the new client type
 
-        client = None
-        try:
-            if self.active_ai_client_type == AIClientType.AZURE_OPEN_AI:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI
-                )
-            elif self.active_ai_client_type == AIClientType.OPEN_AI:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI
-                )
-            elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI_REALTIME
-                )
-            elif self.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI_REALTIME
-                )
-            elif self.active_ai_client_type == AIClientType.AZURE_AI_AGENT:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_AI_AGENT
-                )
-                subscription_id = client.scope["subscription_id"]
-                resource_group = client.scope["resource_group_name"]
-                self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
-                self.azure_logic_app_manager.initialize_logic_apps(trigger_name="When_a_HTTP_request_is_received")
-        except Exception as e:
-            logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
+        client = get_ai_client(new_client_type)
+        if client is None:
+            message = f"{new_client_type.name} assistant client not initialized properly, check the API keys"
+            self.status_messages['ai_client_type'] = f'<span style="color: red;">{message}</span>'
+            self.update_client_label()
+            return
 
-        finally:
-            if client is None:
-                message = f"{self.active_ai_client_type.name} assistant client not initialized properly, check the API keys"
-                self.status_messages['ai_client_type'] = f'<span style="color: red;">{message}</span>'
-                self.update_client_label()
-            else:
-                message = ""
-                self.status_messages['ai_client_type'] = message
-                self.update_client_label()
+        # If it's an AZURE_AI_AGENT, set up Azure Logic App, TODO: move this to Functions menu
+        if self.active_ai_client_type == AIClientType.AZURE_AI_AGENT:
+            subscription_id = client.scope["subscription_id"]
+            resource_group = client.scope["resource_group_name"]
+            self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
+            self.azure_logic_app_manager.initialize_logic_apps(trigger_name="When_a_HTTP_request_is_received")
+
+        self.status_messages['ai_client_type'] = ""
+        self.update_client_label()
 
     def update_client_label(self):
         if hasattr(self, 'active_client_label'):
