@@ -509,6 +509,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_attachments_from_ui_to_thread(self, thread_client : ConversationThreadClient, thread_id, attachments_dicts):
+        if not attachments_dicts:
+            return
         # Synchronize the thread configuration and cloud client for deleted attachments
         existing_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
         all_attachment_file_ids = [att["file_id"] for att in attachments_dicts]
