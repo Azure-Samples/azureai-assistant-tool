@@ -247,6 +247,7 @@ class ConversationView(QWidget):
         self.inputField = ConversationInputView(self, self.main_window)
         self.inputField.setAcceptRichText(False)  # Accept only plain text
         self.inputField.setFixedHeight(100)  # Set an initial height
+        self.inputField.setToolTip("Type a message or paste an image here for the assistant.")
         self.inputField.setFont(QFont("Arial", 11))
 
         self.layout.addWidget(self.conversationView)

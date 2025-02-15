@@ -549,7 +549,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         local_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
         existing_file_ids = {att.file_id for att in local_thread_attachments}
         new_attachments = []
-        for att_dict in attachments_dicts:
+        for att_dict in attachments_dicts if attachments_dicts else []:
             if att_dict["file_id"] not in existing_file_ids:
                 new_attachment = Attachment.from_dict(att_dict)
                 new_attachments.append(new_attachment)
