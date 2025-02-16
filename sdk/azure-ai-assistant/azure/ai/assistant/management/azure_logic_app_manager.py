@@ -32,6 +32,7 @@ class AzureLogicAppManager:
         self._logic_app_callback_urls: Dict[str, str] = {}
         # Set to cache logic app names
         self._logic_app_names: set[str] = set()
+        self._initialized = False
 
     @classmethod
     def get_instance(cls, subscription_id: str = None, resource_group: str = None) -> 'AzureLogicAppManager':
@@ -52,19 +53,14 @@ class AzureLogicAppManager:
 
     def list_logic_apps(self) -> List[str]:
         """
-        Lists all the Logic Apps (workflows) in the specified resource group.
-        Stores the names in an internal set to avoid duplicates.
-        Each name is suffixed with "(HTTP Trigger)" as an indicator.
+        If the manager is not yet initialized, returns an empty list.
+        Otherwise, returns a sorted list of the Logic App names with (HTTP Trigger) suffix.
         
-        :return: A list of logic app names.
+        :return: A list of logic app names, or an empty list if not initialized.
         """
-        try:
-            workflows = self.logic_client.workflows.list_by_resource_group(self.resource_group)
-            for workflow in workflows:
-                self._logic_app_names.add(workflow.name)
-        except Exception as e:
-            logger.error(f"Error listing logic apps: {e}")
-        # Return a sorted list with the (HTTP Trigger) suffix.
+        if not self._initialized:
+            logger.warning("list_logic_apps was called before initialize_logic_apps. Returning empty list.")
+            return []
         return sorted([f"{name} (HTTP Trigger)" for name in self._logic_app_names])
 
     def register_logic_app(self, logic_app_name: str, trigger_name: str) -> None:
@@ -98,19 +94,25 @@ class AzureLogicAppManager:
     def initialize_logic_apps(self, trigger_name: str = "manual") -> None:
         """
         Initializes the Logic App manager by listing all available Logic Apps
-        and registering each one using the provided trigger name.
+        in the resource group and registering each one with the specified trigger.
+        Sets the _initialized flag on successful completion.
         
         :param trigger_name: The trigger name to use for registration (default is "manual").
         """
-        # List all Logic Apps; this updates the internal cache _logic_app_names.
-        apps = self.list_logic_apps()
-        # The returned names have the suffix; remove it to get the actual app name
-        for full_name in apps:
-            app_name = full_name.replace(" (HTTP Trigger)", "")
-            try:
-                self.register_logic_app(app_name, trigger_name)
-            except Exception as e:
-                logger.error(f"Failed to register Logic App '{app_name}': {e}")
+        try:
+            workflows = self.logic_client.workflows.list_by_resource_group(self.resource_group)
+            for workflow in workflows:
+                self._logic_app_names.add(workflow.name)
+                try:
+                    self.register_logic_app(workflow.name, trigger_name)
+                except Exception as register_ex:
+                    logger.error(f"Failed to register Logic App '{workflow.name}': {register_ex}")
+            
+            # Mark as initialized once listing/registration is done
+            self._initialized = True
+            logger.info("Logic Apps have been successfully initialized.")
+        except Exception as e:
+            logger.error(f"Error during initialize_logic_apps: {e}")
 
     def get_callback_url(self, logic_app_name: str) -> Optional[str]:
         """
@@ -135,7 +137,7 @@ class AzureLogicAppManager:
             raise ValueError(f"Logic App '{logic_app_name}' has not been registered with a callback URL.")
         response = requests.post(url=callback_url, json=payload)
         if response.ok:
-            return {"result": f"Successfully invoked {logic_app_name}."}
+            return response.json()
         else:
             return {
                 "error": f"Error invoking {logic_app_name} ({response.status_code}): {response.text}"

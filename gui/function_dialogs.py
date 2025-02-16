@@ -100,8 +100,12 @@ class CreateFunctionDialog(QDialog):
         selector_layout = QHBoxLayout()
 
         self.azureLogicAppSelector = QComboBox(self)
-        self.azureLogicAppSelector.addItems(self.list_logic_app_names())
         selector_layout.addWidget(self.azureLogicAppSelector, stretch=3)
+
+        self.loadAzureLogicAppsButton = QPushButton("Load", self)
+        self.loadAzureLogicAppsButton.clicked.connect(self.load_azure_logic_apps)
+        self.loadAzureLogicAppsButton.setFixedWidth(100)
+        selector_layout.addWidget(self.loadAzureLogicAppsButton, stretch=1)
 
         self.viewLogicAppDetailsButton = QPushButton("Details..", self)
         self.viewLogicAppDetailsButton.clicked.connect(self.open_logic_app_details_dialog)
@@ -133,6 +137,10 @@ class CreateFunctionDialog(QDialog):
         self.azureUserFunctionSpecEdit.clear()
         self.azureUserFunctionImplEdit.clear()
 
+    def load_azure_logic_apps(self):
+        self.azureLogicAppSelector.clear()
+        self.azureLogicAppSelector.addItems(self.list_logic_app_names())
+
     def open_logic_app_details_dialog(self):
         from PySide6.QtWidgets import QMessageBox
         try:
@@ -155,8 +163,10 @@ class CreateFunctionDialog(QDialog):
     def list_logic_app_names(self) -> List[str]:
         names = []
         try:
-            azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
-            names = azure_manager.list_logic_apps()
+            if hasattr(self.main_window, 'azure_logic_app_manager'):
+                azure_manager: AzureLogicAppManager = self.main_window.azure_logic_app_manager
+                azure_manager.initialize_logic_apps(trigger_name="When_a_HTTP_request_is_received")
+                names = azure_manager.list_logic_apps()
         except Exception as e:
             logger.error(f"Error listing logic apps: {e}")
         return names

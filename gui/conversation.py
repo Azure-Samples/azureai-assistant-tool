@@ -177,29 +177,27 @@ class ConversationInputView(QTextEdit):
 class ClickableTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent
+        self.parent_widget = parent  # if you need back‐references
 
     def mousePressEvent(self, event: QMouseEvent):
-        cursor = self.cursorForPosition(event.pos())
-        pos = cursor.position()
-        text = self.toPlainText()
+        # Only process left‐button clicks for links
+        if event.button() == Qt.LeftButton:
+            # Find the character position under the mouse
+            cursor = self.cursorForPosition(event.pos())
+            char_format = cursor.charFormat()
 
-        text_to_url_map = self.parent.get_text_to_url_map()
-        cursor.select(QTextCursor.BlockUnderCursor)  # Select the entire line (block) of text
-        line_text = cursor.selectedText()
-
-        # Check if the click is on a link in this line
-        if line_text.strip() in text_to_url_map.keys():
-            # get the path from map
-            file_path = text_to_url_map[line_text.strip()]["path"]
-            self.open_file(file_path)
-
-        # Handle regular HTTP URLs
-        for url, start, end in self.find_urls(text):
-            if start <= pos <= end:
-                QDesktopServices.openUrl(QUrl(url))
+            # If there's an HTML anchor (href) at this position, open it
+            href = char_format.anchorHref()
+            if href:
+                if href.startswith("http://") or href.startswith("https://"):
+                    QDesktopServices.openUrl(QUrl(href))
+                else:
+                    # Otherwise treat it as a local file path
+                    self.open_file(href)
+                # Stop further text‐edit handling of this mouse press
                 return
 
+        # If no anchor was found, let the parent class handle normal text selection, etc.
         super().mousePressEvent(event)
 
     def open_file(self, file_path):
@@ -209,11 +207,6 @@ class ClickableTextEdit(QTextEdit):
             os.startfile(file_path)
         elif sys.platform.startswith('darwin'):
             subprocess.call(["open", file_path])
-
-    def find_urls(self, text):
-        url_pattern = r'\b(https?://[^\s)]+)'
-        for match in re.finditer(url_pattern, text):
-            yield (match.group(1), match.start(1), match.end(1))
 
 
 class ConversationView(QWidget):
@@ -375,8 +368,8 @@ class ConversationView(QWidget):
                     formatted_code = f"<pre class='code-block'>{escaped_code}</pre>"
                     html_content += formatted_code
                 else:
-                    text = self.format_file_links(text)
-                    text = self.format_urls(text)
+                    text = self.format_links(text)
+                    #text = self.format_urls(text)
                     formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{text}</span>"
                     html_content += formatted_text
                 html_content += "<br>"
@@ -470,59 +463,71 @@ class ConversationView(QWidget):
         # Substitute URLs in the text with HTML anchor tags.
         return url_pattern.sub(replace_with_link, text)
 
-    def format_file_links(self, text):
-        # 1) Build a map from citation index to filename (for lines like "[0] something.png")
+    def format_links(self, text):
         citation_to_filename = {}
         citation_pattern = re.compile(r'\[(\d+)\]\s*(\S+)')  # e.g. [0] file.png
         for index, filename in citation_pattern.findall(text):
             citation_to_filename[index] = filename
 
-        # 2) Pattern to find bracketed links of the form [some text](some link)
         link_pattern = re.compile(r'\[([^\]]+)\]\(([^\)]+)\)')
 
         def replace_with_clickable_text(match):
-            link_text = match.group(1).strip()  # e.g. "Download my_image.png"
-            link_target = match.group(2).strip()  # either "[0]" or "my_image.png"
+            link_text = match.group(1).strip()
+            link_target = match.group(2).strip()
 
-            # If link_target is of the form "[N]", look up the actual filename from citation_to_filename
+            # 1) Strip off leading/trailing quotes
+            link_target = link_target.strip('"').strip("'")
+
+            # 2) Split on the first space/quote so any trailing HTML attributes are discarded.
+            link_target = re.split(r'\s|["\']', link_target, maxsplit=1)[0]
+
+            # External URL check:
+            if link_target.startswith("http://") or link_target.startswith("https://"):
+                return (
+                    f'<a href="{link_target}" target="_blank" '
+                    f'style="color:blue; text-decoration: underline;">{link_text}</a>'
+                )
+
+            # Otherwise, treat it as a local file reference/citation:
             index_match = re.match(r'^\[(\d+)\]$', link_target)
             if index_match:
                 citation_index = index_match.group(1)
                 file_name = citation_to_filename.get(citation_index)
             else:
-                # Otherwise, assume it's a direct filename/path
                 file_name = link_target
 
             if file_name:
-                # Normalize to get a local file path
                 local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))
 
-                # Prevent collisions in self.text_to_url_map
+                # Use a link_text that is unique in self.text_to_url_map:
                 final_link_text = link_text
                 if final_link_text in self.text_to_url_map:
                     final_link_text = f"{final_link_text} {len(self.text_to_url_map) + 1}"
 
-                # Store the path
                 self.text_to_url_map[final_link_text] = {"path": local_file_path}
 
-                # Return clickable HTML
+                # Render a simpler link with optional file path as a tooltip.
                 return (
-                    f'<div style="display: inline-block;">'
                     f'<a href="{local_file_path}" '
                     f'style="color:green; text-decoration: underline;" '
-                    f'download="{file_name}">{final_link_text}</a></div>'
-                    f'<div style="display: inline-block; color:gray;">{local_file_path}</div>'
+                    f'download="{file_name}" '
+                    f'title="{local_file_path}">'
+                    f'{final_link_text}'
+                    f'</a>'
                 )
 
-            # If no filename found (should be rare), return the original text unmodified
+            # If we failed to find the file, just return the original match:
             return match.group(0)
 
-        # 3) Replace bracketed links with clickable HTML
         updated_text = link_pattern.sub(replace_with_clickable_text, text)
 
-        # 4) Remove leftover citation lines (like "[0] file.png")
-        #    Adjust the extension pattern if you support other file types:
-        updated_text = re.sub(r'\[\d+\]\s*\S+\.(png|jpg|jpeg|gif|bmp)', '', updated_text, flags=re.IGNORECASE)
+        # Remove leftover [N] file references
+        updated_text = re.sub(
+            r'\[\d+\]\s*\S+\.(png|jpg|jpeg|gif|bmp)',
+            '',
+            updated_text,
+            flags=re.IGNORECASE
+        )
 
         return updated_text
 
