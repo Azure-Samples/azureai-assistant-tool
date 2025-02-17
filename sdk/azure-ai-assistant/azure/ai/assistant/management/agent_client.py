@@ -500,6 +500,27 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Error occurred during processing messages: {e}")
             raise EngineError(f"Error occurred during processing messages: {e}")
 
+    def get_run_steps(self, thread_name: str, run_id: str, timeout: Optional[float] = None) -> List[dict]:
+        """
+        Retrieves the steps of a run in a thread.
+
+        :param thread_name: The name of the thread to get the run steps from.
+        :param run_id: The ID of the run to get the steps from.
+        :param timeout: The HTTP request timeout in seconds.
+
+        :return: The steps of the run.
+        :rtype: List[dict]
+        """
+        threads_config: ConversationThreadConfig = self._conversation_thread_client.get_config()
+        thread_id = threads_config.get_thread_id_by_name(thread_name)
+
+        try:
+            run_steps = self._ai_client.agents.list_run_steps(thread_id=thread_id, run_id=run_id)
+            return run_steps.data
+        except Exception as e:
+            logger.error(f"Failed to retrieve run steps for run {run_id}: {e}")
+            raise EngineError(f"Failed to retrieve run steps for run {run_id}: {e}")
+
     def _process_messages_non_streaming(
             self,
             thread_name: str,

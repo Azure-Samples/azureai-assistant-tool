@@ -494,7 +494,11 @@ class ConversationView(QWidget):
                 citation_index = index_match.group(1)
                 file_name = citation_to_filename.get(citation_index)
             else:
-                file_name = re.sub(r'^sandbox:[/\\]mnt[/\\]data[/\\]?', '', link_target)
+                # Remove any leading "sandbox:/mnt/data/" or just "sandbox:/"
+                # This covers both cases like:
+                #   sandbox:/mnt/data/generated_image_123.png
+                #   sandbox:/generated_image_123.png
+                file_name = re.sub(r'^sandbox:[/\\](?:mnt[/\\]data[/\\])?', '', link_target)
 
             if file_name:
                 local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))

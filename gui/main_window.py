@@ -7,6 +7,7 @@
 import os
 import json
 import threading
+from typing import List
 from concurrent.futures import ThreadPoolExecutor
 
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout
@@ -662,29 +663,102 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "Run cancelled")
 
-    def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
+    def on_run_end(self, assistant_name: str, run_identifier: str, run_end_time: str, thread_name: str):
         logger.info(f"Run end for assistant {assistant_name} with run identifier {run_identifier} and thread name {thread_name}")
 
         self.handle_realtime_run_end(assistant_name, run_identifier)
-
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
+        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(
+            thread_name, timeout=self.connection_timeout
+        )
         last_assistant_message = conversation.get_last_text_message(assistant_name)
         if last_assistant_message is None:
-            logger.error(
-                f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'. Aborting run end process."
+            logger.error(f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'.")
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(
+                assistant_name,
+                run_identifier,
+                run_end_time,
+                "No message found. Possibly a rate-limiting issue."
             )
-            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
-                             "Please check Diagnostics for more detailed information and troubleshooting steps.")
         else:
-            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(
+                assistant_name,
+                run_identifier,
+                run_end_time,
+                last_assistant_message.content
+            )
 
-        # copy files from conversation to output folder at the end of the run
+        # Download any files from conversation at run-end
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         for message in conversation.messages:
-            if len(message.file_messages) > 0:
-                for file_message in message.file_messages:
-                    file_path = file_message.retrieve_file(assistant_config.output_folder_path)
-                    logger.debug(f"File downloaded to {file_path} on run end")
+            for file_message in message.file_messages:
+                file_path = file_message.retrieve_file(assistant_config.output_folder_path)
+                logger.debug(f"File downloaded to {file_path} on run end")
+
+        # Retrieve steps from the active client, parse them, then emit them to the DiagnosticsSidebar when the run ends.
+        try:
+            # Get run steps from whichever client is active
+            steps_data = self.get_run_steps(
+                assistant_name=assistant_name,
+                run_identifier=run_identifier,
+                thread_name=thread_name
+            )
+
+            if steps_data:
+                # Send them to the DiagnosticsSidebar
+                # This will cause the “Steps” tree node + sub-items to appear
+                self.diagnostics_sidebar.add_run_steps_signal.steps_signal.emit(run_identifier, steps_data)
+
+        except Exception as e:
+            logger.error(f"Could not retrieve steps for run {run_identifier}: {e}")
+
+    def get_run_steps(self, assistant_name: str, run_identifier: str, thread_name: str) -> List[dict]:
+        client = self.assistant_client_manager.get_client(assistant_name)
+
+        if not hasattr(client, "get_run_steps"):
+            logger.debug(f"Assistant client {assistant_name} does not support run steps retrieval.")
+            return []
+
+        raw_steps = client.get_run_steps(thread_name, run_identifier, timeout=self.connection_timeout)
+
+        steps_data = []
+        for step_obj in raw_steps:
+            tool_calls_list = []
+
+            # If step type == "tool_calls", we pull out the list of calls
+            if step_obj.type.lower() == "tool_calls" and hasattr(step_obj, "step_details"):
+                step_details_dict = getattr(step_obj, "step_details", {}) or {}
+                maybe_tool_calls = step_details_dict.get("tool_calls", [])
+
+                for call in maybe_tool_calls:
+                    # Every call at least has "id" and "type"
+                    tool_call_entry = {
+                        "id":  call.get("id", ""),
+                        "type": call.get("type", "")
+                    }
+
+                    # Depending on tool-call type, we read different fields
+                    call_type = tool_call_entry["type"].lower()
+                    if call_type in ("openapi", "function"):
+                        function_dict = call.get("function", {})
+                        tool_call_entry["function_name"] = function_dict.get("name", "")
+                        tool_call_entry["arguments"] = function_dict.get("arguments", "")
+                    elif call_type == "azure_ai_search":
+                        azure_ai_search_dict = call.get("azure_ai_search", {})
+                        tool_call_entry["azure_ai_search_input"] = azure_ai_search_dict.get("input", "")
+                        tool_call_entry["azure_ai_search_output"] = azure_ai_search_dict.get("output", "")
+                    else:
+                        logger.warning(f"Unknown tool call type for run steps: {call_type}, all data not stored: {call}")
+
+                    tool_calls_list.append(tool_call_entry)
+
+            single_step = {
+                "id": step_obj.id,
+                "status": step_obj.status,
+                "tool_calls": tool_calls_list,
+            }
+            steps_data.append(single_step)
+
+        return steps_data
 
     def on_run_audio_data(self, assistant_name, run_identifier, audio_data):
         if self.is_realtime_assistant(assistant_name):
