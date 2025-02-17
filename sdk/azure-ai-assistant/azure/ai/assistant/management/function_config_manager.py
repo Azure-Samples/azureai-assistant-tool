@@ -49,6 +49,7 @@ class FunctionConfigManager:
             self._config_folder = config_folder
         self.load_function_configs()
         self.load_function_error_specs()
+        self.load_openapi_functions()
 
     @staticmethod
     def _default_config_path() -> str:
@@ -646,6 +647,94 @@ class FunctionConfigManager:
         pattern = fr'def {re.escape(function_name)}\('
         match = re.search(pattern, code)
         return bool(match)
+
+    def load_openapi_functions(self) -> None:
+        """
+        Loads OpenAPI definitions from "openapi_functions.json" into memory.
+        Stores them in self._openapi_functions as a list of dicts, each like:
+            {
+               "type": "openapi",
+               "openapi": {
+                   "name": "...",
+                   "description": "...",
+                   "spec": {...}
+               },
+               "auth": {
+                   "type": "anonymous|connection|managed_identity"
+               }
+            }
+        """
+        self._openapi_functions = []
+        openapi_file_path = Path(self._config_folder) / "openapi_functions.json"
+        if openapi_file_path.exists():
+            try:
+                with open(openapi_file_path, 'r') as f:
+                    self._openapi_functions = json.load(f)
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON in '{openapi_file_path}'.")
+            except Exception as e:
+                logger.error(f"Error loading OpenAPI definitions: {e}")
+        else:
+            logger.info(f"No 'openapi_functions.json' found at {openapi_file_path}. Starting with empty list.")
+
+    def get_all_openapi_functions(self) -> list:
+        """
+        Returns the list of all loaded OpenAPI definitions as raw dicts.
+        """
+        return self._openapi_functions
+
+    def save_openapi_function(self, openapi_dict: dict) -> None:
+        """
+        Creates or updates an OpenAPI definition in "openapi_functions.json".
+        If an entry with the same openapi['name'] exists, this updates it;
+        otherwise, it appends a new entry.
+        """
+        if "openapi" not in openapi_dict:
+            raise EngineError("Invalid OpenAPI definition: Missing 'openapi' block.")
+        name_to_save = openapi_dict["openapi"].get("name")
+        if not name_to_save:
+            raise EngineError("Invalid OpenAPI definition: Missing 'openapi.name'.")
+
+        updated = False
+        for i, entry in enumerate(self._openapi_functions):
+            existing_name = entry.get("openapi", {}).get("name")
+            if existing_name == name_to_save:
+                self._openapi_functions[i] = openapi_dict
+                updated = True
+                break
+        if not updated:
+            self._openapi_functions.append(openapi_dict)
+
+        self._write_openapi_functions_to_file()
+
+    def delete_openapi_function(self, name: str) -> bool:
+        """
+        Removes an OpenAPI function by name from self._openapi_functions.
+        Returns True if found and removed, False if no matching entry exists.
+        """
+        found = False
+        for i, entry in enumerate(self._openapi_functions):
+            openapi_name = entry.get("openapi", {}).get("name")
+            if openapi_name == name:
+                del self._openapi_functions[i]
+                found = True
+                break
+
+        # If we removed something, persist the changes:
+        if found:
+            self._write_openapi_functions_to_file()
+
+        return found
+
+    def _write_openapi_functions_to_file(self) -> None:
+        openapi_file_path = Path(self._config_folder) / "openapi_functions.json"
+        try:
+            with open(openapi_file_path, 'w') as f:
+                json.dump(self._openapi_functions, f, indent=4)
+            logger.info(f"Saved OpenAPI definitions to {openapi_file_path}")
+        except Exception as e:
+            logger.error(f"Could not write to {openapi_file_path}: {e}")
+            raise EngineError(f"Could not save OpenAPI definitions: {e}")
 
     @staticmethod
     def get_function_spec_template() -> str:

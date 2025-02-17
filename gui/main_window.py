@@ -58,7 +58,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.status_messages = {
             'ai_client_type': ''
         }
-        self.connection_timeout : float = 90.0
+        self.connection_timeout : float = 360.0
         self.use_system_assistant_for_thread_name : bool = False
         self.use_streaming_for_assistant : bool = True
         self.active_ai_client_type = None
