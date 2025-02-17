@@ -8,7 +8,7 @@ import json
 import threading
 from typing import List
 
-from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox
+from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox, QFrame, QFormLayout
 from PySide6.QtCore import Qt
 
 from azure.ai.assistant.management.ai_client_type import AIClientType
@@ -62,12 +62,12 @@ class CreateFunctionDialog(QDialog):
         if (getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT and
             hasattr(self.main_window, 'azure_logic_app_manager')):
             self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
-            self.tabs.addTab(self.azureLogicAppsTab, "Azure Logic Apps")
+            self.tabs.addTab(self.azureLogicAppsTab, "Azure Logic App Functions")
 
         # Add OpenAPI tab if we are in an agent mode 
         if getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT:
             self.openapiTab = self.create_openapi_tab()
-            self.tabs.addTab(self.openapiTab, "OpenAPI")
+            self.tabs.addTab(self.openapiTab, "OpenAPI Functions")
 
         mainLayout.addWidget(self.tabs)
 
@@ -123,20 +123,71 @@ class CreateFunctionDialog(QDialog):
         main_layout.addWidget(desc_label)
         main_layout.addWidget(self.openapiDescriptionEdit)
 
-        # Auth
+        # Auth Type
         auth_label = QLabel("Auth Type:")
         self.openapiAuthSelector = QComboBox()
         self.openapiAuthSelector.addItems(["anonymous", "connection", "managed_identity"])
         main_layout.addWidget(auth_label)
         main_layout.addWidget(self.openapiAuthSelector)
 
-        # Raw JSON text for the spec
+        # Create a form area to hold authentication details (Connection ID / Audience)
+        self.auth_details_frame = QFrame()
+        self.auth_details_layout = QFormLayout(self.auth_details_frame)
+        
+        # Connection ID fields
+        self.connection_id_label = QLabel("Connection ID:")
+        self.connection_id_edit = QLineEdit()
+        self.auth_details_layout.addRow(self.connection_id_label, self.connection_id_edit)
+        
+        # Audience fields (for managed identity)
+        self.audience_label = QLabel("Audience:")
+        self.audience_edit = QLineEdit()
+        self.auth_details_layout.addRow(self.audience_label, self.audience_edit)
+        
+        # By default, hide the details fields
+        self.connection_id_label.hide()
+        self.connection_id_edit.hide()
+        self.audience_label.hide()
+        self.audience_edit.hide()
+
+        main_layout.addWidget(self.auth_details_frame)
+
+        # Connect the combo box signal to show/hide the relevant auth detail fields
+        self.openapiAuthSelector.currentIndexChanged.connect(self.on_auth_type_changed)
+
+        # Raw JSON text for the spec, with tooltip
         self.openapiSpecEdit = self.create_text_edit()
+        self.openapiSpecEdit.setToolTip(
+            "Tip: You can test your OpenAPI schema with https://swagger.io/tools/swagger-editor/"
+            " before using this tool."
+        )
         openapiSpecWidget = self.create_text_edit_labeled("OpenAPI Specification:", self.openapiSpecEdit)
         main_layout.addWidget(openapiSpecWidget)
 
         return tab
 
+    def on_auth_type_changed(self, index):
+        auth_type = self.openapiAuthSelector.currentText()
+        
+        if auth_type == "connection":
+            # Show connection ID fields, hide audience
+            self.connection_id_label.show()
+            self.connection_id_edit.show()
+            self.audience_label.hide()
+            self.audience_edit.hide()
+        elif auth_type == "managed_identity":
+            # Show audience fields, hide connection
+            self.connection_id_label.hide()
+            self.connection_id_edit.hide()
+            self.audience_label.show()
+            self.audience_edit.show()
+        else:  # "anonymous"
+            # Hide both connection ID and audience fields
+            self.connection_id_label.hide()
+            self.connection_id_edit.hide()
+            self.audience_label.hide()
+            self.audience_edit.hide()
+    
     def load_openapi_functions(self):
         self.openapiSelector.clear()
         self.openapiSelector.addItem("New OpenAPI Function", None)
@@ -174,6 +225,10 @@ class CreateFunctionDialog(QDialog):
                 if index >= 0:
                     self.openapiAuthSelector.setCurrentIndex(index)
 
+                security_scheme = auth_data.get("security_scheme", {})
+                self.connection_id_edit.setText(security_scheme.get("connection_id", ""))
+                self.audience_edit.setText(security_scheme.get("audience", ""))
+
                 # Spec (convert dict to JSON text)
                 spec_dict = openapi_data.get("spec", {})
                 spec_text = json.dumps(spec_dict, indent=4)
@@ -184,11 +239,15 @@ class CreateFunctionDialog(QDialog):
                 self.openapiNameEdit.clear()
                 self.openapiDescriptionEdit.clear()
                 self.openapiSpecEdit.clear()
+                self.connection_id_edit.clear()
+                self.audience_edit.clear()
         else:
             # "New OpenAPI Function" selected or no data
             self.openapiNameEdit.clear()
             self.openapiDescriptionEdit.clear()
             self.openapiSpecEdit.clear()
+            self.connection_id_edit.clear()
+            self.audience_edit.clear()
             self.openapiAuthSelector.setCurrentIndex(0)  # default to "anonymous", for example
 
     def save_openapi_function(self):
@@ -196,6 +255,8 @@ class CreateFunctionDialog(QDialog):
         name_val = self.openapiNameEdit.text().strip()
         desc_val = self.openapiDescriptionEdit.text().strip()
         auth_val = self.openapiAuthSelector.currentText()
+        connection_id_val = self.connection_id_edit.text().strip()
+        audience_val = self.audience_edit.text().strip()
         raw_spec = self.openapiSpecEdit.toPlainText().strip()
 
         if not name_val:
@@ -223,6 +284,18 @@ class CreateFunctionDialog(QDialog):
                 "type": auth_val
             }
         }
+
+        # If the user chose "connection" or "managed_identity", store the respective security_scheme details
+        if auth_val == "connection":
+            openapi_data["auth"]["security_scheme"] = {"connection_id": connection_id_val}
+            if not connection_id_val:
+                QMessageBox.warning(self, "Error", "Connection ID is required for 'connection' auth type.")
+                return
+        elif auth_val == "managed_identity":
+            openapi_data["auth"]["security_scheme"] = {"audience": audience_val}
+            if not audience_val:
+                QMessageBox.warning(self, "Error", "Audience is required for 'managed_identity' auth type.")
+                return
 
         # Pass this object to our manager to handle creation/update in openapi_functions.json
         try:
