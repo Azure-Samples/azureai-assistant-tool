@@ -494,7 +494,7 @@ class ConversationView(QWidget):
                 citation_index = index_match.group(1)
                 file_name = citation_to_filename.get(citation_index)
             else:
-                file_name = link_target
+                file_name = re.sub(r'^sandbox:[/\\]mnt[/\\]data[/\\]?', '', link_target)
 
             if file_name:
                 local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))

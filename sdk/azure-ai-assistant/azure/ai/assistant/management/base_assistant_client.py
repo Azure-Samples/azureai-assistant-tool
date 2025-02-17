@@ -191,9 +191,15 @@ class BaseAssistantClient:
 
         try:
             for func_spec in assistant_config.functions:
-                logger.info(f"Loading selected function: {func_spec['function']['name']}")
+                function_type = func_spec.get("type")
+                if function_type == "openapi":
+                    logger.debug(f"Skip loading of OpenAPI functions.")
+                    continue
+
                 function_name = func_spec["function"]["name"]
                 module_name = func_spec["function"].get("module", "default.module.path")
+
+                logger.info(f"Loading selected function: {function_name}")
 
                 # Check if it is a system function
                 if function_name in system_functions:
@@ -204,7 +210,9 @@ class BaseAssistantClient:
                 else:
                     logger.error(f"Invalid module name: {module_name}")
                     raise EngineError(f"Invalid module name: {module_name}")
-                self._functions = functions
+
+            self._functions = functions
+
         except Exception as e:
             logger.error(f"Error loading selected functions for assistant: {e}")
             raise EngineError(f"Error loading selected functions for assistant: {e}")

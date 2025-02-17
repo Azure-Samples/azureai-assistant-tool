@@ -5,7 +5,7 @@ import json
 import time
 import yaml
 import copy
-from typing import Optional
+from typing import Optional, List, Tuple
 from datetime import datetime
 
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
@@ -18,7 +18,7 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
-from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources
+from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources, OpenApiTool, OpenApiAnonymousAuthDetails
 
 
 class AgentClient(BaseAssistantClient):
@@ -767,10 +767,53 @@ class AgentClient(BaseAssistantClient):
         self,
         assistant_config: AssistantConfig,
         tool_resources: Optional[dict]
-    ) -> tuple[list[dict], ToolResources]:
+    ) -> Tuple[List[dict], Optional["ToolResources"]]:
 
         tools = []
         resources = {}
+        standard_functions = []
+        openapi_functions = []
+
+        for f_spec in assistant_config.functions:
+            f_type = f_spec.get("type")
+            if f_type == "openapi":
+                openapi_functions.append(f_spec)
+            else:
+                standard_functions.append(f_spec)
+
+        # Build an OpenApiTool and add its definitions
+        openapi_tool = None
+        for idx, f_spec in enumerate(openapi_functions):
+            openapi_data = f_spec.get("openapi", {})
+            function_name = openapi_data.get("name", "openapi_function")
+            description = openapi_data.get("description", f"OpenAPI function {function_name}")
+
+            # Parse auth config, TODO: add more auth types
+            auth_config = f_spec.get("auth", {})
+            auth = OpenApiAnonymousAuthDetails()
+
+            if idx == 0:
+                # For the first OpenAPI function, create the primary OpenApiTool
+                openapi_tool = OpenApiTool(
+                    name=function_name,
+                    spec=openapi_data.get("spec", {}),
+                    description=description,
+                    auth=auth
+                )
+            else:
+                # For subsequent OpenAPI functions, add them as definitions to the same tool
+                openapi_tool.add_definition(
+                    name=function_name,
+                    spec=openapi_data.get("spec", {}),
+                    description=description,
+                    auth=auth
+                )
+
+        # If we found any OpenAPI functions, merge that one tool’s definitions
+        if openapi_tool is not None:
+            tools.extend(openapi_tool.definitions)
+
+        # Handle the standard “tool_resources” (Code Interpreter, etc.)
         if tool_resources is not None:
             # Code Interpreter Tool
             if "code_interpreter" in tool_resources:
@@ -779,6 +822,7 @@ class AgentClient(BaseAssistantClient):
                 code_interpreter_tool = CodeInterpreterTool(file_ids=file_ids)
                 tools.extend(code_interpreter_tool.definitions)
                 resources = code_interpreter_tool.resources
+
             # File Search Tool
             if "file_search" in tool_resources:
                 fs_data = tool_resources["file_search"]
@@ -787,24 +831,24 @@ class AgentClient(BaseAssistantClient):
                 tools.extend(file_search_tool.definitions)
                 resources.update(file_search_tool.resources)
         else:
-            # if code interpreter is enabled without tool resources, include an empty CodeInterpreterTool.
+            # If code interpreter is enabled without tool_resources
             if assistant_config.code_interpreter:
                 code_interpreter_tool = CodeInterpreterTool()
                 tools.extend(code_interpreter_tool.definitions)
                 resources = code_interpreter_tool.resources
 
-        # if functions are enabled, include the function specs in the tools list
-        if assistant_config.functions:
+        # Add the standard functions to the tools list
+        if standard_functions:
             modified_functions = []
-            for function in assistant_config.functions:
-                # Create a copy of the function spec to avoid modifying the original
-                modified_function = copy.deepcopy(function)
-                # Remove the module field from the function spec
-                if "function" in modified_function and "module" in modified_function["function"]:
-                    del modified_function["function"]["module"]
-                modified_functions.append(modified_function)
+            for func in standard_functions:
+                # Create a copy so we can remove the module field safely
+                func_copy = copy.deepcopy(func)
+                if "function" in func_copy and "module" in func_copy["function"]:
+                    del func_copy["function"]["module"]
+                modified_functions.append(func_copy)
             tools.extend(modified_functions)
 
+        # Convert resources dict to a ToolResources object if needed
         if not resources:
             resources = None
         else:

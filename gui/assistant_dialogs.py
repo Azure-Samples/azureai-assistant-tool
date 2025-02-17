@@ -35,6 +35,7 @@ import json, os, shutil, threading
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.assistant_config import ToolResourcesConfig, VectorStoreConfig
+from azure.ai.assistant.management.function_config import OpenAPIFunctionConfig
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClientFactory
 from azure.ai.assistant.management.logger_module import logger
@@ -93,17 +94,19 @@ class AssistantConfigDialog(QDialog):
             os.makedirs(self.default_output_folder_path)
 
     def on_tab_changed(self, index):
-        # If the Instructions Editor tab is selected, copy instructions from the Configuration tab.
-        # For non-realtime assistants, the editor is tab 3;
-        # for realtime assistants, it's tab 4.
-        if ((index == 3 and self.assistant_type != AssistantType.REALTIME_ASSISTANT.value)
-            or (index == 4 and self.assistant_type == AssistantType.REALTIME_ASSISTANT.value)):
-            self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
-
-        # If the Configuration tab (#0) is selected, copy instructions back,
-        # as long as newInstructionsEdit has text.
-        elif index == 0 and hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText():
-            self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
+        current_tab_text = self.tabWidget.tabText(index)
+        
+        # If the "Instructions Editor" tab is now active,
+        # copy instructions from the "General" tab (if any).
+        if current_tab_text == "Instructions Editor":
+            if hasattr(self, 'instructionsEdit') and hasattr(self, 'newInstructionsEdit'):
+                self.newInstructionsEdit.setPlainText(self.instructionsEdit.toPlainText())
+        
+        # If the "General" tab is now active, copy back whatever is in "Instructions Editor"
+        # as long as there is some text in newInstructionsEdit.
+        elif current_tab_text == "General":
+            if hasattr(self, 'newInstructionsEdit') and self.newInstructionsEdit.toPlainText():
+                self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
     def closeEvent(self, event):
         super(AssistantConfigDialog, self).closeEvent(event)
@@ -117,9 +120,13 @@ class AssistantConfigDialog(QDialog):
         configTab = self.create_config_tab()
         self.tabWidget.addTab(configTab, "General")
 
-        # Create Tools tab
-        toolsTab = self.create_tools_tab()
-        self.tabWidget.addTab(toolsTab, "Tools")
+        # Create Actions tab (replaces part of Tools)
+        actionsTab = self.create_actions_tab()
+        self.tabWidget.addTab(actionsTab, "Actions")
+
+        # Create Knowledge tab (replaces part of Tools)
+        knowledgeTab = self.create_knowledge_tab()
+        self.tabWidget.addTab(knowledgeTab, "Knowledge")
 
         # Create Completion tab
         completionTab = self.create_completion_tab()
@@ -294,56 +301,107 @@ class AssistantConfigDialog(QDialog):
 
         return configTab
 
-    def create_tools_tab(self):
-        toolsTab = QWidget()
-        toolsLayout = QVBoxLayout(toolsTab)
+    def create_actions_tab(self):
+        actionsTab = QWidget()
+        actionsLayout = QVBoxLayout(actionsTab)
 
-        # Splitter for system and user functions
-        splitter = QSplitter(Qt.Vertical)  # Use Qt.Horizontal for a horizontal splitter if preferred
-        toolsLayout.addWidget(splitter)
+        # Splitter for system, user, and OpenAPI functions
+        splitter = QSplitter(Qt.Vertical)
+        actionsLayout.addWidget(splitter)
 
-        # Group box for system functions
+        # -----------------
+        # System Functions
+        # -----------------
         systemFunctionsGroup = QGroupBox("System Functions")
         systemFunctionsLayout = QVBoxLayout(systemFunctionsGroup)
         self.systemFunctionsList = QListWidget()
         systemFunctionsLayout.addWidget(self.systemFunctionsList)
         splitter.addWidget(systemFunctionsGroup)
 
-        # Group box for user functions
+        # ----------------
+        # User Functions
+        # ----------------
         userFunctionsGroup = QGroupBox("User Functions")
         userFunctionsLayout = QVBoxLayout(userFunctionsGroup)
         self.userFunctionsList = QListWidget()
         userFunctionsLayout.addWidget(self.userFunctionsList)
         splitter.addWidget(userFunctionsGroup)
 
+        # Connect signals for function selection on all three lists
         self.systemFunctionsList.itemChanged.connect(self.handle_function_selection)
         self.userFunctionsList.itemChanged.connect(self.handle_function_selection)
 
-        # Function sections
+        # -----------------------------
+        # Add items: System/User funcs
+        # -----------------------------
         if self.function_config_manager:
             function_configs = self.function_config_manager.get_function_configs()
             for function_type, funcs in function_configs.items():
-                list_widget = self.systemFunctionsList if function_type == 'system' else self.userFunctionsList
+                list_widget = (
+                    self.systemFunctionsList
+                    if function_type == 'system' else self.userFunctionsList
+                )
                 self.create_function_section(list_widget, function_type, funcs)
 
+        # -------------------
+        # OpenAPI Functions (only for AGENT)
+        # -------------------
+        if self.assistant_type == AssistantType.AGENT.value:
+            openapiFunctionsGroup = QGroupBox("OpenAPI Functions")
+            openapiFunctionsLayout = QVBoxLayout(openapiFunctionsGroup)
+            self.openapiFunctionsList = QListWidget()
+            openapiFunctionsLayout.addWidget(self.openapiFunctionsList)
+            splitter.addWidget(openapiFunctionsGroup)
+            self.openapiFunctionsList.itemChanged.connect(self.handle_function_selection)
+
+            if self.function_config_manager:
+                openapi_funcs = self.function_config_manager.get_all_openapi_functions()
+            
+                for openapi_func in openapi_funcs:
+                    # For display name, we look at openapi_func["openapi"]["name"]
+                    display_name = (openapi_func.get('openapi', {}).get('name') or "Unnamed OpenAPI Func")
+                    listItem = QListWidgetItem(display_name)
+                    listItem.setFlags(listItem.flags() | Qt.ItemIsUserCheckable)  # Allow item to be checkable
+                    listItem.setCheckState(Qt.Unchecked)
+                    
+                    # Wrap the dict in our OpenAPIFunctionConfig (so handle_function_selection works)
+                    func_config = OpenAPIFunctionConfig(openapi_func)
+                    listItem.setData(Qt.UserRole, func_config)
+
+                    self.openapiFunctionsList.addItem(listItem)
+
+        # ---------
+        # Code Interpreter
+        # ---------
         if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             # Section for managing code interpreter files
-            self.setup_code_interpreter_files(toolsLayout)
+            self.setup_code_interpreter_files(actionsLayout)
 
             # Checkbox to enable code interpreter tool
             self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
-            self.codeInterpreterCheckBox.stateChanged.connect(lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value))
-            toolsLayout.addWidget(self.codeInterpreterCheckBox)
+            self.codeInterpreterCheckBox.stateChanged.connect(
+                lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value)
+            )
+            actionsLayout.addWidget(self.codeInterpreterCheckBox)
 
-            # Section for managing files for file search vector stores
-            self.setup_file_search_vector_stores(toolsLayout)
+        return actionsTab
+
+    def create_knowledge_tab(self):
+        knowledgeTab = QWidget()
+        knowledgeLayout = QVBoxLayout(knowledgeTab)
+
+        # If assistant/agent, show file search
+        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
+            self.setup_file_search_vector_stores(knowledgeLayout)
 
             # Checkbox to enable file search tool
             self.fileSearchCheckBox = QCheckBox("Enable File Search")
-            self.fileSearchCheckBox.stateChanged.connect(lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value))
-            toolsLayout.addWidget(self.fileSearchCheckBox)
+            self.fileSearchCheckBox.stateChanged.connect(
+                lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value)
+            )
+            knowledgeLayout.addWidget(self.fileSearchCheckBox)
 
-        return toolsTab
+        return knowledgeTab
 
     def create_realtime_tab(self):
         audioTab = QWidget()
@@ -1170,22 +1228,47 @@ class AssistantConfigDialog(QDialog):
     def pre_select_functions(self):
         # Iterate over all selected functions
         for func in self.assistant_config.functions:
-            func_name = func['function']['name']
+            func_type = func.get('type', 'function')  # Default to 'function' if missing
 
-            # Find the category of each function
-            function_configs = self.function_config_manager.get_function_configs()
-            for func_type, funcs in function_configs.items():
-                # Check if the function is in the current category and set the corresponding item as checked
-                for func_config in funcs:
-                    if func_config.name == func_name:
-                        if func_config.get_full_spec() not in self.functions:
-                            self.functions.append(func_config.get_full_spec())
-                        list_widget = self.systemFunctionsList if func_type == 'system' else self.userFunctionsList
-                        for i in range(list_widget.count()):
-                            listItem = list_widget.item(i)
-                            if listItem.text() == func_name:
-                                listItem.setCheckState(Qt.Checked)
-                                break  # Break since we've found and checked the item
+            if func_type == 'openapi' and hasattr(self, 'openapiFunctionsList'):
+                func_name = func.get('openapi', {}).get('name')
+                if not func_name:
+                    # If we can't retrieve the name, skip
+                    continue
+
+                # Add the entire function spec (func) to self.functions if not already present
+                if func not in self.functions:
+                    self.functions.append(func)
+
+                # Now mark the matching item in openapiFunctionsList as checked
+                for i in range(self.openapiFunctionsList.count()):
+                    listItem = self.openapiFunctionsList.item(i)
+                    if listItem.text() == func_name:
+                        listItem.setCheckState(Qt.Checked)
+                        break  # Found and checked it—stop searching
+
+            else:
+                func_name = func['function']['name']                
+                # Look in our existing function configs by category
+                function_configs = self.function_config_manager.get_function_configs()
+                for category_type, funcs in function_configs.items():
+                    for func_config in funcs:
+                        if func_config.name == func_name:
+                            # If this function spec wasn't already in self.functions, add it
+                            if func_config.get_full_spec() not in self.functions:
+                                self.functions.append(func_config.get_full_spec())
+                            
+                            # Mark the appropriate list (system or user) as checked
+                            if category_type == 'system':
+                                list_widget = self.systemFunctionsList
+                            else:
+                                list_widget = self.userFunctionsList
+
+                            for i in range(list_widget.count()):
+                                listItem = list_widget.item(i)
+                                if listItem.text() == func_name:
+                                    listItem.setCheckState(Qt.Checked)
+                                    break  # Found and checked it—stop searching
 
     def create_function_section(self, list_widget, function_type, funcs):
         for func_config in funcs:
@@ -1197,16 +1280,13 @@ class AssistantConfigDialog(QDialog):
 
     def handle_function_selection(self, item):
         self.functions = []
-        
-        # Since the method now receives an item, we can check directly if this item is checked
-        if item.checkState() == Qt.Checked:
-            functionConfig = item.data(Qt.UserRole)
-            # if functionConfig is already in the list, don't add it again
-            if functionConfig.get_full_spec() not in self.functions:
-                self.functions.append(functionConfig.get_full_spec())
 
-        # However, to maintain a complete list of checked items, we still need to iterate over all items
-        for listWidget in [self.systemFunctionsList, self.userFunctionsList]:
+        # Check if openapi functions list is available
+        openAPIFunctionsList = QListWidget()
+        if hasattr(self, 'openapiFunctionsList'):
+            openAPIFunctionsList = self.openapiFunctionsList
+
+        for listWidget in [self.systemFunctionsList, self.userFunctionsList, openAPIFunctionsList]:
             for i in range(listWidget.count()):
                 listItem = listWidget.item(i)
                 if listItem.checkState() == Qt.Checked:
@@ -1276,8 +1356,8 @@ class AssistantConfigDialog(QDialog):
         return realtime_config
 
     def save_configuration(self):
-        if ((self.tabWidget.currentIndex() == 3 and self.assistant_type != AssistantType.REALTIME_ASSISTANT.value) 
-        or (self.tabWidget.currentIndex() == 4 and self.assistant_type == AssistantType.REALTIME_ASSISTANT.value)):
+        current_tab_text = self.tabWidget.tabText(self.tabWidget.currentIndex())
+        if current_tab_text == "Instructions Editor":
             self.instructionsEdit.setPlainText(self.newInstructionsEdit.toPlainText())
 
         self.assistant_name = self.get_name()
