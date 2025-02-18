@@ -751,10 +751,14 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
                     tool_calls_list.append(tool_call_entry)
 
+            usage_info = getattr(step_obj, "usage", {}) or {}
+
             single_step = {
                 "id": step_obj.id,
                 "status": step_obj.status,
+                "type": step_obj.type,
                 "tool_calls": tool_calls_list,
+                "usage": usage_info
             }
             steps_data.append(single_step)
 

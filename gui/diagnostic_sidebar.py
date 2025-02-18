@@ -168,25 +168,59 @@ class DiagnosticsSidebar(QWidget):
             if not current_run_item:
                 return
 
-            # Create a parent item for "Steps," so user can collapse or expand them
+            # Create a parent item for "Steps," so user can expand/collapse
             steps_parent_item = QTreeWidgetItem(current_run_item)
             steps_parent_item.setText(0, "Steps")
 
             for step in steps:
                 step_item = QTreeWidgetItem(steps_parent_item)
-                step_item.setText(
-                    0, 
-                    f"Step {step.get('id', 'unknown')} status: {step.get('status', 'n/a')}"
-                )
+                step_id = step.get('id', 'unknown')
+                step_status = step.get('status', 'n/a')
+                step_type = step.get('type', '')  # optional
 
-                # If the step has tool calls, we'll list them under each step
+                # Show: "Step step_123 (type) status: completed"
+                # or simply "Step step_123 status: completed"
+                if step_type:
+                    step_item.setText(
+                        0, 
+                        f"Step {step_id} ({step_type}) status: {step_status}"
+                    )
+                else:
+                    step_item.setText(
+                        0, 
+                        f"Step {step_id} status: {step_status}"
+                    )
+
+                # -- (A) USAGE Info --
+                usage = step.get('usage', {})
+                if usage:
+                    usage_parent = QTreeWidgetItem(step_item)
+                    usage_parent.setText(0, "Usage:")
+                    
+                    # If you have nested usage dicts, you can either:
+                    # 1) Flatten them into lines, or
+                    # 2) Recursively create child items.
+                    # Below is a quick example that handles shallow usage dicts
+                    for k, v in usage.items():
+                        if isinstance(v, dict):
+                            # e.g. "prompt_token_details"
+                            sub_parent = QTreeWidgetItem(usage_parent)
+                            sub_parent.setText(0, f"  {k}:")
+                            for sub_k, sub_v in v.items():
+                                sub_item = QTreeWidgetItem(sub_parent)
+                                sub_item.setText(0, f"    {sub_k}: {sub_v}")
+                        else:
+                            usage_item = QTreeWidgetItem(usage_parent)
+                            usage_item.setText(0, f"  {k}: {v}")
+
+                # -- (B) TOOL CALLS --
                 tool_calls = step.get('tool_calls', [])
                 if tool_calls:
                     tool_calls_parent = QTreeWidgetItem(step_item)
                     tool_calls_parent.setText(0, "Tool calls:")
 
                     for call in tool_calls:
-                        # Show the base line with ID + type
+                        # Basic line with ID and Type
                         call_item = QTreeWidgetItem(tool_calls_parent)
                         call_item.setText(
                             0,
@@ -194,47 +228,42 @@ class DiagnosticsSidebar(QWidget):
                             f" | Type: {call.get('type', '')}"
                         )
 
-                        # Then, branch on the type to display further detail
-                        call_type = call.get("type", "").lower()
-
-                        # -- (A) openapi / function calls --
+                        call_type = (call.get("type") or "").lower()
                         if call_type in ("openapi", "function"):
+                            # Show function name/arguments
                             fn_item = QTreeWidgetItem(call_item)
                             fn_item.setText(
                                 0,
                                 f"    Function name: {call.get('function_name','')}"
                             )
-
                             arg_item = QTreeWidgetItem(call_item)
                             arg_item.setText(
                                 0,
                                 f"    Arguments: {call.get('arguments','')}"
                             )
-
-                        # -- (B) azure_ai_search calls --
                         elif call_type == "azure_ai_search":
+                            # Show input/output
                             input_item = QTreeWidgetItem(call_item)
                             input_item.setText(
                                 0,
                                 f"    Search Input: {call.get('azure_ai_search_input', '')}"
                             )
-
                             output_item = QTreeWidgetItem(call_item)
                             output_item.setText(
                                 0,
                                 f"    Search Output: {call.get('azure_ai_search_output', '')}"
                             )
-
                         else:
-                            # Some unknown type — just mark it
                             unknown_item = QTreeWidgetItem(call_item)
                             unknown_item.setText(0, "    (Unrecognized tool call type)")
 
-            # Optionally expand or collapse
+            # Optionally expand or collapse “Steps”
             steps_parent_item.setExpanded(False)
             self.functionCallTree.scrollToItem(steps_parent_item, QAbstractItemView.PositionAtBottom)
+
         except Exception as e:
             logger.error(f"Error occurred while adding run steps for {run_identifier}: {e}")
+
 
     def collect_diagnostics_data(self):
         try:
