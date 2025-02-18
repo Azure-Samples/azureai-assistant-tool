@@ -18,7 +18,7 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
-from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources, OpenApiTool, OpenApiAnonymousAuthDetails
+from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources, OpenApiTool, OpenApiAnonymousAuthDetails, AzureAISearchTool, BingGroundingTool, ConnectionType
 
 
 class AgentClient(BaseAssistantClient):
@@ -458,6 +458,32 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Failed to purge agent with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge agent with name: {self.name}: {e}")
 
+    def get_azure_search_connections(self) -> list:
+        """
+        Returns a list of connection IDs for connections 
+        whose type is Azure AI Search.
+        """
+        conn_list = self._ai_client.connections.list()
+        azure_search_ids = []
+        for conn in conn_list:
+            # Check your actual condition for Azure AI Search
+            if conn.connection_type == ConnectionType.AZURE_AI_SEARCH:
+                azure_search_ids.append(conn.id)
+        return azure_search_ids
+
+    def get_bing_search_connections(self) -> list:
+        """
+        Returns a list of connection IDs for connections 
+        pointing to Bing Search endpoint.
+        """
+        conn_list = self._ai_client.connections.list()
+        bing_ids = []
+        for conn in conn_list:
+            # Check your actual condition for Bing 
+            if conn.endpoint_url and conn.endpoint_url.lower().startswith("https://api.bing.microsoft.com"):
+                bing_ids.append(conn.id)
+        return bing_ids
+
     def _delete_agent(
             self, 
             assistant_config: AssistantConfig,
@@ -857,6 +883,25 @@ class AgentClient(BaseAssistantClient):
                 code_interpreter_tool = CodeInterpreterTool()
                 tools.extend(code_interpreter_tool.definitions)
                 resources = code_interpreter_tool.resources
+
+        # Add the Azure AI Search if enabled
+        if assistant_config.azure_ai_search.get("enabled", False):
+            conn_id = assistant_config.azure_ai_search.get("connection_id", "")
+            index_name = assistant_config.azure_ai_search.get("index_name", "")
+            if conn_id and index_name:
+                azure_ai_search_tool = AzureAISearchTool(index_connection_id=conn_id, index_name=index_name)
+                tools.extend(azure_ai_search_tool.definitions)
+                if azure_ai_search_tool.resources:
+                    resources.update(azure_ai_search_tool.resources)
+
+        # Add the Bing Search if enabled
+        if assistant_config.bing_search.get("enabled", False):
+            conn_id = assistant_config.bing_search.get("connection_id", "")
+            if conn_id:
+                bing_search_tool = BingGroundingTool(connection_id=conn_id)
+                tools.extend(bing_search_tool.definitions)
+                if bing_search_tool.resources:
+                    resources.update(bing_search_tool.resources)
 
         # Add the standard functions to the tools list
         if standard_functions:

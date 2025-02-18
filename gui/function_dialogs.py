@@ -123,6 +123,13 @@ class CreateFunctionDialog(QDialog):
         main_layout.addWidget(desc_label)
         main_layout.addWidget(self.openapiDescriptionEdit)
 
+        openapiDocLink = QLabel(
+            '<a href="https://learn.microsoft.com/en-us/azure/ai-services/agents/how-to/tools/openapi-spec?tabs=python&pivots=overview">'
+            'Learn about integrating OpenAPI in Azure AI Services Agents</a>'
+        )
+        openapiDocLink.setOpenExternalLinks(True)
+        main_layout.addWidget(openapiDocLink)
+
         # Auth Type
         auth_label = QLabel("Auth Type:")
         self.openapiAuthSelector = QComboBox()
@@ -155,12 +162,10 @@ class CreateFunctionDialog(QDialog):
         # Connect the combo box signal to show/hide the relevant auth detail fields
         self.openapiAuthSelector.currentIndexChanged.connect(self.on_auth_type_changed)
 
-        # Raw JSON text for the spec, with tooltip
+        # Raw JSON text for the spec
         self.openapiSpecEdit = self.create_text_edit()
-        self.openapiSpecEdit.setToolTip(
-            "Tip: You can test your OpenAPI schema with https://swagger.io/tools/swagger-editor/"
-            " before using this tool."
-        )
+        self.openapiSpecEdit.setToolTip("")
+        
         openapiSpecWidget = self.create_text_edit_labeled("OpenAPI Specification:", self.openapiSpecEdit)
         main_layout.addWidget(openapiSpecWidget)
 

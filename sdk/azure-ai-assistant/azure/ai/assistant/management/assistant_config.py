@@ -1025,6 +1025,16 @@ class AssistantConfig:
         # Config folder for local assistant and threads configuration
         self._config_folder = None
 
+        self._azure_ai_search = config_data.get('azure_ai_search', {
+            'enabled': False,
+            'connection_id': '',
+            'index_name': ''
+        })
+        self._bing_search = config_data.get('bing_search', {
+            'enabled': False,
+            'connection_id': ''
+        })
+
     def _setup_completion_settings(self, config_data):
         if config_data.get('completion_settings', None) is not None:
             if self._assistant_type == AssistantType.CHAT_ASSISTANT.value:
@@ -1209,6 +1219,8 @@ class AssistantConfig:
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
         self._config_data['realtime_settings'] = self._realtime_config.to_dict() if self._realtime_config is not None else None
         self._config_data['config_folder'] = self._config_folder
+        self._config_data['azure_ai_search'] = self._azure_ai_search
+        self._config_data['bing_search'] = self._bing_search
         return self._config_data
 
     def _get_function_configs(self):
@@ -1475,6 +1487,51 @@ class AssistantConfig:
         :type value: str
         """
         self._config_folder = value
+
+    @property
+    def azure_ai_search(self) -> dict:
+        """
+        Returns a dictionary describing the Azure AI Search configuration.
+        Example structure:
+            {
+                'enabled': bool,
+                'connection_id': str,
+                'index_name': str
+            }
+        """
+        return self._azure_ai_search
+
+    @azure_ai_search.setter
+    def azure_ai_search(self, value: dict) -> None:
+        """
+        Sets the Azure AI Search configuration.
+
+        :param value: A dict with keys 'enabled', 'connection_id', and 'index_name'.
+        :type value: dict
+        """
+        self._azure_ai_search = value
+
+    @property
+    def bing_search(self) -> dict:
+        """
+        Returns a dictionary describing the Bing Search configuration.
+        Example structure:
+            {
+                'enabled': bool,
+                'connection_id': str
+            }
+        """
+        return self._bing_search
+
+    @bing_search.setter
+    def bing_search(self, value: dict) -> None:
+        """
+        Sets the Bing Search configuration.
+
+        :param value: A dict with keys 'enabled' and 'connection_id'.
+        :type value: dict
+        """
+        self._bing_search = value
 
     def _remove_trailing_spaces(self, text):
         return '\n'.join(line.rstrip() for line in text.splitlines())

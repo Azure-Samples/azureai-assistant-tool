@@ -41,7 +41,7 @@ from azure.ai.assistant.management.ai_client_factory import AIClientType, AIClie
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
-from gui.utils import resource_path
+from gui.assistant_client_manager import AssistantClientManager
 
 
 class CustomSpinBox(QSpinBox):
@@ -373,16 +373,24 @@ class AssistantConfigDialog(QDialog):
         # ---------
         # Code Interpreter
         # ---------
-        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
+        if self.assistant_type in [AssistantType.ASSISTANT.value, AssistantType.AGENT.value]:
+            codeInterpreterGroup = QGroupBox("Code Interpreter")
+            codeInterpreterLayout = QVBoxLayout(codeInterpreterGroup)
+            
             # Section for managing code interpreter files
-            self.setup_code_interpreter_files(actionsLayout)
+            # We previously called self.setup_code_interpreter_files(actionsLayout).
+            # Now, we call it with codeInterpreterLayout so it adds its widgets here.
+            self.setup_code_interpreter_files(codeInterpreterLayout)
 
-            # Checkbox to enable code interpreter tool
+            # Checkbox to enable the Code Interpreter tool
             self.codeInterpreterCheckBox = QCheckBox("Enable Code Interpreter")
             self.codeInterpreterCheckBox.stateChanged.connect(
                 lambda state: setattr(self, 'code_interpreter', state == Qt.CheckState.Checked.value)
             )
-            actionsLayout.addWidget(self.codeInterpreterCheckBox)
+            codeInterpreterLayout.addWidget(self.codeInterpreterCheckBox)
+
+            # Finally, add this group to the overall actions layout
+            actionsLayout.addWidget(codeInterpreterGroup)
 
         return actionsTab
 
@@ -391,18 +399,108 @@ class AssistantConfigDialog(QDialog):
         knowledgeLayout = QVBoxLayout(knowledgeTab)
 
         # If assistant/agent, show file search
-        if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
-            self.setup_file_search_vector_stores(knowledgeLayout)
+        if self.assistant_type in [AssistantType.ASSISTANT.value, AssistantType.AGENT.value]:
+            
+            fileSearchGroup = QGroupBox("File Search")
+            fileSearchLayout = QVBoxLayout(fileSearchGroup)
 
-            # Checkbox to enable file search tool
+            self.setup_file_search_vector_stores(fileSearchLayout)
+
             self.fileSearchCheckBox = QCheckBox("Enable File Search")
             self.fileSearchCheckBox.stateChanged.connect(
                 lambda state: setattr(self, 'file_search', state == Qt.CheckState.Checked.value)
             )
-            knowledgeLayout.addWidget(self.fileSearchCheckBox)
+            fileSearchLayout.addWidget(self.fileSearchCheckBox)
+            knowledgeLayout.addWidget(fileSearchGroup)
+
+        if self.assistant_type == AssistantType.AGENT.value:
+            azureGroup = QGroupBox("Azure AI Search")
+            azureLayout = QVBoxLayout(azureGroup)
+
+            # Link to QuickStart
+            azureLinkLabel = QLabel(
+                '<a href="https://learn.microsoft.com/en-us/azure/ai-services/agents/how-to/tools/azure-ai-search?tabs=azurecli%2Cpython&pivots=overview-azure-ai-search">'
+                'Azure AI Search QuickStart for Agents</a>'
+            )
+            azureLinkLabel.setOpenExternalLinks(True)
+            azureLayout.addWidget(azureLinkLabel)
+
+            # Connection ID dropdown
+            azureLayout.addWidget(QLabel("Connection ID"))
+            self.azureSearchConnectionComboBox = QComboBox()
+
+            azure_connections = self.get_azure_search_connections()  # returns a list of connection objects
+            for conn in azure_connections:
+                display_name = self._extract_display_name(conn)
+                # Add an item with short display text, and store the full path in userData
+                self.azureSearchConnectionComboBox.addItem(display_name, conn)
+                # Also set the tooltip to the full connection ID/path
+                idx = self.azureSearchConnectionComboBox.count() - 1
+                self.azureSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
+
+            azureLayout.addWidget(self.azureSearchConnectionComboBox)
+
+            # Index Name
+            azureLayout.addWidget(QLabel("Index Name"))
+            self.azureSearchIndexLineEdit = QLineEdit()
+            azureLayout.addWidget(self.azureSearchIndexLineEdit)
+
+            self.azureSearchCheckBox = QCheckBox("Enable Azure AI Search")
+            azureLayout.addWidget(self.azureSearchCheckBox)
+
+            knowledgeLayout.addWidget(azureGroup)
+
+            bingGroup = QGroupBox("Bing Search")
+            bingLayout = QVBoxLayout(bingGroup)
+
+            # Link to QuickStart
+            bingLinkLabel = QLabel(
+                '<a href="https://learn.microsoft.com/en-us/azure/ai-services/agents/how-to/tools/bing-grounding?tabs=python&pivots=overview">'
+                'Bing Search QuickStart for Agents</a>'
+            )
+            bingLinkLabel.setOpenExternalLinks(True)
+            bingLayout.addWidget(bingLinkLabel)
+
+            # Connection ID dropdown
+            bingLayout.addWidget(QLabel("Connection ID"))
+            self.bingSearchConnectionComboBox = QComboBox()
+
+            bing_connections = self.get_bing_search_connections()  # returns a list of connection objects
+            for conn in bing_connections:
+                display_name = self._extract_display_name(conn)
+                self.bingSearchConnectionComboBox.addItem(display_name, conn)
+                idx = self.bingSearchConnectionComboBox.count() - 1
+                self.bingSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
+
+            bingLayout.addWidget(self.bingSearchConnectionComboBox)
+
+            self.bingSearchCheckBox = QCheckBox("Enable Bing Search")
+            bingLayout.addWidget(self.bingSearchCheckBox)
+
+            knowledgeLayout.addWidget(bingGroup)
 
         return knowledgeTab
 
+    def get_azure_search_connections(self):
+        """Obtain a list of Azure AI Search connections from your agent/project."""
+        assistant_client_manager = AssistantClientManager.get_instance()
+        assistant_client = assistant_client_manager.get_client(name=self.assistant_name)
+        return assistant_client.get_azure_search_connections()
+
+    def get_bing_search_connections(self):
+        """Obtain a list of Bing connections from your agent/project."""
+        assistant_client_manager = AssistantClientManager.get_instance()
+        assistant_client = assistant_client_manager.get_client(name=self.assistant_name)
+        return assistant_client.get_bing_search_connections()
+
+    def _extract_display_name(self, connection_obj):
+        """
+        Defines how to show a short, user-friendly name in the combo box.
+        If your connection objects have .name, use that; otherwise parse
+        something from .id. Adjust as needed.
+        """
+        return connection_obj.rsplit('/', 1)[-1]
+    
     def create_realtime_tab(self):
         audioTab = QWidget()
 
@@ -686,7 +784,7 @@ class AssistantConfigDialog(QDialog):
         layout.addLayout(self.localVadSettings)
 
     def setup_code_interpreter_files(self, layout):
-        codeFilesLabel = QLabel('Files for Code Interpreter:')
+        codeFilesLabel = QLabel('Files:')
         self.codeFileList = QListWidget()
         self.codeFileList.setStyleSheet(
             "QListWidget {"
@@ -709,7 +807,7 @@ class AssistantConfigDialog(QDialog):
         layout.addLayout(codeFileButtonLayout)
 
     def setup_file_search_vector_stores(self, layout):
-        fileSearchLabel = QLabel('Files for File Search Vector Store:')
+        fileSearchLabel = QLabel('Files:')
         self.fileSearchList = QListWidget()
         self.fileSearchList.setStyleSheet(
             "QListWidget {"
@@ -1017,6 +1115,13 @@ class AssistantConfigDialog(QDialog):
             self.fileSearchList.clear()
         if hasattr(self, 'codeFileList'):
             self.codeFileList.clear()
+        if self.assistant_type == AssistantType.AGENT.value:
+            self.azureSearchCheckBox.setChecked(False)
+            self.azureSearchConnectionComboBox.setCurrentIndex(0)
+            self.azureSearchIndexLineEdit.clear()
+
+            self.bingSearchCheckBox.setChecked(False)
+            self.bingSearchConnectionComboBox.setCurrentIndex(0)
 
     def create_instructions_tab(self):
         instructionsEditorTab = QWidget()
@@ -1072,52 +1177,82 @@ class AssistantConfigDialog(QDialog):
 
     def pre_load_assistant_config(self, name):
         self.assistant_config = AssistantConfigManager.get_instance().get_config(name)
-        if self.assistant_config:
-            self.nameEdit.setText(self.assistant_config.name)
-            self.assistant_id = self.assistant_config.assistant_id
-            self.instructionsEdit.setText(self.assistant_config.instructions)
-            index = self.modelComboBox.findText(self.assistant_config.model)
-            if index >= 0:
-                self.modelComboBox.setCurrentIndex(index)
-            else:
-                self.modelComboBox.addItem(self.assistant_config.model)
-                self.modelComboBox.setCurrentIndex(self.modelComboBox.count() - 1)
+        if not self.assistant_config:
+            return
 
-            # Pre-select functions
-            self.pre_select_functions()
+        self.nameEdit.setText(self.assistant_config.name)
+        self.assistant_id = self.assistant_config.assistant_id
+        self.instructionsEdit.setText(self.assistant_config.instructions)
 
-            # Pre-fill reference files
-            for file_path in self.assistant_config.file_references:
-                self.fileReferenceList.addItem(file_path)
+        index = self.modelComboBox.findText(self.assistant_config.model)
+        if index >= 0:
+            self.modelComboBox.setCurrentIndex(index)
+        else:
+            self.modelComboBox.addItem(self.assistant_config.model)
+            self.modelComboBox.setCurrentIndex(self.modelComboBox.count() - 1)
 
-            # Accessing code interpreter files from the tool resources
-            if self.assistant_config.tool_resources:
-                code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
-                if code_interpreter_files:
-                    for file_path, file_id in code_interpreter_files.items():
-                        self.code_interpreter_files[file_path] = file_id
-                        self.codeFileList.addItem(f"{file_path}")
-                self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
+        # Pre-select functions
+        self.pre_select_functions()
 
-                for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
-                    self.vector_store_ids.append(vector_store.id)
-                    for file_path, file_id in vector_store.files.items():
-                        item = QListWidgetItem(file_path)
-                        item.setData(Qt.UserRole, file_id)
-                        self.file_search_files[file_path] = file_id
-                        self.fileSearchList.addItem(item)
-                self.fileSearchCheckBox.setChecked(bool(self.assistant_config.file_search))
+        # Pre-fill reference files
+        for file_path in self.assistant_config.file_references:
+            self.fileReferenceList.addItem(file_path)
 
-            # Load completion settings
-            self.load_completion_settings(self.assistant_config.text_completion_config)
+        # Tool resources / code interpreter / file search
+        if self.assistant_config.tool_resources:
+            code_interpreter_files = self.assistant_config.tool_resources.code_interpreter_files
+            if code_interpreter_files:
+                for file_path, file_id in code_interpreter_files.items():
+                    self.code_interpreter_files[file_path] = file_id
+                    self.codeFileList.addItem(f"{file_path}")
+            self.codeInterpreterCheckBox.setChecked(self.assistant_config.code_interpreter)
 
-            if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                self.load_realtime_settings(self.assistant_config.realtime_config)
+            for vector_store in self.assistant_config.tool_resources.file_search_vector_stores:
+                self.vector_store_ids.append(vector_store.id)
+                for file_path, file_id in vector_store.files.items():
+                    item = QListWidgetItem(file_path)
+                    item.setData(Qt.UserRole, file_id)
+                    self.file_search_files[file_path] = file_id
+                    self.fileSearchList.addItem(item)
+            self.fileSearchCheckBox.setChecked(bool(self.assistant_config.file_search))
 
-            # Set the output folder path if it's in the configuration
-            output_folder_path = self.assistant_config.output_folder_path
-            if output_folder_path:
-                self.outputFolderPathEdit.setText(output_folder_path)
+        # Load completion settings
+        self.load_completion_settings(self.assistant_config.text_completion_config)
+
+        # Load real-time settings
+        if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+            self.load_realtime_settings(self.assistant_config.realtime_config)
+
+        # Output folder path
+        output_folder_path = self.assistant_config.output_folder_path
+        if output_folder_path:
+            self.outputFolderPathEdit.setText(output_folder_path)
+
+        # Load search settings for agent, azure search and bing search
+        if self.assistant_type == AssistantType.AGENT.value:
+            azure_search = getattr(self.assistant_config, "azure_ai_search", None)
+            if azure_search:
+                self.azureSearchCheckBox.setChecked(azure_search.get("enabled", False))
+                saved_azure_conn_id = azure_search.get("connection_id", "")
+                # Now find the matching itemData in the Azure combo
+                for i in range(self.azureSearchConnectionComboBox.count()):
+                    data = self.azureSearchConnectionComboBox.itemData(i, Qt.UserRole)
+                    if data == saved_azure_conn_id:
+                        self.azureSearchConnectionComboBox.setCurrentIndex(i)
+                        break
+
+                self.azureSearchIndexLineEdit.setText(azure_search.get("index_name", ""))
+
+            bing_search = getattr(self.assistant_config, "bing_search", None)
+            if bing_search:
+                self.bingSearchCheckBox.setChecked(bing_search.get("enabled", False))
+                saved_bing_conn_id = bing_search.get("connection_id", "")
+                # Now find the matching itemData in the Bing combo
+                for i in range(self.bingSearchConnectionComboBox.count()):
+                    data = self.bingSearchConnectionComboBox.itemData(i, Qt.UserRole)
+                    if data == saved_bing_conn_id:
+                        self.bingSearchConnectionComboBox.setCurrentIndex(i)
+                        break
 
     def load_completion_settings(self, text_completion_config):
         if text_completion_config:
@@ -1459,6 +1594,21 @@ class AssistantConfigDialog(QDialog):
             'completion_settings': completion_settings,
             'realtime_settings': self.get_realtime_settings() if self.assistant_type == AssistantType.REALTIME_ASSISTANT.value else None
         }
+
+        if self.assistant_type == AssistantType.AGENT.value:
+            azure_conn_id = self.azureSearchConnectionComboBox.currentData(Qt.UserRole)
+            bing_conn_id = self.bingSearchConnectionComboBox.currentData(Qt.UserRole)
+            azure_ai_search = {
+                'enabled': self.azureSearchCheckBox.isChecked(),
+                'connection_id': azure_conn_id,
+                'index_name': self.azureSearchIndexLineEdit.text()
+            }
+            bing_search = {
+                'enabled': self.bingSearchCheckBox.isChecked(),
+                'connection_id': bing_conn_id
+            }
+            config['azure_ai_search'] = azure_ai_search
+            config['bing_search'] = bing_search
 
         # Validation and emission of the configuration
         if not config['name'] or not config['instructions'] or not config['model']:
