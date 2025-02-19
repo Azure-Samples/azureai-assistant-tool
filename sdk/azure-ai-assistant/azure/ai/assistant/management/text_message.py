@@ -43,6 +43,45 @@ class FileCitation:
         return self._file_name
 
 
+class UrlCitation:
+    """
+    A class representing a URL citation.
+
+    :param url: The URL being cited.
+    :type url: str
+    :param title: An optional title or label for the URL.
+    :type title: Optional[str]
+    """
+    def __init__(
+            self,
+            url: str,
+            title: Optional[str] = None
+    ) -> None:
+        self._url = url
+        # If no title is provided, use the URL as the fallback
+        self._title = title or url
+
+    @property
+    def url(self) -> str:
+        """
+        Returns the cited URL.
+
+        :return: The cited URL.
+        :rtype: str
+        """
+        return self._url
+
+    @property
+    def title(self) -> str:
+        """
+        Returns the title (or fallback) of the cited URL.
+
+        :return: The title for this citation.
+        :rtype: str
+        """
+        return self._title
+
+
 class TextMessage:
     """
     A class representing a text message.
@@ -51,10 +90,19 @@ class TextMessage:
     :type content: str
     :param file_citations: The list of file citations in the message.
     :type file_citations: Optional[List[FileCitation]]
+    :param url_citations: The list of URL citations in the message.
+    :type url_citations: Optional[List[UrlCitation]]
     """
-    def __init__(self, content: str, file_citations: Optional[List[FileCitation]] = None):
+    def __init__(
+        self,
+        content: str,
+        file_citations: Optional[List[FileCitation]] = None,
+        url_citations: Optional[List[UrlCitation]] = None
+    ):
         self._content = content
-        self._file_citations = file_citations
+        # Initialize citations to empty lists if None is provided
+        self._file_citations = file_citations or []
+        self._url_citations = url_citations or []
 
     @property
     def content(self) -> str:
@@ -77,11 +125,21 @@ class TextMessage:
         self._content = value
 
     @property
-    def file_citations(self) -> Optional[List[FileCitation]]:
+    def file_citations(self) -> List[FileCitation]:
         """
         Returns the list of file citations in the message.
 
         :return: The list of file citations in the message.
-        :rtype: Optional[List[FileCitation]]
+        :rtype: List[FileCitation]
         """
         return self._file_citations
+
+    @property
+    def url_citations(self) -> List[UrlCitation]:
+        """
+        Returns the list of URL citations in the message.
+
+        :return: The list of URL citations in the message.
+        :rtype: List[UrlCitation]
+        """
+        return self._url_citations

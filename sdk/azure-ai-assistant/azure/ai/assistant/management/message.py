@@ -26,7 +26,7 @@ from azure.ai.projects.models import (
 )
 
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.text_message import TextMessage, FileCitation
+from azure.ai.assistant.management.text_message import TextMessage, FileCitation, UrlCitation
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.message_utils import _resize_image, _save_image
 from azure.ai.assistant.management.attachment import AttachmentType
@@ -56,6 +56,7 @@ class ConversationMessage:
         self._file_messages: List[FileMessage] = []
         self._image_messages: List[ImageMessage] = []
         self._image_urls: List[str] = []
+        self._url_citations: List[UrlCitation] = []
         self._role: str = "assistant"
         self._sender: Optional[str] = None
 
@@ -142,17 +143,21 @@ class ConversationMessage:
 
     def _process_azure_thread_message_contents(self, thread_message: ThreadMessage):
         for idx, text_content in enumerate(thread_message.text_messages):
-            text_value = text_content.text.value  
-            citations, file_citations = self._process_azure_text_annotations(text_content, idx)
+            text_value = text_content.text.value
+            # Now we capture file citations, references, AND url citations
+            citations, file_citations, url_citations = self._process_azure_text_annotations(text_content, idx)
 
             if citations:
                 text_value += "\n" + "\n".join(citations)
 
-            # If we only preserve one text message, this sets self._text_message 
-            # to the *last* text block. If you have multiple text blocks, 
-            # you might store them differently. 
-            self._text_message = TextMessage(text_value, file_citations)
+            # Create a TextMessage that includes both file and URL citations
+            self._text_message = TextMessage(
+                content=text_value,
+                file_citations=file_citations,
+                url_citations=url_citations
+            )
 
+        # Handle any image attachments as before
         for image_content in thread_message.image_contents:
             file_id = image_content.image_file.file_id
             file_name = f"{file_id}.png"
@@ -162,19 +167,21 @@ class ConversationMessage:
         self,
         text_content: MessageTextContent,
         block_index: int
-    ) -> Tuple[List[str], List[FileCitation]]:
-
+    ) -> Tuple[List[str], List[FileCitation], List[UrlCitation]]:
+        
         citations = []
-        file_citations = []
+        file_citations: List[FileCitation] = []
+        url_citations: List[UrlCitation] = []
 
         if text_content.text.annotations:
             for index, annotation in enumerate(text_content.text.annotations):
-                # Insert bracket references in the text
                 ref_marker = f"[{block_index}.{index}]"
+                # Insert bracket references in the text
                 text_content.text.value = text_content.text.value.replace(
                     annotation.text, f" {ref_marker}"
                 )
 
+                # Handle file path annotation
                 if isinstance(annotation, MessageTextFilePathAnnotation):
                     file_id = annotation.file_path.file_id
                     file_name = os.path.basename(annotation.text)
@@ -182,6 +189,7 @@ class ConversationMessage:
                     citations.append(f"{ref_marker} {file_name}")
                     file_citations.append(FileCitation(file_id, file_name))
 
+                # Handle file citation annotation
                 elif isinstance(annotation, MessageTextFileCitationAnnotation):
                     file_id = annotation.file_citation.file_id
                     try:
@@ -192,7 +200,18 @@ class ConversationMessage:
                     citations.append(f"{ref_marker} {file_name}")
                     file_citations.append(FileCitation(file_id, file_name))
 
-        return citations, file_citations
+                # Handle URL citation (no official type in azure.ai.projects yet)
+                elif getattr(annotation, "type", None) == "url_citation":
+                    # Here 'annotation' is a dict, not a typed object
+                    url_citation_dict = annotation.get("url_citation", {})
+                    url = url_citation_dict.get("url")
+                    title = url_citation_dict.get("title") or url
+                    if url:
+                        # [link text](link target)
+                        citations.append(f"[{title}]({url})")
+                        url_citations.append(UrlCitation(url, title))
+
+        return citations, file_citations, url_citations
 
     def _get_sender_name_azure(self, thread_message: ThreadMessage) -> str:
         if thread_message.role.value == "assistant":

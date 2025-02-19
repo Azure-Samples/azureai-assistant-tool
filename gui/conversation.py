@@ -201,12 +201,15 @@ class ClickableTextEdit(QTextEdit):
         super().mousePressEvent(event)
 
     def open_file(self, file_path):
-        if sys.platform.startswith('linux'):
-            subprocess.call(["xdg-open", file_path])
-        elif sys.platform.startswith('win32'):
-            os.startfile(file_path)
-        elif sys.platform.startswith('darwin'):
-            subprocess.call(["open", file_path])
+        try:
+            if sys.platform.startswith('linux'):
+                subprocess.call(["xdg-open", file_path])
+            elif sys.platform.startswith('win32'):
+                os.startfile(file_path)
+            elif sys.platform.startswith('darwin'):
+                subprocess.call(["open", file_path])
+        except Exception as e:
+            logger.error(f"Failed to open file: {file_path} - {e}")
 
 
 class ConversationView(QWidget):
