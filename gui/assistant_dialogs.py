@@ -429,14 +429,15 @@ class AssistantConfigDialog(QDialog):
             azureLayout.addWidget(QLabel("Connection ID"))
             self.azureSearchConnectionComboBox = QComboBox()
 
-            azure_connections = self.get_azure_search_connections()  # returns a list of connection objects
-            for conn in azure_connections:
-                display_name = self._extract_display_name(conn)
-                # Add an item with short display text, and store the full path in userData
-                self.azureSearchConnectionComboBox.addItem(display_name, conn)
-                # Also set the tooltip to the full connection ID/path
-                idx = self.azureSearchConnectionComboBox.count() - 1
-                self.azureSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
+            azure_connections = self.get_azure_search_connections()
+            if azure_connections:
+                for conn in azure_connections:
+                    display_name = self._extract_display_name(conn)
+                    # Add an item with short display text, and store the full path in userData
+                    self.azureSearchConnectionComboBox.addItem(display_name, conn)
+                    # Also set the tooltip to the full connection ID/path
+                    idx = self.azureSearchConnectionComboBox.count() - 1
+                    self.azureSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
 
             azureLayout.addWidget(self.azureSearchConnectionComboBox)
 
@@ -466,11 +467,12 @@ class AssistantConfigDialog(QDialog):
             self.bingSearchConnectionComboBox = QComboBox()
 
             bing_connections = self.get_bing_search_connections()  # returns a list of connection objects
-            for conn in bing_connections:
-                display_name = self._extract_display_name(conn)
-                self.bingSearchConnectionComboBox.addItem(display_name, conn)
-                idx = self.bingSearchConnectionComboBox.count() - 1
-                self.bingSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
+            if bing_connections:
+                for conn in bing_connections:
+                    display_name = self._extract_display_name(conn)
+                    self.bingSearchConnectionComboBox.addItem(display_name, conn)
+                    idx = self.bingSearchConnectionComboBox.count() - 1
+                    self.bingSearchConnectionComboBox.setItemData(idx, conn, Qt.ToolTipRole)
 
             bingLayout.addWidget(self.bingSearchConnectionComboBox)
 
@@ -483,16 +485,26 @@ class AssistantConfigDialog(QDialog):
 
     def get_azure_search_connections(self):
         """Obtain a list of Azure AI Search connections from your agent/project."""
-        assistant_client_manager = AssistantClientManager.get_instance()
-        assistant_client = assistant_client_manager.get_client(name=self.assistant_name)
-        return assistant_client.get_azure_search_connections()
+        ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
+        conn_list = ai_client.connections.list()
+        azure_search_ids = []
+        for conn in conn_list:
+            # Check your actual condition for Azure AI Search
+            if conn.connection_type == "CognitiveSearch":
+                azure_search_ids.append(conn.id)
+        return azure_search_ids
 
     def get_bing_search_connections(self):
         """Obtain a list of Bing connections from your agent/project."""
-        assistant_client_manager = AssistantClientManager.get_instance()
-        assistant_client = assistant_client_manager.get_client(name=self.assistant_name)
-        return assistant_client.get_bing_search_connections()
-
+        ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
+        conn_list = ai_client.connections.list()
+        bing_ids = []
+        for conn in conn_list:
+            # Check your actual condition for Bing 
+            if conn.endpoint_url and conn.endpoint_url.lower().startswith("https://api.bing.microsoft.com"):
+                bing_ids.append(conn.id)
+        return bing_ids
+    
     def _extract_display_name(self, connection_obj):
         """
         Defines how to show a short, user-friendly name in the combo box.

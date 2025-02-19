@@ -1172,7 +1172,9 @@ class AssistantConfig:
                 self._tool_resources == other._tool_resources and
                 self._functions == other._functions and
                 self._file_search == other._file_search and
-                self._code_interpreter == other._code_interpreter)
+                self._code_interpreter == other._code_interpreter and
+                self.azure_ai_search == other.azure_ai_search and
+                self.bing_search == other.bing_search)
 
     @classmethod
     def from_dict(

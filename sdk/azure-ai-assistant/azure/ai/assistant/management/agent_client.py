@@ -458,32 +458,6 @@ class AgentClient(BaseAssistantClient):
             logger.error(f"Failed to purge agent with name: {self.name}: {e}")
             raise EngineError(f"Failed to purge agent with name: {self.name}: {e}")
 
-    def get_azure_search_connections(self) -> list:
-        """
-        Returns a list of connection IDs for connections 
-        whose type is Azure AI Search.
-        """
-        conn_list = self._ai_client.connections.list()
-        azure_search_ids = []
-        for conn in conn_list:
-            # Check your actual condition for Azure AI Search
-            if conn.connection_type == ConnectionType.AZURE_AI_SEARCH:
-                azure_search_ids.append(conn.id)
-        return azure_search_ids
-
-    def get_bing_search_connections(self) -> list:
-        """
-        Returns a list of connection IDs for connections 
-        pointing to Bing Search endpoint.
-        """
-        conn_list = self._ai_client.connections.list()
-        bing_ids = []
-        for conn in conn_list:
-            # Check your actual condition for Bing 
-            if conn.endpoint_url and conn.endpoint_url.lower().startswith("https://api.bing.microsoft.com"):
-                bing_ids.append(conn.id)
-        return bing_ids
-
     def _delete_agent(
             self, 
             assistant_config: AssistantConfig,
