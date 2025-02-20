@@ -746,6 +746,17 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                         azure_ai_search_dict = call.get("azure_ai_search", {})
                         tool_call_entry["azure_ai_search_input"] = azure_ai_search_dict.get("input", "")
                         tool_call_entry["azure_ai_search_output"] = azure_ai_search_dict.get("output", "")
+                    elif call_type == "bing_grounding":
+                        bg_dict = call.get("bing_grounding", {})
+                        tool_call_entry["bing_grounding_requesturl"] = bg_dict.get("requesturl", "")
+                    elif call_type == "file_search":
+                        fs_dict = call.get("file_search", {})
+                        tool_call_entry["file_search_ranking_options"] = fs_dict.get("ranking_options", {})
+                        tool_call_entry["file_search_results"] = fs_dict.get("results", [])
+                    elif call_type == "code_interpreter":
+                        ci_dict = call.get("code_interpreter", {})
+                        tool_call_entry["code_interpreter_input"] = ci_dict.get("input", "")
+                        tool_call_entry["code_interpreter_outputs"] = ci_dict.get("outputs", [])
                     else:
                         logger.warning(f"Unknown tool call type for run steps: {call_type}, all data not stored: {call}")
 

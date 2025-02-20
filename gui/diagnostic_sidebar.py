@@ -178,8 +178,7 @@ class DiagnosticsSidebar(QWidget):
                 step_status = step.get('status', 'n/a')
                 step_type = step.get('type', '')  # optional
 
-                # Show: "Step step_123 (type) status: completed"
-                # or simply "Step step_123 status: completed"
+                # Show "Step step_123 (type) status: completed"
                 if step_type:
                     step_item.setText(
                         0, 
@@ -196,11 +195,7 @@ class DiagnosticsSidebar(QWidget):
                 if usage:
                     usage_parent = QTreeWidgetItem(step_item)
                     usage_parent.setText(0, "Usage:")
-                    
-                    # If you have nested usage dicts, you can either:
-                    # 1) Flatten them into lines, or
-                    # 2) Recursively create child items.
-                    # Below is a quick example that handles shallow usage dicts
+
                     for k, v in usage.items():
                         if isinstance(v, dict):
                             # e.g. "prompt_token_details"
@@ -229,8 +224,9 @@ class DiagnosticsSidebar(QWidget):
                         )
 
                         call_type = (call.get("type") or "").lower()
+
+                        # 1) function/openapi calls
                         if call_type in ("openapi", "function"):
-                            # Show function name/arguments
                             fn_item = QTreeWidgetItem(call_item)
                             fn_item.setText(
                                 0,
@@ -241,8 +237,9 @@ class DiagnosticsSidebar(QWidget):
                                 0,
                                 f"    Arguments: {call.get('arguments','')}"
                             )
+
+                        # 2) azure_ai_search
                         elif call_type == "azure_ai_search":
-                            # Show input/output
                             input_item = QTreeWidgetItem(call_item)
                             input_item.setText(
                                 0,
@@ -253,7 +250,59 @@ class DiagnosticsSidebar(QWidget):
                                 0,
                                 f"    Search Output: {call.get('azure_ai_search_output', '')}"
                             )
+
+                        # 3) bing_grounding
+                        elif call_type == "bing_grounding":
+                            bg_url_item = QTreeWidgetItem(call_item)
+                            bg_url_item.setText(
+                                0,
+                                f"    Request URL: {call.get('bing_grounding_requesturl', '')}"
+                            )
+
+                        # 4) file_search
+                        elif call_type == "file_search":
+                            fs_rank_opts = call.get("file_search_ranking_options", {})
+                            fs_results = call.get("file_search_results", [])
+
+                            # Ranking options
+                            rank_item = QTreeWidgetItem(call_item)
+                            rank_item.setText(0, "    Ranking Options:")
+                            for opt_key, opt_val in fs_rank_opts.items():
+                                sub_opt_item = QTreeWidgetItem(rank_item)
+                                sub_opt_item.setText(0, f"      {opt_key}: {opt_val}")
+
+                            # Results
+                            results_item = QTreeWidgetItem(call_item)
+                            results_item.setText(0, "    Results:")
+                            for i, result in enumerate(fs_results):
+                                single_res_item = QTreeWidgetItem(results_item)
+                                # e.g. {'file_id': ..., 'file_name': ..., 'score': ...}
+                                single_res_item.setText(
+                                    0,
+                                    f"      #{i+1}: file_id={result.get('file_id','')}, "
+                                    f"name={result.get('file_name','')}, score={result.get('score','')}"
+                                )
+
+                        # 5) code_interpreter
+                        elif call_type == "code_interpreter":
+                            ci_input = call.get("code_interpreter_input", "")
+                            ci_outputs = call.get("code_interpreter_outputs", [])
+
+                            ci_input_item = QTreeWidgetItem(call_item)
+                            ci_input_item.setText(
+                                0,
+                                f"    Code Input: {ci_input}"
+                            )
+
+                            ci_output_parent = QTreeWidgetItem(call_item)
+                            ci_output_parent.setText(0, "    Outputs:")
+                            for i, o in enumerate(ci_outputs):
+                                o_item = QTreeWidgetItem(ci_output_parent)
+                                # If outputs are just strings or dicts, adapt as needed
+                                o_item.setText(0, f"      #{i+1}: {o}")
+
                         else:
+                            # Some unknown type
                             unknown_item = QTreeWidgetItem(call_item)
                             unknown_item.setText(0, "    (Unrecognized tool call type)")
 
