@@ -25,7 +25,7 @@
 - Getting Help
 
 ## 🤖🛠️ Azure AI Assistants tool 
-Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with Azure OpenAI Assistants, Chat Completion and/or Realtime API based technologies. Use this powerful, easy-to-setup low-code playground tool to quickly experiment and build AI agents within your application.
+Azure AI Assistants tool is an experimental Python application and middleware designed to simplify the development, experimentation, testing, and debugging of AI agents created with Azure AI Agents, Azure OpenAI Assistants, Chat Completion and/or Realtime API based technologies. Use this powerful, easy-to-setup low-code playground tool to quickly experiment and build AI agents within your application.
 
 > [!IMPORTANT]
 > **The Azure AI Assistant Tool is experimental**, created to support your product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
@@ -33,7 +33,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 ## 🆕 Latest News
 
-- **February 23, 2025:** Released version 0.5.2 of the tool, introducing preview support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes.
+- **February 23, 2025:** Released version 0.5.2 of the tool, introducing preview support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes on image input and links handling. Added new LLM function to generate images.
 - **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
@@ -43,8 +43,8 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 **Key Features** include:
 
-- **Azure AI Tools**: Seamlessly integrate and execute server-side tools like Bing, Azure AI Search, and Azure Functions without handling calls manually.
-- **Azure AI Foundry Project**: Utilizes Azure AI Foundry Projects to get access to different connections, models, Azure Logic Apps, telemetry
+- **Azure AI Agents Service Tools**: Seamlessly integrate and execute server-side tools like `Bing Grounding`, `Azure AI Search`, `OpenAPI Functions` and `Azure Functions`.
+- **Azure AI Foundry Project Connections**: Utilizes Azure AI Foundry Projects to get access to different connections, e.g., `Azure Logic Apps`, `Application Insights`.
 - **Extensive Model Support**: Utilize a diverse range of AI models including Azure OpenAI, Llama 3, Mistral, and Cohere to meet enterprise requirements.
 - **Enterprise Data Integration**: Leverage secure data interactions across multiple sources and ensure enterprise-grade security and privacy.
 
