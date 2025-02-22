@@ -18,6 +18,14 @@ from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.utils import camel_to_snake
+from enum import Enum
+
+
+class FunctionTab(Enum):
+    SYSTEM = "System Functions"
+    USER = "User Functions"
+    AZURE_LOGIC_APP = "Azure Logic App Functions"
+    OPENAPI = "OpenAPI Functions"
 
 
 class CreateFunctionDialog(QDialog):
@@ -55,19 +63,19 @@ class CreateFunctionDialog(QDialog):
         self.systemFunctionsTab = self.create_system_functions_tab()
         self.userFunctionsTab = self.create_user_functions_tab()
 
-        self.tabs.addTab(self.systemFunctionsTab, "System Functions")
-        self.tabs.addTab(self.userFunctionsTab, "User Functions")
+        self.tabs.addTab(self.systemFunctionsTab, FunctionTab.SYSTEM.value)
+        self.tabs.addTab(self.userFunctionsTab, FunctionTab.USER.value)
         
         # Add Azure Logic Apps tab if the active AI client is AZURE_AI_AGENT and azure_logic_app_manager is set
         if (getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT and
             hasattr(self.main_window, 'azure_logic_app_manager')):
             self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
-            self.tabs.addTab(self.azureLogicAppsTab, "Azure Logic App Functions")
+            self.tabs.addTab(self.azureLogicAppsTab, FunctionTab.AZURE_LOGIC_APP.value)
 
         # Add OpenAPI tab if we are in an agent mode 
         if getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT:
             self.openapiTab = self.create_openapi_tab()
-            self.tabs.addTab(self.openapiTab, "OpenAPI Functions")
+            self.tabs.addTab(self.openapiTab, FunctionTab.OPENAPI.value)
 
         mainLayout.addWidget(self.tabs)
 
@@ -418,7 +426,7 @@ class CreateFunctionDialog(QDialog):
 
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             # Generate the spec (goes into self.azure_spec_json on completion)
-            threading.Thread(target=self._generate_function_spec, args=(request_message, "Azure Logic Apps")).start()
+            threading.Thread(target=self._generate_function_spec, args=(request_message, FunctionTab.AZURE_LOGIC_APP.value)).start()
             # Generate the code (goes into self.azure_code on completion)
             threading.Thread(target=self._generate_logic_app_user_function_thread, args=(request_message,)).start()
         except Exception as e:
@@ -596,12 +604,12 @@ class CreateFunctionDialog(QDialog):
         self.status_bar.stop_animation(status)
         # Based on the current active tab, update only that tab's controls if needed
         current_tab = self.tabs.tabText(self.tabs.currentIndex())
-        if current_tab == "User Functions":
+        if current_tab == FunctionTab.USER.value:
             if self.user_spec_json is not None:
                 self.userSpecEdit.setText(self.user_spec_json)
             if self.user_code is not None:
                 self.userImplEdit.setText(self.user_code)
-        elif current_tab == "Azure Logic Apps":
+        elif current_tab == FunctionTab.AZURE_LOGIC_APP.value:
             if self.azure_spec_json is not None:
                 self.azureUserFunctionSpecEdit.setText(self.azure_spec_json)
             if self.azure_code is not None:
@@ -621,9 +629,9 @@ class CreateFunctionDialog(QDialog):
                 raise Exception("Function spec creator not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
             result = self.function_spec_creator.process_messages(user_request=user_request, stream=False)
-            if target_tab == "User Functions":
+            if target_tab == FunctionTab.USER.value:
                 self.user_spec_json = result
-            elif target_tab == "Azure Logic Apps":
+            elif target_tab == FunctionTab.AZURE_LOGIC_APP.value:
                 self.azure_spec_json = result
         except Exception as e:
             self.error_signal.error_signal.emit(f"An error occurred while generating the function spec: {e}")
@@ -653,22 +661,22 @@ class CreateFunctionDialog(QDialog):
     def save_function(self):
         current_tab_text = self.tabs.tabText(self.tabs.currentIndex())
         
-        if current_tab_text == "System Functions":
+        if current_tab_text == FunctionTab.SYSTEM.value:
             functionSpec = self.systemSpecEdit.toPlainText()
             functionImpl = None
             function_selector = self.systemFunctionSelector
 
-        elif current_tab_text == "User Functions":
+        elif current_tab_text == FunctionTab.USER.value:
             functionSpec = self.userSpecEdit.toPlainText()
             functionImpl = self.userImplEdit.toPlainText()
             function_selector = self.userFunctionSelector
 
-        elif current_tab_text == "Azure Logic Apps":
+        elif current_tab_text == FunctionTab.AZURE_LOGIC_APP.value:
             functionSpec = self.azureUserFunctionSpecEdit.toPlainText()
             functionImpl = self.azureUserFunctionImplEdit.toPlainText()
             function_selector = None
 
-        elif current_tab_text == "OpenAPI":
+        elif current_tab_text == FunctionTab.OPENAPI.value:
             try:
                 self.save_openapi_function()
                 return
@@ -692,7 +700,7 @@ class CreateFunctionDialog(QDialog):
         new_function_name = None
 
         # Figure out the function name from the spec or the selector
-        if current_tab_text == "Azure Logic Apps":
+        if current_tab_text == FunctionTab.AZURE_LOGIC_APP.value:
             try:
                 spec_dict = json.loads(functionSpec)
                 current_user_function_names = self.get_user_function_names()
@@ -747,13 +755,13 @@ class CreateFunctionDialog(QDialog):
     def remove_function(self):
         current_tab_text = self.tabs.tabText(self.tabs.currentIndex())
 
-        if current_tab_text == "System Functions":
+        if current_tab_text == FunctionTab.SYSTEM.value:
             # If your FunctionConfigManager has no method to remove system functions,
             # show a warning or implement your own logic here.
             QMessageBox.warning(self, "Not Supported", "Removing system functions is not supported.")
             return
 
-        elif current_tab_text == "User Functions":
+        elif current_tab_text == FunctionTab.USER.value:
             # Example: remove using the name from a combo box (or text field)
             function_name = self.userFunctionSelector.currentText().strip()
             if not function_name:
@@ -776,12 +784,12 @@ class CreateFunctionDialog(QDialog):
             else:
                 QMessageBox.warning(self, "Error", f"User function '{function_name}' was not found.")
 
-        elif current_tab_text == "Azure Logic Apps":
+        elif current_tab_text == FunctionTab.AZURE_LOGIC_APP.value:
             # If you don't have a remove method for Azure logic apps yet, show a message (or implement similarly)
             QMessageBox.warning(self, "Not Supported", "Removing Azure Logic App functions is not yet supported.")
             return
 
-        elif current_tab_text == "OpenAPI":
+        elif current_tab_text == FunctionTab.OPENAPI.value:
             # Remove the OpenAPI function, using its name from an edit or the combo box
             openapi_name = self.openapiNameEdit.text().strip()
             if not openapi_name:
