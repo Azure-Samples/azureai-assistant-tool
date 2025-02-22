@@ -15,7 +15,7 @@
 
 - 🤖🛠️ Azure AI Assistants Tool
 - 🆕 Latest News
-- 🧱 What is Assistants from Azure OpenAI Service?
+- 🧱 Assistants from Azure OpenAI Service?
 - 🚀 How does this Tool help?
 - 🔊🎤 OpenAI Realtime Support (Experimental)
 - ✨ Quick Start: Getting Started with the Tool
@@ -30,12 +30,31 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 > [!IMPORTANT]
 > **The Azure AI Assistant Tool is experimental**, created to support your product ideation and experimentation using AI agents. As the tool evolves, expect significant updates and improvements. We welcome feedback and contributions to help shape its future.
 
+
 ## 🆕 Latest News
 
+- **February 23, 2025:** Released version 0.5.2 of the tool, introducing preview support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes.
 - **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
-## 🧱 What is Assistants from Azure OpenAI service?
+## 🧱 Azure AI Agents
+
+🌟**Azure AI Agents**, a fully managed service from Azure AI, transforms how developers build interactive AI-driven applications by integrating powerful generative models with real-world data sources and tools. This makes it easy to build, deploy, and scale adaptable AI agents with minimal coding. The service provides all the functionalities of Azure OpenAI Assistants, plus: 
+
+**Key Features** include:
+
+- **Azure AI Tools**: Seamlessly integrate and execute server-side tools like Bing, Azure AI Search, and Azure Functions without handling calls manually.
+- **Azure AI Foundry Project**: Utilizes Azure AI Foundry Projects to get access to different connections, models, Azure Logic Apps, telemetry
+- **Extensive Model Support**: Utilize a diverse range of AI models including Azure OpenAI, Llama 3, Mistral, and Cohere to meet enterprise requirements.
+- **Enterprise Data Integration**: Leverage secure data interactions across multiple sources and ensure enterprise-grade security and privacy.
+
+**Learn more** about Azure AI Agents:
+
+  - Explore detailed documentation and guides on [Azure AI Agents Overview](https://learn.microsoft.com/en-us/azure/ai-services/agents/overview).
+  - Engage with Microsoft Q&A for community insights or product feedback.
+
+
+## 🧱 Azure OpenAI Assistants
 
 🌟**Assistants**, API from Azure OpenAI Service, is a stateful evolution of the Chat Completions API. Assistants makes it easier for developers to create applications with sophisticated copilot-like experiences in their applications and enable developer access to powerful tools like Code Interpreter and File Search. Assistants is built on the same capabilities that power OpenAI’s GPT product and offers unparalleled flexibility for creating a wide range of copilot-like applications. Copilots created with Assistants can sift through data, suggest solutions, and automate tasks and use cases span a wide range: AI-powered product recommender, sales analyst app, coding assistant, employee Q&A chatbot, and more.
 
@@ -55,12 +74,12 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 ## 🚀 How Does This Tool Help?
 
-- **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using OpenAI's technologies, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
+- **Enable Rapid AI Agent Prototyping:** Rapidly create AI agent prototypes using Azure AI and OpenAI's technologies, Agents, Assistants, Chat Completion, and Realtime APIs. This includes user-friendly configurability of different agents, built-in system functions, specific tool configurations, and LLM configurations.
 
 - **Enhance Developer Productivity:** Streamline the agent development process through built-in middleware libraries and tools, utilizing tools in prompt engineering to automate your coding tasks and integrate AI capabilities into your copilot applications more effectively.
 
 
-## 🔊🎤 OpenAI Realtime Support (Experimental)
+## 🔊🎤 OpenAI Realtime
 
 This section covers the Realtime capabilities for AI agent prototyping with OpenAI's Realtime APIs, focusing on speech and text input/output through real-time WebSocket communication.
 
@@ -95,7 +114,7 @@ https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
 
 - Create an Azure Subscription for [free](https://azure.microsoft.com/en-us/free/ai-services/), if you don't have one already
 - [Apply for access](https://aka.ms/oai/access) to Azure OpenAI Service in this Azure Subscription. Azure OpenAI Service is currently a limited access service so access is granted through an application process. Most applications are processed within a day of applying.
-- Azure OpenAI Assistants is currently available in Sweden Central, East US 2, and Australia East. We are expanding our models and regional availability - see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availability for Assistants.
+- Azure OpenAI Assistants models and region availability, see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availability for Assistants.
 - Create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region
 
 ### Step 2: Install Python
