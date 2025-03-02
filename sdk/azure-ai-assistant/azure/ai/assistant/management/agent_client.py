@@ -466,7 +466,7 @@ class AgentClient(BaseAssistantClient):
         try:
             assistant_id = assistant_config.assistant_id
             self._ai_client.agents.delete_agent(
-                assistant_id=assistant_id
+                agent_id=assistant_id
             )
             logger.info(f"Deleted agent with ID: {assistant_id}")
         except Exception as e:
@@ -534,7 +534,7 @@ class AgentClient(BaseAssistantClient):
 
             run = self._ai_client.agents.create_run(
                 thread_id=thread_id,
-                assistant_id=self.assistant_config.assistant_id,
+                agent_id=self.assistant_config.assistant_id,
                 additional_instructions=additional_instructions,
                 temperature=None if text_completion_config is None else text_completion_config.temperature,
                 max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
@@ -620,7 +620,7 @@ class AgentClient(BaseAssistantClient):
 
             with self._ai_client.agents.create_stream(
                 thread_id=thread_id,
-                assistant_id=self._assistant_config.assistant_id,
+                agent_id=self._assistant_config.assistant_id,
                 additional_instructions=additional_instructions,
                 temperature=None if text_completion_config is None else text_completion_config.temperature,
                 max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
@@ -678,7 +678,7 @@ class AgentClient(BaseAssistantClient):
     ):
         try:
             logger.info(f"Retrieving agent with ID: {assistant_id}")
-            return self._ai_client.agents.get_agent(assistant_id=assistant_id)
+            return self._ai_client.agents.get_agent(agent_id=assistant_id)
         except Exception as e:
             logger.error(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
             raise EngineError(f"Failed to retrieve agent with ID: {assistant_id}: {e}")
@@ -772,7 +772,7 @@ class AgentClient(BaseAssistantClient):
             tools, resources = self._build_tools_and_resources(assistant_config, tool_resources)
 
             self._ai_client.agents.update_agent(
-                assistant_id=assistant_config.assistant_id,
+                agent_id=assistant_config.assistant_id,
                 name=assistant_config.name,
                 instructions=instructions,
                 tools=tools,

@@ -6,6 +6,7 @@
 
 import json
 import threading
+import copy
 from typing import List
 
 from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox, QFrame, QFormLayout
@@ -13,6 +14,7 @@ from PySide6.QtCore import Qt
 
 from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
+from azure.ai.assistant.management.azure_functions_manager import AzureFunctionManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
@@ -21,11 +23,50 @@ from gui.utils import camel_to_snake
 from enum import Enum
 
 
+azure_function_spec_template = {
+   "type": "azure_function",
+   "azure_function": {
+      "function": {
+         "name": "function_name, e.g. get_weather",
+         "module": "azure_functions",
+         "description": "Description of the function, e.g. Get the weather",
+         "parameters": {
+               "type": "object",
+               "properties": {
+                     "argument_1, e.g. location": {
+                      "type": "argument_type, e.g. string",
+                      "description": "The description, e.g. location of the weather"
+                  }
+               },
+               "required": [
+                  "argument_1 of function, e.g. location"
+               ]
+            }
+      },
+      "input_binding": {
+         "type": "storage_queue",
+         "storage_queue": {
+            "queue_service_uri": "DEPLOYMENT_STORAGE_CONNECTION_STRING",
+            "queue_name": "inputQueue"
+         }
+      },
+      "output_binding": {
+         "type": "storage_queue",
+         "storage_queue": {
+            "queue_service_uri": "DEPLOYMENT_STORAGE_CONNECTION_STRING",
+            "queue_name": "outputQueue"
+         }
+      }
+   }
+}
+
+
 class FunctionTab(Enum):
     SYSTEM = "System Functions"
     USER = "User Functions"
     AZURE_LOGIC_APP = "Azure Logic App Functions"
     OPENAPI = "OpenAPI Functions"
+    AZURE_FUNCTIONS = "Azure Functions"
 
 
 class CreateFunctionDialog(QDialog):
@@ -71,6 +112,9 @@ class CreateFunctionDialog(QDialog):
             hasattr(self.main_window, 'azure_logic_app_manager')):
             self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
             self.tabs.addTab(self.azureLogicAppsTab, FunctionTab.AZURE_LOGIC_APP.value)
+
+            self.azureFunctionsTab = self.create_azure_functions_tab()
+            self.tabs.addTab(self.azureFunctionsTab, FunctionTab.AZURE_FUNCTIONS.value)
 
         # Add OpenAPI tab if we are in an agent mode 
         if getattr(self.main_window, 'active_ai_client_type', None) == AIClientType.AZURE_AI_AGENT:
@@ -261,7 +305,7 @@ class CreateFunctionDialog(QDialog):
             self.openapiSpecEdit.clear()
             self.connection_id_edit.clear()
             self.audience_edit.clear()
-            self.openapiAuthSelector.setCurrentIndex(0)  # default to "anonymous", for example
+            self.openapiAuthSelector.setCurrentIndex(0)  # default to "anonymous"
 
     def save_openapi_function(self):
         # Gather fields
@@ -283,7 +327,7 @@ class CreateFunctionDialog(QDialog):
         try:
             spec_dict = json.loads(raw_spec)
         except json.JSONDecodeError as ex:
-            QMessageBox.warning(self, "Error", f"Invalid JSON for OpenAPI spec:\n{e}")
+            QMessageBox.warning(self, "Error", f"Invalid JSON for OpenAPI spec:\n{ex}")
             return
 
         openapi_data = {
@@ -362,6 +406,164 @@ class CreateFunctionDialog(QDialog):
         main_layout.addWidget(splitter)
 
         return tab
+
+    def create_azure_functions_tab(self):
+        tab = QWidget()
+        main_layout = QVBoxLayout(tab)
+
+        # Row 1: "Select Azure Function App" + Load button
+        row1_layout = QHBoxLayout()
+        label_app = QLabel("Select Azure Function App:")
+        row1_layout.addWidget(label_app)
+
+        self.azureFunctionAppSelector = QComboBox(self)
+        row1_layout.addWidget(self.azureFunctionAppSelector)
+
+        self.loadAzureFunctionAppsButton = QPushButton("Load", self)
+        self.loadAzureFunctionAppsButton.clicked.connect(self.load_azure_function_apps)
+        row1_layout.addWidget(self.loadAzureFunctionAppsButton)
+        main_layout.addLayout(row1_layout)
+
+        # Row 2: "Select Function in App:" + function combo + "Details.." button
+        row2_layout = QHBoxLayout()
+        label_func = QLabel("Select Function in App:")
+        row2_layout.addWidget(label_func)
+
+        self.azureFunctionSelector = QComboBox(self)
+        row2_layout.addWidget(self.azureFunctionSelector)
+
+        # Add the "Details.." button for the selected function
+        self.viewAzureFunctionDetailsButton = QPushButton("Details..", self)
+        self.viewAzureFunctionDetailsButton.clicked.connect(self.open_azure_function_details_dialog)
+        row2_layout.addWidget(self.viewAzureFunctionDetailsButton)
+
+        main_layout.addLayout(row2_layout)
+
+        # Connect selection signals
+        self.azureFunctionAppSelector.currentIndexChanged.connect(self.on_azure_function_app_selected)
+        self.azureFunctionSelector.currentIndexChanged.connect(self.on_azure_function_selected)
+
+        # Text box to show or paste code for the selected function
+        self.azureFunctionCodeEdit = self.create_text_edit()
+        code_widget = self.create_text_edit_labeled("Fill the details into Azure function specification below:", self.azureFunctionCodeEdit)
+        main_layout.addWidget(code_widget)
+
+        return tab
+
+    def open_azure_function_details_dialog(self):
+        """
+        Open a dialog showing details for the currently selected Azure Function.
+        This mirrors the approach used in open_logic_app_details_dialog.
+        """
+        from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit
+        try:
+            if not hasattr(self.main_window, 'azure_function_manager'):
+                QMessageBox.warning(self, "Warning", "Azure Function Manager is not available.")
+                return
+
+            manager: AzureFunctionManager = self.main_window.azure_function_manager
+            function_app_name = self.azureFunctionAppSelector.currentText()
+            func_data = self.azureFunctionSelector.currentData()
+
+            if not function_app_name or not func_data:
+                QMessageBox.warning(self, "Warning", "No Azure Function selected.")
+                return
+
+            # The function_data structure often has a 'name' key like "appName/functions/FunctionName"
+            function_name = func_data.get("name", "")
+            if not function_name:
+                QMessageBox.warning(self, "Warning", "Invalid function name.")
+                return
+
+            function_details = manager.get_function_details(function_app_name, function_name)
+            if not function_details:
+                QMessageBox.information(self, "Details", f"No details available for function '{function_name}'.")
+                return
+
+            # Display the details in a simple dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Details for {function_name}")
+            layout = QVBoxLayout(dialog)
+            text_edit = QTextEdit(dialog)
+            text_edit.setReadOnly(True)
+            text_edit.setText(json.dumps(function_details, indent=4))
+            layout.addWidget(text_edit)
+            dialog.resize(600, 400)
+            dialog.setLayout(layout)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Error retrieving function details: {e}")
+            QMessageBox.warning(self, "Error", "Error retrieving function details.")
+
+    def load_azure_function_apps(self):
+        if not hasattr(self.main_window, 'azure_function_manager'):
+            QMessageBox.warning(self, "Error", "AzureFunctionManager not available.")
+            return
+        
+        try:
+            self.azure_function_manager : AzureFunctionManager = self.main_window.azure_function_manager
+
+            # Initialize (this will discover function apps in the RG)
+            self.azure_function_manager.initialize_function_apps()
+
+            self.azureFunctionAppSelector.clear()
+            apps = self.azure_function_manager.list_function_apps()
+            if not apps:
+                self.azureFunctionAppSelector.addItem("No Function Apps found", None)
+                return
+            for app_name in apps:
+                self.azureFunctionAppSelector.addItem(app_name, app_name)
+        except Exception as e:
+            logger.error(f"Error loading Azure Function Apps: {e}")
+            QMessageBox.warning(self, "Error", f"Error loading Azure Function Apps: {e}")
+
+    def on_azure_function_app_selected(self):
+        app_name = self.azureFunctionAppSelector.currentData()
+        if not app_name:
+            # Possibly "No Function Apps found" or similar
+            self.azureFunctionSelector.clear()
+            self.azureFunctionSelector.addItem("No Functions", None)
+            return
+
+        # Retrieve the functions in that app
+        if not hasattr(self, 'azure_function_manager'):
+            QMessageBox.warning(self, "Error", "AzureFunctionManager not available.")
+            return
+
+        try:
+            functions = self.azure_function_manager.list_azure_functions_in_app(app_name)
+            self.azureFunctionSelector.clear()
+            if not functions:
+                self.azureFunctionSelector.addItem("No Functions in this app", None)
+                return
+            
+            for fn in functions:
+                # The 'name' is typically "appName/functions/FunctionName". 
+                # Possibly parse it for a friendly label, or you can show the raw name
+                friendly_name = fn["name"]
+                function_name = friendly_name.split("/")[-1]
+                self.azureFunctionSelector.addItem(function_name, fn)
+        except Exception as e:
+            logger.error(f"Error loading functions in app '{app_name}': {e}")
+            QMessageBox.warning(self, "Error", f"Error listing functions in '{app_name}': {e}")
+
+    def on_azure_function_selected(self):
+        func_data = self.azureFunctionSelector.currentData()
+        if not func_data:
+            self.azureFunctionCodeEdit.clear()
+            return
+
+        full_name = func_data.get("name", "")
+        function_name = full_name.split("/")[-1]
+
+        # Make a copy so the global template isn't mutated
+        spec_copy = copy.deepcopy(azure_function_spec_template)
+
+        # Convert the spec template to a JSON string
+        template_json_str = json.dumps(spec_copy, indent=4)
+
+        # Display the JSON in the edit box
+        self.azureFunctionCodeEdit.setPlainText(template_json_str)
 
     def clear_azure_user_function_impl(self):
         self.azureUserFunctionSpecEdit.clear()
@@ -620,7 +822,7 @@ class CreateFunctionDialog(QDialog):
         # When generating for user functions, indicate target as "User Functions".
         threading.Thread(
             target=self._generate_function_spec, 
-            args=(user_request, "User Functions")
+            args=(user_request, FunctionTab.USER.value)
         ).start()
 
     def _generate_function_spec(self, user_request, target_tab):
@@ -676,6 +878,11 @@ class CreateFunctionDialog(QDialog):
             functionImpl = self.azureUserFunctionImplEdit.toPlainText()
             function_selector = None
 
+        elif current_tab_text == FunctionTab.AZURE_FUNCTIONS.value:
+            functionSpec = self.azureFunctionCodeEdit.toPlainText()
+            functionImpl = None
+            function_selector = self.azureFunctionSelector
+
         elif current_tab_text == FunctionTab.OPENAPI.value:
             try:
                 self.save_openapi_function()
@@ -696,8 +903,6 @@ class CreateFunctionDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while validating the function: {e}")
             return
-
-        new_function_name = None
 
         # Figure out the function name from the spec or the selector
         if current_tab_text == FunctionTab.AZURE_LOGIC_APP.value:
@@ -728,6 +933,7 @@ class CreateFunctionDialog(QDialog):
             return
 
         # Save the impl if any
+        file_path = None
         if functionImpl:
             try:
                 file_path = self.function_config_manager.save_function_impl(
@@ -748,7 +954,7 @@ class CreateFunctionDialog(QDialog):
             return
 
         success_message = f"Function '{new_function_name or current_function_name}' saved successfully."
-        if functionImpl:
+        if functionImpl and file_path:
             success_message += f" Impl file: {file_path}"
         QMessageBox.information(self, "Success", success_message)
 
@@ -756,13 +962,10 @@ class CreateFunctionDialog(QDialog):
         current_tab_text = self.tabs.tabText(self.tabs.currentIndex())
 
         if current_tab_text == FunctionTab.SYSTEM.value:
-            # If your FunctionConfigManager has no method to remove system functions,
-            # show a warning or implement your own logic here.
             QMessageBox.warning(self, "Not Supported", "Removing system functions is not supported.")
             return
 
         elif current_tab_text == FunctionTab.USER.value:
-            # Example: remove using the name from a combo box (or text field)
             function_name = self.userFunctionSelector.currentText().strip()
             if not function_name:
                 QMessageBox.warning(self, "Error", "Please select a user function to remove.")
@@ -785,12 +988,10 @@ class CreateFunctionDialog(QDialog):
                 QMessageBox.warning(self, "Error", f"User function '{function_name}' was not found.")
 
         elif current_tab_text == FunctionTab.AZURE_LOGIC_APP.value:
-            # If you don't have a remove method for Azure logic apps yet, show a message (or implement similarly)
             QMessageBox.warning(self, "Not Supported", "Removing Azure Logic App functions is not yet supported.")
             return
 
         elif current_tab_text == FunctionTab.OPENAPI.value:
-            # Remove the OpenAPI function, using its name from an edit or the combo box
             openapi_name = self.openapiNameEdit.text().strip()
             if not openapi_name:
                 QMessageBox.warning(self, "Error", "Cannot remove OpenAPI function: no name specified.")
@@ -813,7 +1014,6 @@ class CreateFunctionDialog(QDialog):
 
         else:
             QMessageBox.warning(self, "Error", "Invalid tab selected for removal.")
-
 
     def refresh_dropdown(self):
         self.load_functions(self.userFunctionSelector, "user")

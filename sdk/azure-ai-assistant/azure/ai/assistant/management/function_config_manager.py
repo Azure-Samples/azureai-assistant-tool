@@ -31,6 +31,7 @@ function_spec_template = {
     }
 }
 
+
 class FunctionConfigManager:
     _instance = None
     """

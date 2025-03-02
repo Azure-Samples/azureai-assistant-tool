@@ -21,6 +21,7 @@ from azure.ai.assistant.management.assistant_client_callbacks import AssistantCl
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
+from azure.ai.assistant.management.azure_functions_manager import AzureFunctionManager
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
@@ -86,7 +87,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.init_system_assistant_settings()
             self.init_system_assistants()
         except Exception as e:
-            error_message = f"An error occurred while initializing the system assistants: {e}"
+            error_message = f"{e}"
+            self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
     def init_system_assistants(self):
@@ -127,17 +129,16 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
         self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
 
-        try:
-            resolved_client_type = AIClientType[self.system_client_type]
-            self.system_client = get_ai_client(resolved_client_type, self.system_api_version)
+        resolved_client_type = AIClientType[self.system_client_type]
+        self.system_client = get_ai_client(resolved_client_type, self.system_api_version)
 
-            if self.system_client is None:
-                raise ValueError(f"Unable to initialize AI client of type {self.system_client_type}. Check your keys or config.")
-
-        except Exception as e:
-            logger.error(f"Error initializing system assistant client {self.system_client_type}: {e}")
-            raise ValueError(f"Error initializing system assistant client {self.system_client_type}: {e}")
-
+        if self.system_client is None:
+            raise ValueError(
+                f"Unable to initialize system assistants of type: {self.system_client_type}. "
+                "System assistants are AI agents integrated into the application to provide "
+                "additional functionality; it is recommended (but not mandatory) to set up the system assistant settings for full functionality. "
+                "Check system_assistant_settings.json or configure them under the Settings menu."
+            )
     def initialize_ui(self):
         self.initialize_ui_components()
         self.initialize_signals()
@@ -284,6 +285,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             subscription_id = client.scope["subscription_id"]
             resource_group = client.scope["resource_group_name"]
             self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
+            self.azure_function_manager = AzureFunctionManager.get_instance(subscription_id, resource_group)
 
         self.status_messages['ai_client_type'] = ""
         self.update_client_label()

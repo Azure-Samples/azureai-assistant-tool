@@ -45,7 +45,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 - **Azure AI Agents Service Tools**: Seamlessly integrate and execute server-side tools like `Bing Grounding`, `Azure AI Search`, `OpenAPI Functions` and `Azure Functions`.
 - **Azure AI Foundry Project Connections**: Utilizes Azure AI Foundry Projects to get access to different connections, e.g., `Azure Logic Apps`, `Application Insights`.
-- **Extensive Model Support**: Utilize a diverse range of AI models including Azure OpenAI, Llama 3, Mistral, and Cohere to meet enterprise requirements.
+- **Extensive Model Support**: Utilize a diverse range of AI models including `Azure OpenAI`, `Llama 3`, `Mistral`, and `Cohere` to meet enterprise requirements.
 - **Enterprise Data Integration**: Leverage secure data interactions across multiple sources and ensure enterprise-grade security and privacy.
 
 **Learn more** about Azure AI Agents:

@@ -217,7 +217,7 @@ class ConversationMessage:
         if thread_message.role.value == "assistant":
             # Optionally use assistant name from config manager
             name = self._assistant_config_manager.get_assistant_name_by_assistant_id(
-                thread_message.assistant_id
+                thread_message.agent_id
             )
             return name if name else "assistant"
         else:
