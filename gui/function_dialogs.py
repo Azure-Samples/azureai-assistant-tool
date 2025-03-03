@@ -11,6 +11,7 @@ from typing import List
 
 from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox, QFrame, QFormLayout
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextOption
 
 from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
@@ -113,6 +114,7 @@ class CreateFunctionDialog(QDialog):
             self.azureLogicAppsTab = self.create_azure_logic_apps_tab()
             self.tabs.addTab(self.azureLogicAppsTab, FunctionTab.AZURE_LOGIC_APP.value)
 
+            self.azureFunctionSpecEdit = self.create_text_edit()
             self.azureFunctionsTab = self.create_azure_functions_tab()
             self.tabs.addTab(self.azureFunctionsTab, FunctionTab.AZURE_FUNCTIONS.value)
 
@@ -422,6 +424,7 @@ class CreateFunctionDialog(QDialog):
         self.loadAzureFunctionAppsButton = QPushButton("Load", self)
         self.loadAzureFunctionAppsButton.clicked.connect(self.load_azure_function_apps)
         row1_layout.addWidget(self.loadAzureFunctionAppsButton)
+
         main_layout.addLayout(row1_layout)
 
         # Row 2: "Select Function in App:" + function combo + "Details.." button
@@ -432,6 +435,9 @@ class CreateFunctionDialog(QDialog):
         self.azureFunctionSelector = QComboBox(self)
         row2_layout.addWidget(self.azureFunctionSelector)
 
+        self.azureFunctionAppSelector.currentIndexChanged.connect(self.on_azure_function_app_selected)
+        self.azureFunctionSelector.currentIndexChanged.connect(self.on_azure_function_selected)
+
         # Add the "Details.." button for the selected function
         self.viewAzureFunctionDetailsButton = QPushButton("Details..", self)
         self.viewAzureFunctionDetailsButton.clicked.connect(self.open_azure_function_details_dialog)
@@ -439,23 +445,64 @@ class CreateFunctionDialog(QDialog):
 
         main_layout.addLayout(row2_layout)
 
-        # Connect selection signals
-        self.azureFunctionAppSelector.currentIndexChanged.connect(self.on_azure_function_app_selected)
-        self.azureFunctionSelector.currentIndexChanged.connect(self.on_azure_function_selected)
+        # Insert a separate combo box for local azure_function specs from config:
+        local_layout = QHBoxLayout()
+        label_local = QLabel("Pick from local Azure function specs:")
+        local_layout.addWidget(label_local)
 
-        # Text box to show or paste code for the selected function
-        self.azureFunctionCodeEdit = self.create_text_edit()
-        code_widget = self.create_text_edit_labeled("Fill the details into Azure function specification below:", self.azureFunctionCodeEdit)
+        self.azureFunctionSelectorLocal = self.create_function_selector("azure_function")
+        local_layout.addWidget(self.azureFunctionSelectorLocal)
+
+        main_layout.addLayout(local_layout)
+
+        code_widget = self.create_text_edit_labeled(
+            "Azure Function Specification (from local config or loaded from Azure):", 
+            self.azureFunctionSpecEdit
+        )
         main_layout.addWidget(code_widget)
 
         return tab
 
+    def build_azure_function_spec(self, app_details: dict, function_details: dict) -> dict:
+
+        # Make a deep copy so we don't modify the original template
+        spec = copy.deepcopy(azure_function_spec_template)
+
+        # 1. Extract the short function name from e.g. "aml-jhakulin-func-app/queue_trigger"
+        full_function_name = function_details.get("name", "")
+        short_function_name = full_function_name.split("/")[-1] if full_function_name else "unknown_function"
+        spec["azure_function"]["function"]["name"] = short_function_name
+
+        # 2. Identify the input and output bindings from the function details
+        bindings = function_details.get("bindings", [])
+        input_binding_info = next((b for b in bindings if b.get("direction") == "IN"), None)
+        output_binding_info = next((b for b in bindings if b.get("direction") == "OUT"), None)
+
+        # 3. Fill in the input binding info (if present)
+        if input_binding_info:
+            in_queue_name = input_binding_info.get("queueName", "input")
+            # Typically, if the binding's "connection" is "DEPLOYMENT_STORAGE_CONNECTION_STRING",
+            # we use the "AzureWebJobsStorage" from app_details
+            queue_service_connection = app_details.get("AzureWebJobsStorage", "")
+            spec["azure_function"]["input_binding"]["storage_queue"]["queue_name"] = in_queue_name
+            spec["azure_function"]["input_binding"]["storage_queue"]["queue_service_uri"] = queue_service_connection
+        else:
+            # No IN binding -> remove the input_binding section altogether
+            spec["azure_function"].pop("input_binding", None)
+
+        # 4. Fill in the output binding info (if present)
+        if output_binding_info:
+            out_queue_name = output_binding_info.get("queueName", "output")
+            queue_service_connection = app_details.get("AzureWebJobsStorage", "")
+            spec["azure_function"]["output_binding"]["storage_queue"]["queue_name"] = out_queue_name
+            spec["azure_function"]["output_binding"]["storage_queue"]["queue_service_uri"] = queue_service_connection
+        else:
+            # No OUT binding -> remove the output_binding section
+            spec["azure_function"].pop("output_binding", None)
+
+        return spec
+
     def open_azure_function_details_dialog(self):
-        """
-        Open a dialog showing details for the currently selected Azure Function.
-        This mirrors the approach used in open_logic_app_details_dialog.
-        """
-        from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit
         try:
             if not hasattr(self.main_window, 'azure_function_manager'):
                 QMessageBox.warning(self, "Warning", "Azure Function Manager is not available.")
@@ -475,19 +522,33 @@ class CreateFunctionDialog(QDialog):
                 QMessageBox.warning(self, "Warning", "Invalid function name.")
                 return
 
+            app_details = manager.get_function_app_details(function_app_name)
             function_details = manager.get_function_details(function_app_name, function_name)
             if not function_details:
                 QMessageBox.information(self, "Details", f"No details available for function '{function_name}'.")
                 return
 
-            # Display the details in a simple dialog
+            # Display both the app_details and function_details in a simple dialog
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Details for {function_name}")
             layout = QVBoxLayout(dialog)
+
             text_edit = QTextEdit(dialog)
             text_edit.setReadOnly(True)
-            text_edit.setText(json.dumps(function_details, indent=4))
+
+            # Enable line wrapping and character/word wrapping
+            text_edit.setLineWrapMode(text_edit.LineWrapMode.WidgetWidth)
+            text_edit.setWordWrapMode(QTextOption.WrapMode.WordWrap)
+
+            # Combine both details into a single string, formatted with JSON:
+            result_text = "App Details:\n"
+            result_text += json.dumps(app_details, indent=4)
+            result_text += "\n\nFunction Details:\n"
+            result_text += json.dumps(function_details, indent=4)
+
+            text_edit.setText(result_text)
             layout.addWidget(text_edit)
+
             dialog.resize(600, 400)
             dialog.setLayout(layout)
             dialog.exec()
@@ -550,20 +611,24 @@ class CreateFunctionDialog(QDialog):
     def on_azure_function_selected(self):
         func_data = self.azureFunctionSelector.currentData()
         if not func_data:
-            self.azureFunctionCodeEdit.clear()
+            self.azureFunctionSpecEdit.clear()
             return
 
         full_name = func_data.get("name", "")
-        function_name = full_name.split("/")[-1]
+        if not full_name:
+            self.azureFunctionSpecEdit.clear()
+            return
 
         # Make a copy so the global template isn't mutated
-        spec_copy = copy.deepcopy(azure_function_spec_template)
+        app_details = self.azure_function_manager.get_function_app_details(self.azureFunctionAppSelector.currentText())
+        function_details = self.azure_function_manager.get_function_details(self.azureFunctionAppSelector.currentText(), full_name)
+        spec = self.build_azure_function_spec(app_details, function_details)
 
         # Convert the spec template to a JSON string
-        template_json_str = json.dumps(spec_copy, indent=4)
+        template_json_str = json.dumps(spec, indent=4)
 
         # Display the JSON in the edit box
-        self.azureFunctionCodeEdit.setPlainText(template_json_str)
+        self.azureFunctionSpecEdit.setPlainText(template_json_str)
 
     def clear_azure_user_function_impl(self):
         self.azureUserFunctionSpecEdit.clear()
@@ -755,33 +820,73 @@ class CreateFunctionDialog(QDialog):
         return textEdit
 
     def create_function_selector(self, function_type):
+        if function_type == "system":
+            spec_edit = self.systemSpecEdit
+            impl_edit = None
+        elif function_type == "user":
+            spec_edit = self.userSpecEdit
+            impl_edit = self.userImplEdit
+        elif function_type == "azure_function":
+            spec_edit = self.azureFunctionSpecEdit
+            impl_edit = None
+        else:
+            # Fallback: no connected text boxes
+            spec_edit = None
+            impl_edit = None
+
         function_selector = QComboBox(self)
         function_selector.currentIndexChanged.connect(
-            lambda: self.on_function_selected(
-                function_selector,
-                self.systemSpecEdit if function_type == "system" else self.userSpecEdit,
-                self.userImplEdit if function_type == "user" else None
-            )
+            lambda: self.on_function_selected(function_selector, spec_edit, impl_edit)
         )
+
+        # Populate based on the given type
         self.load_functions(function_selector, function_type)
         return function_selector
 
     def get_user_function_names(self):
         functions_data = self.function_config_manager.get_all_functions_data()
-        return [f_spec['function']['name'] for f_type, f_spec, _ in functions_data if f_type == "user"]
+        return [
+            f_spec["function"]["name"]
+            for f_type, f_spec, _ in functions_data
+            # Must be in manager-level "user" category
+            # AND actually a normal function spec ("type": "function")
+            if f_type == "user" and f_spec.get("type") == "function"
+        ]
 
     def load_functions(self, function_selector, function_type):
         functions_data = self.function_config_manager.get_all_functions_data()
         function_selector.clear()
+
+        # If it's the user tab, we also add "New Function" at the top:
         if function_type == "user":
             function_selector.addItem("New Function", None)
+
         for f_type, function_spec, _ in functions_data:
-            if f_type == function_type:
-                try:
-                    func_name = function_spec['function']['name']
-                    function_selector.addItem(func_name, (f_type, function_spec))
-                except Exception as e:
-                    logger.error(f"Error loading functions: {e}")
+            if function_type == "user":
+                if f_type == "user" and function_spec.get("type") == "function":
+                    try:
+                        func_name = function_spec["function"]["name"]
+                        function_selector.addItem(func_name, (f_type, function_spec))
+                    except Exception as e:
+                        logger.error(f"Error loading user functions: {e}")
+
+            elif function_type == "azure_function":
+                if function_spec.get("type") == "azure_function":
+                    try:
+                        azure_block = function_spec.get("azure_function", {})
+                        azure_func = azure_block.get("function", {})
+                        func_name = azure_func.get("name", "UnnamedAzureFunction")
+                        function_selector.addItem(func_name, (f_type, function_spec))
+                    except Exception as e:
+                        logger.error(f"Error loading Azure functions: {e}")
+
+            else:
+                if f_type == function_type:
+                    try:
+                        func_name = function_spec["function"]["name"]
+                        function_selector.addItem(func_name, (f_type, function_spec))
+                    except Exception as e:
+                        logger.error(f"Error loading functions: {e}")
 
     def on_function_selected(self, function_selector, spec_edit, impl_edit=None):
         function_data = function_selector.currentData()
@@ -879,7 +984,7 @@ class CreateFunctionDialog(QDialog):
             function_selector = None
 
         elif current_tab_text == FunctionTab.AZURE_FUNCTIONS.value:
-            functionSpec = self.azureFunctionCodeEdit.toPlainText()
+            functionSpec = self.azureFunctionSpecEdit.toPlainText()
             functionImpl = None
             function_selector = self.azureFunctionSelector
 
@@ -927,7 +1032,7 @@ class CreateFunctionDialog(QDialog):
 
         # Save the spec
         try:
-            _, new_function_name = self.function_config_manager.save_function_spec(functionSpec, current_function_name)
+            _, new_function_name = self.function_config_manager.save_function_spec(functionSpec)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while saving the function spec: {e}")
             return

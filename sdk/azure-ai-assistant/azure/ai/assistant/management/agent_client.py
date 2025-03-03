@@ -18,7 +18,7 @@ from azure.ai.assistant.management.conversation_thread_config import Conversatio
 from azure.ai.assistant.management.exceptions import EngineError, InvalidJSONError
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.projects.models import RequiredFunctionToolCall, SubmitToolOutputsAction, ThreadRun
-from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources, OpenApiTool, OpenApiAnonymousAuthDetails, AzureAISearchTool, BingGroundingTool, ConnectionType
+from azure.ai.projects.models import CodeInterpreterTool, FileSearchTool, ToolSet, ToolResources, OpenApiTool, OpenApiAnonymousAuthDetails, AzureAISearchTool, BingGroundingTool, AzureFunctionTool, AzureFunctionStorageQueue
 
 
 class AgentClient(BaseAssistantClient):
@@ -792,17 +792,24 @@ class AgentClient(BaseAssistantClient):
 
         tools = []
         resources = {}
+
         standard_functions = []
         openapi_functions = []
+        azure_function_functions = []
 
         for f_spec in assistant_config.functions:
             f_type = f_spec.get("type")
             if f_type == "openapi":
                 openapi_functions.append(f_spec)
+            elif f_type == "azure_function":
+                azure_function_functions.append(f_spec)
             else:
+                # Everything else is treated as standard
                 standard_functions.append(f_spec)
 
-        # Build an OpenApiTool and add its definitions
+        #
+        # Handle OpenAPI functions
+        #
         openapi_tool = None
         for idx, f_spec in enumerate(openapi_functions):
             openapi_data = f_spec.get("openapi", {})
@@ -834,7 +841,54 @@ class AgentClient(BaseAssistantClient):
         if openapi_tool is not None:
             tools.extend(openapi_tool.definitions)
 
-        # Handle the standard “tool_resources” (Code Interpreter, etc.)
+        #
+        # Handle Azure Functions
+        #
+        for f_spec in azure_function_functions:
+            azure_function_data = f_spec.get("azure_function", {})
+            function_obj = azure_function_data.get("function", {})
+
+            function_name = function_obj.get("name", "azure_function")
+            description = function_obj.get("description", f"Azure function {function_name}")
+            parameters = function_obj.get("parameters", {})
+
+            # Parse input binding
+            input_binding = azure_function_data.get("input_binding", {})
+            input_binding_type = input_binding.get("type")
+            azure_input_queue = None
+            if input_binding_type == "storage_queue":
+                sq_data = input_binding.get("storage_queue", {})
+                azure_input_queue = AzureFunctionStorageQueue(
+                    queue_name=sq_data.get("queue_name", ""),
+                    storage_service_endpoint=sq_data.get("queue_service_uri", "")
+                )
+
+            # Parse output binding
+            output_binding = azure_function_data.get("output_binding", {})
+            output_binding_type = output_binding.get("type")
+            azure_output_queue = None
+            if output_binding_type == "storage_queue":
+                sq_data = output_binding.get("storage_queue", {})
+                azure_output_queue = AzureFunctionStorageQueue(
+                    queue_name=sq_data.get("queue_name", ""),
+                    storage_service_endpoint=sq_data.get("queue_service_uri", "")
+                )
+
+            # Create the AzureFunctionTool
+            azure_function_tool = AzureFunctionTool(
+                name=function_name,
+                description=description,
+                parameters=parameters,
+                input_queue=azure_input_queue,
+                output_queue=azure_output_queue,
+            )
+
+            # Extend the tools with the definitions from the AzureFunctionTool
+            tools.extend(azure_function_tool.definitions)
+
+        #
+        # Handle tool_resources (Code Interpreter, File Search, etc.)
+        #
         if tool_resources is not None:
             # Code Interpreter Tool
             if "code_interpreter" in tool_resources:
@@ -858,7 +912,9 @@ class AgentClient(BaseAssistantClient):
                 tools.extend(code_interpreter_tool.definitions)
                 resources = code_interpreter_tool.resources
 
+        #
         # Add the Azure AI Search if enabled
+        #
         if assistant_config.azure_ai_search.get("enabled", False):
             conn_id = assistant_config.azure_ai_search.get("connection_id", "")
             index_name = assistant_config.azure_ai_search.get("index_name", "")
@@ -868,7 +924,9 @@ class AgentClient(BaseAssistantClient):
                 if azure_ai_search_tool.resources:
                     resources.update(azure_ai_search_tool.resources)
 
+        #
         # Add the Bing Search if enabled
+        #
         if assistant_config.bing_search.get("enabled", False):
             conn_id = assistant_config.bing_search.get("connection_id", "")
             if conn_id:
@@ -877,7 +935,9 @@ class AgentClient(BaseAssistantClient):
                 if bing_search_tool.resources:
                     resources.update(bing_search_tool.resources)
 
-        # Add the standard functions to the tools list
+        #
+        # Finally, add all standard functions to the tools list
+        #
         if standard_functions:
             modified_functions = []
             for func in standard_functions:
@@ -888,7 +948,9 @@ class AgentClient(BaseAssistantClient):
                 modified_functions.append(func_copy)
             tools.extend(modified_functions)
 
-        # Convert resources dict to a ToolResources object if needed
+        #
+        # Convert 'resources' dict to a ToolResources object if needed
+        #
         if not resources:
             resources = None
         else:

@@ -1419,10 +1419,14 @@ class AssistantConfigDialog(QDialog):
 
     def create_function_section(self, list_widget, function_type, funcs):
         for func_config in funcs:
-            listItem = QListWidgetItem(func_config.name)
-            listItem.setFlags(listItem.flags() | Qt.ItemIsUserCheckable)  # Allow the item to be checkable
+            display_name = func_config.name
+            if function_type == "azure":
+                display_name += " (Azure Function)"
+
+            listItem = QListWidgetItem(display_name)
+            listItem.setFlags(listItem.flags() | Qt.ItemIsUserCheckable)  # checkable
             listItem.setCheckState(Qt.Unchecked)
-            listItem.setData(Qt.UserRole, func_config)  # Store the function config object for later retrieval
+            listItem.setData(Qt.UserRole, func_config)
             list_widget.addItem(listItem)
 
     def handle_function_selection(self, item):
