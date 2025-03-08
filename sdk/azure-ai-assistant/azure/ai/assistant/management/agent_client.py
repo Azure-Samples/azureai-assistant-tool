@@ -642,34 +642,50 @@ class AgentClient(BaseAssistantClient):
             self._ai_client.agents.cancel_run(thread_id=thread_id, run_id=run_id)
             return False
 
-        tool_outputs = self._process_tool_calls(name, run_id, tool_calls)
-        if not tool_outputs:
+        tool_outputs, azure_function_in_tool_calls = self._process_tool_calls(name, run_id, tool_calls)
+        if not tool_outputs and not azure_function_in_tool_calls:
             return False
 
-        self._ai_client.agents.submit_tool_outputs_to_run(
-            thread_id=thread_id,
-            run_id=run_id,
-            tool_outputs=tool_outputs,
-        )
+        if not azure_function_in_tool_calls:
+            self._ai_client.agents.submit_tool_outputs_to_run(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs,
+            )
         return True
 
-    def _process_tool_calls(self, name, run_id, tool_calls: list[RequiredFunctionToolCall]) -> list[dict]:
+    def _process_tool_calls(self, name, run_id, tool_calls: list[RequiredFunctionToolCall]) -> Tuple[List[dict], bool]:
         tool_outputs = []
+        azure_function_in_tool_calls = False
+
         for tool_call in tool_calls:
+            if tool_call.type == "azure_function":
+                logger.info("Tool call with azure_function type detected")
+                azure_function_in_tool_calls = True
+                continue
+
+            # Handle the function call for non-azure functions
             start_time = time.time()
             function_response = str(self._handle_function_call(tool_call.function.name, tool_call.function.arguments))
             end_time = time.time()
-            logger.debug(f"Total time taken for function {tool_call.function.name}: {end_time - start_time} seconds")
+
+            logger.debug(f"Total time taken for function {tool_call.function.name}: {end_time - start_time:.4f} seconds")
             logger.info(f"Function response: {function_response}")
 
             self._callbacks.on_function_call_processed(
-                name, run_id, tool_call.function.name, tool_call.function.arguments, function_response
+                name,
+                run_id,
+                tool_call.function.name,
+                tool_call.function.arguments,
+                function_response
             )
+
             tool_outputs.append({
                 "tool_call_id": tool_call.id,
                 "output": function_response,
             })
-        return tool_outputs
+
+        return tool_outputs, azure_function_in_tool_calls
 
     def _retrieve_agent(
             self, 

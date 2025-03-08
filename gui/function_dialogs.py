@@ -463,39 +463,67 @@ class CreateFunctionDialog(QDialog):
 
         return tab
 
+    def parse_azure_storage_connection_string(self, conn_str):
+        conn_dict = {}
+        for segment in conn_str.strip().split(';'):
+            if '=' in segment:
+                key, value = segment.split('=', 1)
+                conn_dict[key.strip()] = value.strip()
+        return conn_dict
+
     def build_azure_function_spec(self, app_details: dict, function_details: dict) -> dict:
 
         # Make a deep copy so we don't modify the original template
         spec = copy.deepcopy(azure_function_spec_template)
 
-        # 1. Extract the short function name from e.g. "aml-jhakulin-func-app/queue_trigger"
+        # Extract the short function name from e.g. "func-app/queue_trigger"
         full_function_name = function_details.get("name", "")
         short_function_name = full_function_name.split("/")[-1] if full_function_name else "unknown_function"
         spec["azure_function"]["function"]["name"] = short_function_name
 
-        # 2. Identify the input and output bindings from the function details
+        # Identify the input and output bindings from the function details
         bindings = function_details.get("bindings", [])
         input_binding_info = next((b for b in bindings if b.get("direction") == "IN"), None)
         output_binding_info = next((b for b in bindings if b.get("direction") == "OUT"), None)
 
-        # 3. Fill in the input binding info (if present)
+        # Fill in the input binding info (if present)
         if input_binding_info:
             in_queue_name = input_binding_info.get("queueName", "input")
-            # Typically, if the binding's "connection" is "DEPLOYMENT_STORAGE_CONNECTION_STRING",
-            # we use the "AzureWebJobsStorage" from app_details
-            queue_service_connection = app_details.get("AzureWebJobsStorage", "")
             spec["azure_function"]["input_binding"]["storage_queue"]["queue_name"] = in_queue_name
-            spec["azure_function"]["input_binding"]["storage_queue"]["queue_service_uri"] = queue_service_connection
+
+            # Extract the account name from the connection string to form the queue service URI
+            queue_service_connection = app_details.get("AzureWebJobsStorage", "")
+            if queue_service_connection:
+                conn_dict = self.parse_azure_storage_connection_string(queue_service_connection)
+                account_name = conn_dict.get("AccountName")
+                if account_name:
+                    storage_queue_uri = f"https://{account_name}.queue.core.windows.net"
+                    spec["azure_function"]["input_binding"]["storage_queue"]["queue_service_uri"] = storage_queue_uri
+                else:
+                    raise ValueError("AccountName not found in storage connection string for input binding.")
+            else:
+                raise ValueError("AzureWebJobsStorage connection string is missing.")
         else:
             # No IN binding -> remove the input_binding section altogether
             spec["azure_function"].pop("input_binding", None)
 
-        # 4. Fill in the output binding info (if present)
+        # Fill in the output binding info (if present)
         if output_binding_info:
             out_queue_name = output_binding_info.get("queueName", "output")
             queue_service_connection = app_details.get("AzureWebJobsStorage", "")
             spec["azure_function"]["output_binding"]["storage_queue"]["queue_name"] = out_queue_name
-            spec["azure_function"]["output_binding"]["storage_queue"]["queue_service_uri"] = queue_service_connection
+
+            queue_service_connection = app_details.get("AzureWebJobsStorage", "")
+            if queue_service_connection:
+                conn_dict = self.parse_azure_storage_connection_string(queue_service_connection)
+                account_name = conn_dict.get("AccountName")
+                if account_name:
+                    storage_queue_uri = f"https://{account_name}.queue.core.windows.net"
+                    spec["azure_function"]["output_binding"]["storage_queue"]["queue_service_uri"] = storage_queue_uri
+                else:
+                    raise ValueError("AccountName not found in storage connection string for output binding.")
+            else:
+                raise ValueError("AzureWebJobsStorage connection string is missing.")
         else:
             # No OUT binding -> remove the output_binding section
             spec["azure_function"].pop("output_binding", None)

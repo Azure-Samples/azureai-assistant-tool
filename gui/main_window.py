@@ -371,6 +371,9 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 QMessageBox.warning(self, "Error", "Please select an assistant first.")
                 return
 
+            if not user_input and not pasted_image_file_paths:
+                return
+
             sidebar_attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item() or []
 
             pasted_image_attachments = []
@@ -661,7 +664,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         self.update_conversation_messages(conversation)
 
-    def on_run_cancelled(self, assistant_name, run_identifier, run_end_time):
+    def on_run_cancelled(self, assistant_name, run_identifier, run_end_time, thread_name):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "Run cancelled")
 

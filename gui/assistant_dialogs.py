@@ -1373,49 +1373,68 @@ class AssistantConfigDialog(QDialog):
                 )
 
     def pre_select_functions(self):
-        # Iterate over all selected functions
+        # Iterate over all selected functions from your assistant_config
         for func in self.assistant_config.functions:
-            func_type = func.get('type', 'function')  # Default to 'function' if missing
+            func_type = func.get('type', 'function')  # default to 'function' if missing
 
             if func_type == 'openapi' and hasattr(self, 'openapiFunctionsList'):
+                # Handle OpenAPI as before
                 func_name = func.get('openapi', {}).get('name')
                 if not func_name:
-                    # If we can't retrieve the name, skip
-                    continue
+                    continue  # Skip if no name
 
-                # Add the entire function spec (func) to self.functions if not already present
+                # If not already selected, add to self.functions
                 if func not in self.functions:
                     self.functions.append(func)
 
-                # Now mark the matching item in openapiFunctionsList as checked
+                # Mark the matching OpenAPI item in openapiFunctionsList
                 for i in range(self.openapiFunctionsList.count()):
                     listItem = self.openapiFunctionsList.item(i)
                     if listItem.text() == func_name:
                         listItem.setCheckState(Qt.Checked)
-                        break  # Found and checked it—stop searching
+                        break
 
             else:
-                func_name = func['function']['name']                
-                # Look in our existing function configs by category
+                # Handle normal vs. azure
+                if func_type == 'azure_function':
+                    # Azure: name is at func["azure_function"]["function"]["name"]
+                    func_name = func.get('azure_function', {}).get('function', {}).get('name')
+                else:
+                    # Normal (type=function or anything else)
+                    func_name = func.get('function', {}).get('name')
+
+                # If we didn't get a name at all, skip
+                if not func_name:
+                    continue
+
+                # Add the function to self.functions if it's not already there
+                if func not in self.functions:
+                    self.functions.append(func)
+
+                # Now see if we can match it to an existing FunctionConfig in our manager
                 function_configs = self.function_config_manager.get_function_configs()
-                for category_type, funcs in function_configs.items():
-                    for func_config in funcs:
+                for category_type, funcs_in_category in function_configs.items():
+                    for func_config in funcs_in_category:
                         if func_config.name == func_name:
-                            # If this function spec wasn't already in self.functions, add it
+                            # If not already in self.functions, add func_config's spec
                             if func_config.get_full_spec() not in self.functions:
                                 self.functions.append(func_config.get_full_spec())
-                            
-                            # Mark the appropriate list (system or user) as checked
+
+                            # Decide which list widget to check
+                            #   - "system" remains systemFunctionsList
+                            #   - everything else (including "user" or "azure") goes in userFunctionsList
                             if category_type == 'system':
                                 list_widget = self.systemFunctionsList
                             else:
                                 list_widget = self.userFunctionsList
 
+                            # Check the matching item
                             for i in range(list_widget.count()):
                                 listItem = list_widget.item(i)
-                                if listItem.text() == func_name:
+                                if listItem.text() == func_name or \
+                                listItem.text() == f"{func_name} (Azure Function)": 
                                     listItem.setCheckState(Qt.Checked)
-                                    break  # Found and checked it—stop searching
+                                    break
 
     def create_function_section(self, list_widget, function_type, funcs):
         for func_config in funcs:

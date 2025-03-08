@@ -162,9 +162,9 @@ class AgentStreamEventHandler(AgentEventHandler):
                 return
 
             logger.info(f"Handling required action for run_id: {run.id}")
-            tool_outputs = self._parent._process_tool_calls(self._name, self._run_id, tool_calls)
+            tool_outputs, azure_function_in_tool_calls = self._parent._process_tool_calls(self._name, self._run_id, tool_calls)
 
-            if not tool_outputs:
+            if not tool_outputs or azure_function_in_tool_calls:
                 logger.warning(f"No tool outputs were generated for run_id: {run.id}")
                 return
 

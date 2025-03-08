@@ -192,8 +192,8 @@ class BaseAssistantClient:
         try:
             for func_spec in assistant_config.functions:
                 function_type = func_spec.get("type")
-                if function_type == "openapi":
-                    logger.debug(f"Skip loading of OpenAPI functions.")
+                if function_type in ["openapi", "azure_function"]:
+                    logger.debug(f"Skip loading of OpenAPI/Azure Functions")
                     continue
 
                 function_name = func_spec["function"]["name"]
