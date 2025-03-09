@@ -110,11 +110,11 @@ https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
 
 ## ✨ Quick Start: Getting Started with the Tool
 
-The Azure AI Assistant Tool supports **Azure AI Agents**, **Azure OpenAI Assistants** and directly **OpenAI**.Follow the appropriate instructions depending on the setup you'd like to use.
+The Azure AI Assistant Tool supports **Azure AI Agents**, **Azure OpenAI Assistants**, and **OpenAI directly**. Follow the appropriate instructions depending on the setup you'd like to use.
 
-### Step 1: Complete Azure (or OpenAI) prerequisities
+### Step 1: Complete Azure (or OpenAI) prerequisites
 
-Choose your preferred integration:
+Select the integration option that fits your scenario best:
 
 #### ✅ **Option A: Azure AI Agents**
 
@@ -152,6 +152,7 @@ Create a new Python virtual environment. Virtual environment is recommended for 
    py -3 -m venv .venv
    .venv\scripts\activate
    ```
+---
 
 ### Step 3: Install the tool and dependencies
 
@@ -160,6 +161,7 @@ Run the following command in your terminal to install all the necessary dependen
 ```
 pip install -r requirements.txt
 ```
+---
 
 ### Step 4: Build and install azure.ai.assistant Python library (Optional)
 
@@ -175,6 +177,7 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 - Install the generated wheel using following command: `pip install --force-reinstall azure_ai_assistant-0.x.xa1-py3-none-any.whl`
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
+---
 
 ### Step 5: Find and Copy API Keys and Connection Details
 
@@ -197,6 +200,8 @@ eastus.api.azureml.ms;12345678-abcd-1234-9fc6-62780b3d3e05;my-resource-group;my-
 
 #### ▶️ **OpenAI (Direct)**
 - Your **OpenAI API KEY** from [platform.openai.com](https://platform.openai.com/api-keys).
+
+---
 
 ### Step 6: Setup Environment Variables
 
@@ -249,6 +254,7 @@ set OPENAI_API_KEY=<Your OpenAI key>
 ```bash
 export OPENAI_API_KEY="Your OpenAI key"
 ```
+---
 
 ### Step 7: Launch the application
 
