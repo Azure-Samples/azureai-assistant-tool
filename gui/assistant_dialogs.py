@@ -112,6 +112,9 @@ class AssistantConfigDialog(QDialog):
         super(AssistantConfigDialog, self).closeEvent(event)
 
     def init_ui(self):
+        self.error_signal = ErrorSignal()
+        self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
+
         self.setWindowTitle("Assistant Configuration")
         self.tabWidget = QTabWidget(self)
         self.tabWidget.currentChanged.connect(self.on_tab_changed)
@@ -159,10 +162,8 @@ class AssistantConfigDialog(QDialog):
 
         self.start_processing_signal = StartStatusAnimationSignal()
         self.stop_processing_signal = StopStatusAnimationSignal()
-        self.error_signal = ErrorSignal()
         self.start_processing_signal.start_signal.connect(self.start_processing)
         self.stop_processing_signal.stop_signal.connect(self.stop_processing)
-        self.error_signal.error_signal.connect(lambda error_message: QMessageBox.warning(self, "Error", error_message))
 
         self.update_model_combobox()
         self.update_assistant_combobox()
@@ -485,25 +486,31 @@ class AssistantConfigDialog(QDialog):
 
     def get_azure_search_connections(self):
         """Obtain a list of Azure AI Search connections from your agent/project."""
-        ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
-        conn_list = ai_client.connections.list()
-        azure_search_ids = []
-        for conn in conn_list:
-            # Check your actual condition for Azure AI Search
-            if conn.connection_type == "CognitiveSearch":
-                azure_search_ids.append(conn.id)
-        return azure_search_ids
+        try:
+            ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
+            conn_list = ai_client.connections.list()
+            azure_search_ids = []
+            for conn in conn_list:
+                # Check your actual condition for Azure AI Search
+                if conn.connection_type == "CognitiveSearch":
+                    azure_search_ids.append(conn.id)
+            return azure_search_ids
+        except Exception as e:
+            self.error_signal.error_signal.emit(str(e))
 
     def get_bing_search_connections(self):
         """Obtain a list of Bing connections from your agent/project."""
-        ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
-        conn_list = ai_client.connections.list()
-        bing_ids = []
-        for conn in conn_list:
-            # Check your actual condition for Bing 
-            if conn.endpoint_url and conn.endpoint_url.lower().startswith("https://api.bing.microsoft.com"):
-                bing_ids.append(conn.id)
-        return bing_ids
+        try:
+            ai_client = AIClientFactory.get_instance().get_client(AIClientType.AZURE_AI_AGENT)
+            conn_list = ai_client.connections.list()
+            bing_ids = []
+            for conn in conn_list:
+                # Check your actual condition for Bing 
+                if conn.endpoint_url and conn.endpoint_url.lower().startswith("https://api.bing.microsoft.com"):
+                    bing_ids.append(conn.id)
+            return bing_ids
+        except Exception as e:
+            self.error_signal.error_signal.emit(str(e))
     
     def _extract_display_name(self, connection_obj):
         """
