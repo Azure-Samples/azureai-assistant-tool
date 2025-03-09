@@ -8,7 +8,9 @@ from PySide6.QtCore import QRunnable, QObject, Signal
 from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client import AssistantClient
+from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
+from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.agent_client import AgentClient
 from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
@@ -188,3 +190,57 @@ class LoadAssistantWorker(QRunnable):
             self.signals.finished.emit(assistant_names)
         except Exception as e:
             self.signals.error.emit(str(e), assistant_names)
+
+
+class DeleteThreadsWorkerSignals(QObject):
+    """
+    Signals for the DeleteThreadsWorker.
+    """
+    finished = Signal(list)             # Provides the updated list of threads after deletions
+    error = Signal(str)                 # Sends the error message if something goes wrong
+    status_update = Signal(str)         # Sends the name of the thread currently being deleted
+
+
+class DeleteThreadsWorker(QRunnable):
+    """
+    Worker thread to delete multiple conversation threads asynchronously.
+    """
+    def __init__(self, 
+                 ai_client_type,
+                 thread_names: list,
+                 main_window):
+        super().__init__()
+        self.ai_client_type = ai_client_type
+        self.thread_names = thread_names
+        self.main_window = main_window
+        self.signals = DeleteThreadsWorkerSignals()
+
+    def run(self):
+        """
+        Perform the deletions in a separate thread.
+        """
+        try:
+            # Get the thread client for the selected AI client type
+            threads_client = ConversationThreadClient.get_instance(self.ai_client_type)
+
+            for thread_name in self.thread_names:
+                # Update status for each thread to be deleted
+                self.signals.status_update.emit(thread_name)
+
+                # Perform the deletion
+                try:
+                    threads_client.delete_conversation_thread(thread_name)
+                except Exception as e:
+                    # Log the error but keep trying to delete the rest
+                    logger.warning(f"Error deleting thread '{thread_name}': {e}")
+                finally:
+                    threads_client.save_conversation_threads()
+
+            # After loop, retrieve the updated thread list
+            updated_threads = threads_client.get_conversation_threads()
+            # Notify successful completion
+            self.signals.finished.emit(updated_threads)
+
+        except Exception as e:
+            # If something catastrophic happened
+            self.signals.error.emit(str(e))

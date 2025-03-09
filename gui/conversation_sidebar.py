@@ -8,7 +8,7 @@ import uuid
 import os
 import time
 
-from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
+from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu, QAbstractItemView
 from PySide6.QtCore import Qt, Signal, QThreadPool
 from PySide6.QtGui import QFont, QIcon, QAction
 
@@ -18,7 +18,7 @@ from azure.ai.assistant.management.assistant_config import AssistantType
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
-from gui.assistant_gui_workers import open_assistant_config_dialog, LoadAssistantWorker, ProcessAssistantWorker
+from gui.assistant_gui_workers import open_assistant_config_dialog, LoadAssistantWorker, ProcessAssistantWorker, DeleteThreadsWorker, DeleteThreadsWorkerSignals
 from gui.status_bar import ActivityStatus
 
 
@@ -48,7 +48,6 @@ class AssistantItemWidget(QWidget):
 
 
 class CustomListWidget(QListWidget):
-    itemDeleted = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -177,8 +176,7 @@ class CustomListWidget(QListWidget):
             self.itemIdToFileMap[item_id] = attachments[:]
             self.update_item_icon(current_item, attachments)
         else:
-            # logger.warning("No item is currently selected.")
-            print("No item is currently selected.")
+            logger.warning("No item is currently selected.")
 
     def load_threads_with_attachments(self, threads):
         """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
@@ -205,18 +203,15 @@ class CustomListWidget(QListWidget):
         self.itemIdToFileMap[item_id] = attachments[:]
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            current_item = self.currentItem()
-            if current_item:
-                item_text = current_item.text()
-                row = self.row(current_item)
-                self.takeItem(row)
-                item_id = self._get_item_id(current_item)
-                if item_id in self.itemIdToFileMap:
-                    del self.itemIdToFileMap[item_id]
-                self.itemDeleted.emit(item_text)
-        else:
-            super().keyPressEvent(event)
+        super().keyPressEvent(event)
+
+    def delete_selected_item(self, item):
+        if item:
+            row = self.row(item)
+            self.takeItem(row)
+            item_id = self._get_item_id(item)
+            if item_id in self.itemIdToFileMap:
+               del self.itemIdToFileMap[item_id]
 
     def selectNewItem(self, previousRow):
         if previousRow < self.count():
@@ -306,7 +301,7 @@ class ConversationSidebar(QWidget):
         self.addThreadButton.clicked.connect(self.on_add_thread_button_clicked)
         self.cancelRunButton.clicked.connect(self.main_window.on_cancel_run_button_clicked)
         self.threadList.itemClicked.connect(self.select_conversation_thread_by_item)
-        self.threadList.itemDeleted.connect(self.on_selected_thread_delete)
+        self.threadList.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
         self.assistantList = QListWidget(self)
         self.assistantList.setFont(QFont("Arial", 11))
@@ -347,6 +342,8 @@ class ConversationSidebar(QWidget):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             if self.assistantList.hasFocus():
                 self.delete_selected_assistant()
+            elif self.threadList.hasFocus():
+                self.delete_selected_threads()
         else:
             super().keyPressEvent(event)
 
@@ -557,8 +554,15 @@ class ConversationSidebar(QWidget):
             QMessageBox.warning(self, "Error", f"An error occurred while creating a new thread: {e}")
 
     def select_conversation_thread_by_item(self, selected_item):
-        unique_thread_name = selected_item.text()
-        self._select_thread(unique_thread_name)
+        selected_count = len(self.threadList.selectedItems())
+        if selected_count == 1:
+            # Only load the conversation if exactly one item is selected
+            unique_thread_name = selected_item.text()
+            self._select_thread(unique_thread_name)
+        else:
+            # Multiple items selected – do nothing
+            # so the user can continue shift/ctrl selection, etc.
+            pass
 
     def select_conversation_thread_by_name(self, unique_thread_name):
         self._select_thread(unique_thread_name)
@@ -589,34 +593,89 @@ class ConversationSidebar(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while selecting the thread: {e}")
 
-    def on_selected_thread_delete(self, thread_name):
-        try:
-            # Get current scroll position and selected row
-            current_scroll_position = self.threadList.verticalScrollBar().value()
-            current_row = self.threadList.currentRow()
+    def on_delete_thread_status_update(self, thread_name: str):
+        self.main_window.status_bar.start_animation(
+            ActivityStatus.DELETING,
+            interval=500,
+            thread_name=thread_name
+        )
 
-            # Remove the selected thread from the assistant manager
-            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            threads_client.delete_conversation_thread(thread_name)
-            threads_client.save_conversation_threads()
-            
-            # Clear and reload the thread list
-            self.threadList.clear()
-            threads = threads_client.get_conversation_threads()
-            self.threadList.load_threads_with_attachments(threads)
-            
-            # Restore the scroll position
-            self.threadList.verticalScrollBar().setValue(current_scroll_position)
-            
-            # Restore the selected row
-            if current_row >= self.threadList.count():
-                current_row = self.threadList.count() - 1
-            self.threadList.setCurrentRow(current_row)
-            
-            # Clear the selection in the sidebar
-            self.threadList.clearSelection()
-            
-            # Clear the conversation area
-            self.main_window.conversation_view.conversationView.clear()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while deleting the thread: {e}")
+    def on_delete_threads_finished(self, updated_threads, scroll_position, row):
+        # Stop the status bar animation (or you can produce a different message if you like)
+        self.main_window.status_bar.clear_all_statuses()
+
+        # 1) Clear out the list
+        self.threadList.clear()
+
+        # 2) Reload updated threads with attachments
+        self.threadList.load_threads_with_attachments(updated_threads)
+
+        # 3) Restore scroll position, etc.
+        self.threadList.verticalScrollBar().setValue(scroll_position)
+        if row >= self.threadList.count():
+            row = self.threadList.count() - 1
+        self.threadList.setCurrentRow(row)
+        self.threadList.clearSelection()
+
+        # 4) Clear the conversation area for safety
+        self.main_window.conversation_view.conversationView.clear()
+
+    def on_delete_threads_error(self, error_msg):
+        self.main_window.status_bar.stop_animation(ActivityStatus.DELETING)
+        logger.error(f"Error deleting threads asynchronously: {error_msg}")
+        QMessageBox.warning(
+            self,
+            "Error Deleting Threads",
+            f"An error occurred: {error_msg}"
+        )
+
+    def delete_selected_threads(self):
+        # Gather the items
+        current_scroll_position = self.threadList.verticalScrollBar().value()
+        current_row = self.threadList.currentRow()
+        selected_items = self.threadList.selectedItems()
+        if not selected_items:
+            return  # Nothing selected, nothing to delete
+
+        selected_count = len(selected_items)
+
+        # If multiple items, confirm with user
+        if selected_count > 1:
+            all_names = ", ".join([item.text() for item in selected_items])
+            prompt_title = f"Delete {selected_count} Threads"
+            prompt_text = (
+                f"Are you sure you want to delete these {selected_count} threads?"
+            )
+            reply = QMessageBox.question(
+                self,
+                prompt_title,
+                prompt_text,
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return  # User canceled
+
+        # Prepare thread names to delete
+        thread_names = [item.text() for item in selected_items]
+
+        # Create the worker and connect signals
+        worker = DeleteThreadsWorker(
+            ai_client_type=self._ai_client_type,
+            thread_names=thread_names,
+            main_window=self.main_window
+        )
+        # When a thread is about to be deleted, show 'Deleting <thread_name>'
+        worker.signals.status_update.connect(self.on_delete_thread_status_update)
+        # When deletion is done, refresh the thread list
+        worker.signals.finished.connect(lambda updated_threads:
+            self.on_delete_threads_finished(
+                updated_threads,
+                current_scroll_position,
+                current_row
+            )
+        )
+        # Handle errors
+        worker.signals.error.connect(self.on_delete_threads_error)
+
+        # Execute the worker in a separate thread via QThreadPool
+        QThreadPool.globalInstance().start(worker)

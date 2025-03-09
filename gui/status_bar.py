@@ -11,16 +11,19 @@ class ActivityStatus(Enum):
     PROCESSING_USER_INPUT = "UserInput"
     PROCESSING_SCHEDULED_TASK = "ScheduledTask"
     LISTENING_SPEECH = "ListeningSpeech"
-    LISTENING_KEYWORD = "ListeningKeyword"  # Removed trailing comma to avoid tuple
+    LISTENING_KEYWORD = "ListeningKeyword"
     FUNCTION_EXECUTION = "FunctionExecution"
+    DELETING = "Deleting"
 
 
 class StatusBar:
+
     def __init__(self, main_window):
         self.main_window = main_window
         self.setup_status_bar()
         # Now active_statuses is a dict mapping statuses to their call counts
         self.active_statuses = {}
+        self.current_thread_name = None
 
     def setup_status_bar(self):
         self.processingLabel = QLabel("", self.main_window)
@@ -33,9 +36,17 @@ class StatusBar:
 
     def animate_processing_label(self):
         frames = ["   ", ".  ", ".. ", "..."]
+        
+        if ActivityStatus.DELETING in self.active_statuses:
+            base_text = f"Deleting {self.current_thread_name or ''}"
+            self.processingLabel.setText(f"{base_text}{frames[self.processingDots]}")
+            self.processingDots = (self.processingDots + 1) % 4
+            return
+        
         if ActivityStatus.PROCESSING in self.active_statuses:
             base_text = "Processing"
             self.processingLabel.setText(f"{base_text}{frames[self.processingDots]}")
+
         elif self.active_statuses:
             status_labels = {
                 ActivityStatus.LISTENING_SPEECH: "Speech Input",
@@ -44,25 +55,24 @@ class StatusBar:
                 ActivityStatus.PROCESSING_USER_INPUT: "User Input",
                 ActivityStatus.PROCESSING_SCHEDULED_TASK: "Scheduled Task"
             }
-            # Gather active statuses that are present (keys with count > 0)
             active_labels = [
                 status_labels.get(status, "") 
                 for status in self.active_statuses.keys() 
                 if status in status_labels
             ]
-            # Join them with " | "
             status_message = " | ".join(filter(None, active_labels))
             base_text = f"Processing ({status_message})"
             self.processingLabel.setText(f"{base_text}{frames[self.processingDots]}")
         else:
+            # No active statuses
             self.stop_animation()
+        
         self.processingDots = (self.processingDots + 1) % 4
 
-    def start_animation(self, status, interval=500):
-        """
-        Start the animation for a given status.
-        If the same status is already active, increment its calling count.
-        """
+    def start_animation(self, status, interval=500, thread_name=None):
+        if status == ActivityStatus.DELETING and thread_name:
+            self.current_thread_name = thread_name
+
         # Increase the counter for the given status
         if status in self.active_statuses:
             self.active_statuses[status] += 1
@@ -72,15 +82,10 @@ class StatusBar:
         if not self.animation_timer.isActive():
             self.animation_timer.setInterval(interval)
             self.animation_timer.start()
-        # Update immediately.
+
         self.animate_processing_label()
 
     def stop_animation(self, status=None):
-        """
-        Stop the animation for a given status.
-        If status is None, stop all animations.
-        Decrement the counter for the given status and remove it only if the count reaches zero.
-        """
         if status is not None:
             # If the status exists in our active_statuses, decrement its count.
             if status in self.active_statuses:
@@ -96,5 +101,11 @@ class StatusBar:
             self.processingLabel.clear()
 
     def get_widget(self):
-        """Returns the main widget of the status bar."""
         return self.processingLabel
+    
+    def clear_all_statuses(self):
+        self.active_statuses.clear()
+        self.animation_timer.stop()
+        self.processingLabel.clear()
+        self.processingDots = 0
+        self.current_thread_name = None
