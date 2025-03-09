@@ -110,7 +110,7 @@ https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
 
 ## ✨ Quick Start: Getting Started with the Tool
 
-The Azure AI Assistant Tool supports both **Azure AI Agents** and **Azure OpenAI Assistants**. Follow the appropriate instructions depending on the setup you'd like to use.
+The Azure AI Assistant Tool supports **Azure AI Agents**, **Azure OpenAI Assistants** and directly **OpenAI**.Follow the appropriate instructions depending on the setup you'd like to use.
 
 ### Step 1: Complete Azure (or OpenAI) prerequisities
 
@@ -202,7 +202,7 @@ eastus.api.azureml.ms;12345678-abcd-1234-9fc6-62780b3d3e05;my-resource-group;my-
 
 Set these environment variables according to your chosen setup:
 
-#### 🔷 **If using Azure AI Agents (Recommended):**
+#### 🔷 **If using Azure AI Agents:**
 
 **Windows CMD**
 ```cmd
@@ -225,7 +225,6 @@ export PROJECT_CONNECTION_STRING="<your connection string>"
 set AZURE_OPENAI_API_KEY=<Your Azure OpenAI key>
 set AZURE_OPENAI_ENDPOINT=<Your Azure OpenAI endpoint>
 set AZURE_OPENAI_API_VERSION=2024-05-01-preview
-set OPENAI_API_KEY=<Optional - your OpenAI key if applicable>
 ```
 
 **Linux/MacOS (bash)**
@@ -233,12 +232,11 @@ set OPENAI_API_KEY=<Optional - your OpenAI key if applicable>
 export AZURE_OPENAI_API_KEY="Your Azure OpenAI key"
 export AZURE_OPENAI_ENDPOINT="Your Azure OpenAI endpoint"
 export AZURE_OPENAI_API_VERSION="2024-05-01-preview"
-export OPENAI_API_KEY="Optional - your OpenAI key if applicable"
 ```
 
 ---
 
-#### 🔷 **If using OpenAI (Direct):**
+#### 🔷 **If using OpenAI:**
 
 **Windows CMD**
 
