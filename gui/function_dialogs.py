@@ -9,7 +9,7 @@ import threading
 import copy
 from typing import List
 
-from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox, QFrame, QFormLayout
+from PySide6.QtWidgets import QDialog, QSplitter, QComboBox, QTabWidget, QHBoxLayout, QWidget, QListWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QTextEdit, QMessageBox, QFrame, QFormLayout, QGridLayout
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextOption
 
@@ -20,7 +20,7 @@ from azure.ai.assistant.management.function_config_manager import FunctionConfig
 from azure.ai.assistant.management.logger_module import logger
 from gui.signals import ErrorSignal, StartStatusAnimationSignal, StopStatusAnimationSignal
 from gui.status_bar import ActivityStatus, StatusBar
-from gui.utils import camel_to_snake
+from gui.utils import camel_to_snake, get_ai_client
 from enum import Enum
 
 
@@ -369,9 +369,15 @@ class CreateFunctionDialog(QDialog):
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
 
-        selector_label = QLabel("Select Azure Logic App:", self)
+        ai_client = get_ai_client(AIClientType.AZURE_AI_AGENT)
+        resource_group_name = ai_client.scope["resource_group_name"]
+
+        # Clear Section Label
+        selector_label = QLabel(f"Select Azure Logic App in Resource Group [ {resource_group_name} ]")
+        selector_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         main_layout.addWidget(selector_label)
-        
+
+        # Logic App Selector and Buttons Layout
         selector_layout = QHBoxLayout()
 
         self.azureLogicAppSelector = QComboBox(self)
@@ -382,13 +388,14 @@ class CreateFunctionDialog(QDialog):
         self.loadAzureLogicAppsButton.setFixedWidth(100)
         selector_layout.addWidget(self.loadAzureLogicAppsButton, stretch=1)
 
-        self.viewLogicAppDetailsButton = QPushButton("Details..", self)
+        self.viewLogicAppDetailsButton = QPushButton("Details...", self)
         self.viewLogicAppDetailsButton.clicked.connect(self.open_logic_app_details_dialog)
         self.viewLogicAppDetailsButton.setFixedWidth(100)
         selector_layout.addWidget(self.viewLogicAppDetailsButton, stretch=1)
 
         main_layout.addLayout(selector_layout)
 
+        # Action buttons layout
         buttons_layout = QHBoxLayout()
         self.generateUserFunctionFromLogicAppButton = QPushButton("Generate User Function from Logic App", self)
         self.generateUserFunctionFromLogicAppButton.clicked.connect(self.generate_user_function_for_logic_app)
@@ -399,6 +406,7 @@ class CreateFunctionDialog(QDialog):
         buttons_layout.addWidget(self.clearImplementationButton)
         main_layout.addLayout(buttons_layout)
 
+        # Text Edit Layouts
         self.azureUserFunctionSpecEdit = self.create_text_edit()
         self.azureUserFunctionImplEdit = self.create_text_edit()
 
@@ -413,53 +421,51 @@ class CreateFunctionDialog(QDialog):
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
 
-        # Row 1: "Select Azure Function App" + Load button
-        row1_layout = QHBoxLayout()
-        label_app = QLabel("Select Azure Function App:")
-        row1_layout.addWidget(label_app)
+        ai_client = get_ai_client(AIClientType.AZURE_AI_AGENT)
+        resource_group_name = ai_client.scope["resource_group_name"]
+
+        grid_layout = QGridLayout()
+        main_layout.addLayout(grid_layout)
+
+        # Row 0: Label for resource group, combo for Function App, Load button
+        label_app = QLabel(f"Select Azure Function App in Resource Group [ {resource_group_name} ]")
+        label_app.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         self.azureFunctionAppSelector = QComboBox(self)
-        row1_layout.addWidget(self.azureFunctionAppSelector)
-
         self.loadAzureFunctionAppsButton = QPushButton("Load", self)
         self.loadAzureFunctionAppsButton.clicked.connect(self.load_azure_function_apps)
-        row1_layout.addWidget(self.loadAzureFunctionAppsButton)
 
-        main_layout.addLayout(row1_layout)
+        grid_layout.addWidget(label_app,                  0, 0)
+        grid_layout.addWidget(self.azureFunctionAppSelector, 0, 1)
+        grid_layout.addWidget(self.loadAzureFunctionAppsButton, 0, 2)
 
-        # Row 2: "Select Function in App:" + function combo + "Details.." button
-        row2_layout = QHBoxLayout()
+        # Row 1: Label for Function in App, combo for function, Details button
         label_func = QLabel("Select Function in App:")
-        row2_layout.addWidget(label_func)
-
         self.azureFunctionSelector = QComboBox(self)
-        row2_layout.addWidget(self.azureFunctionSelector)
-
-        self.azureFunctionAppSelector.currentIndexChanged.connect(self.on_azure_function_app_selected)
-        self.azureFunctionSelector.currentIndexChanged.connect(self.on_azure_function_selected)
-
-        # Add the "Details.." button for the selected function
         self.viewAzureFunctionDetailsButton = QPushButton("Details..", self)
         self.viewAzureFunctionDetailsButton.clicked.connect(self.open_azure_function_details_dialog)
-        row2_layout.addWidget(self.viewAzureFunctionDetailsButton)
 
-        main_layout.addLayout(row2_layout)
+        grid_layout.addWidget(label_func,                      1, 0)
+        grid_layout.addWidget(self.azureFunctionSelector,      1, 1)
+        grid_layout.addWidget(self.viewAzureFunctionDetailsButton, 1, 2)
 
-        # Insert a separate combo box for local azure_function specs from config:
-        local_layout = QHBoxLayout()
-        label_local = QLabel("Pick from local Azure function specs:")
-        local_layout.addWidget(label_local)
-
+        # Row 2: Label for local specs, local combo
+        label_local = QLabel("Pick from local Azure Function specs:")
         self.azureFunctionSelectorLocal = self.create_function_selector("azure_function")
-        local_layout.addWidget(self.azureFunctionSelectorLocal)
+        grid_layout.addWidget(label_local,                  2, 0)
+        grid_layout.addWidget(self.azureFunctionSelectorLocal, 2, 1)
 
-        main_layout.addLayout(local_layout)
-
+        # Row 3+: The specification text edit
         code_widget = self.create_text_edit_labeled(
-            "Azure Function Specification (from local config or loaded from Azure):", 
+            "Azure Function Specification (from local config or loaded from Azure):",
             self.azureFunctionSpecEdit
         )
-        main_layout.addWidget(code_widget)
+        # Span this widget across all grid columns for a full-width area
+        grid_layout.addWidget(code_widget, 3, 0, 1, 3)
+
+        # Setup signals to index changes (if not already connected earlier)
+        self.azureFunctionAppSelector.currentIndexChanged.connect(self.on_azure_function_app_selected)
+        self.azureFunctionSelector.currentIndexChanged.connect(self.on_azure_function_selected)
 
         return tab
 
