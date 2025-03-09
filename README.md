@@ -33,7 +33,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 ## 🆕 Latest News
 
-- **February 23, 2025:** Released version 0.5.2 of the tool, introducing support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes on image input and links handling. Added new LLM function to generate images.
+- **March 10, 2025:** Released version 0.5.2 of the tool, introducing support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes on image input and links handling. Added new LLM function to generate images.
 - **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
