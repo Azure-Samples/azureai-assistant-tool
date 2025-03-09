@@ -33,7 +33,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 
 ## 🆕 Latest News
 
-- **February 23, 2025:** Released version 0.5.2 of the tool, introducing preview support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes on image input and links handling. Added new LLM function to generate images.
+- **February 23, 2025:** Released version 0.5.2 of the tool, introducing support for **Azure AI Agents**. Also improved o1 and o3 based model support for assistants and various UI fixes on image input and links handling. Added new LLM function to generate images.
 - **January 20, 2025:** Released 0.5.1 version of the tool containing **o1 Model Support** which allows to use o1 models with ChatAssistant (with limited completion settings) and **OpenAI Realtime Support**, with real-time audio interaction capabilities. The Azure Cognitive Services for speech input and output has been removed from the tool, however Azure Speech SDK is still used within OpenAI Realtime for keyword based detection. For more detailed information, refer to the OpenAI Realtime Support section below.
 
 
@@ -44,7 +44,7 @@ Azure AI Assistants tool is an experimental Python application and middleware de
 **Key Features** include:
 
 - **Azure AI Agents Service Tools**: Seamlessly integrate and execute server-side tools like `Bing Grounding`, `Azure AI Search`, `OpenAPI Functions` and `Azure Functions`.
-- **Azure AI Foundry Project Connections**: Utilizes Azure AI Foundry Projects to get access to different connections, e.g., `Azure Logic Apps`, `Application Insights`.
+- **Azure AI Foundry Project Connections**: Utilizes Azure AI Foundry Projects to get access to different connections, e.g., `Azure Logic Apps`.
 - **Extensive Model Support**: Utilize a diverse range of AI models including `Azure OpenAI`, `Llama 3`, `Mistral`, and `Cohere` to meet enterprise requirements.
 - **Enterprise Data Integration**: Leverage secure data interactions across multiple sources and ensure enterprise-grade security and privacy.
 
@@ -110,12 +110,31 @@ https://github.com/user-attachments/assets/b0c80b34-b825-4442-a80c-93f314909a92
 
 ## ✨ Quick Start: Getting Started with the Tool
 
-### Step 1: Complete Azure prerequisities
+The Azure AI Assistant Tool supports both **Azure AI Agents** and **Azure OpenAI Assistants**. Follow the appropriate instructions depending on the setup you'd like to use.
+
+### Step 1: Complete Azure (or OpenAI) prerequisities
+
+Choose your preferred integration:
+
+#### ✅ **Option A: Azure AI Agents**
+
+- Create an Azure Subscription for free, if you don't have one yet.
+- Deploy Azure AI Agents by following the [Azure AI Agents Quickstart](https://learn.microsoft.com/azure/ai-services/agents/quickstart?pivots=programming-language-python-azure).
+    - You have the choice between a "**Basic**" or "**Standard**" setup option ([learn the difference](https://learn.microsoft.com/azure/ai-services/agents/quickstart?pivots=programming-language-python-azure#choose-basic-or-standard-agent-setup)).
+    - For advanced features such as **Azure AI Search**, **Azure Functions**, **Bing Grounding** and more, the **Standard** agent setup option is required.
+- After deploying your Azure AI Agents resources, note down your project's **Project Connection String** from the Azure Portal's Azure AI Foundry Project Overview page.
+
+#### ✅ **Option B: Azure OpenAI**
 
 - Create an Azure Subscription for [free](https://azure.microsoft.com/en-us/free/ai-services/), if you don't have one already
 - [Apply for access](https://aka.ms/oai/access) to Azure OpenAI Service in this Azure Subscription. Azure OpenAI Service is currently a limited access service so access is granted through an application process. Most applications are processed within a day of applying.
 - Azure OpenAI Assistants models and region availability, see the [models guide](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) for the latest model and regional availability for Assistants.
 - Create an Azure OpenAI resource on [Azure Portal](https://ms.portal.azure.com) with one of the Assistants supported models from the models guide page deployed in that region
+
+#### ✅ **Option C: OpenAI**
+
+- Make sure you already have an active OpenAI account at [platform.openai.com](https://platform.openai.com).
+- Locate your API key from your [OpenAI account](https://platform.openai.com/api-keys).
 
 ### Step 2: Install Python
 
@@ -157,43 +176,80 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
   - This installation will pick the necessary dependencies for the library (openai, python-Levenshtein, fuzzywuzzy, Pillow, requests)
 
 
-### Step 5: Find and copy your Azure OpenAI Service APIkey, endpoint and model deployment version
+### Step 5: Find and Copy API Keys and Connection Details
 
-To successfully make a call against the Azure OpenAI service, you'll need the following:
+Based on your choice earlier, gather these required credentials:
 
-**- ENDPOINT:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. Alternatively, you can find the value in Azure OpenAI Studio > Playground > View code. An example endpoint is: https://docs-test-001.openai.azure.com/.
+#### ▶️ **Azure AI Agents**
+- **PROJECT_CONNECTION_STRING** from your Azure AI Foundry Project page on the Azure Portal.
+- *No other keys or endpoints required.*
 
-**- API-KEY:**	This value can be found in the Keys and Endpoint section when examining your resource from the Azure portal. You can use either KEY1 or KEY2.
+**Example:**
+```
+eastus.api.azureml.ms;12345678-abcd-1234-9fc6-62780b3d3e05;my-resource-group;my-project-name
+```
 
-**- MODEL DEPLOYMENT-NAME:**	This value will correspond to the custom name you chose for your deployment when you deployed a model. This value can be found under Resource Management > Model Deployments in the Azure portal or alternatively under Management > Deployments in Azure OpenAI Studio.
+#### ▶️ **Azure OpenAI Assistants**
+- Azure OpenAI **API KEY**, **ENDPOINT**, and **MODEL DEPLOYMENT NAME** from the Azure portal.
 
-Next, go to your resource in the [Azure portal](https://ms.portal.azure.com/#home). The Keys and Endpoint can be found in the Resource Management section (see image below). Copy your endpoint and access key as you'll need both for authenticating your API calls. You can use either KEY1 or KEY2. Always having two keys allows you to securely rotate and regenerate keys without causing a service disruption.
+*(See image below for where to find keys and endpoint)*
 ![portal keys and endpoint](https://github.com/Azure-Samples/azureai-assistant-tool/assets/118226126/b4ddbbba-1b91-4525-b05d-b9673dd6e143)
+
+#### ▶️ **OpenAI (Direct)**
+- Your **OpenAI API KEY** from [platform.openai.com](https://platform.openai.com/api-keys).
 
 ### Step 6: Setup Environment Variables
 
-Create and assign persistent environment variables for your key and endpoint.
+Set these environment variables according to your chosen setup:
 
-#### ⌨️ Command Line (CLI)
+#### 🔷 **If using Azure AI Agents (Recommended):**
 
-1. Set the Azure OpenAI Service key, endpoint. Version is optional and default currently is `2024-05-01-preview` for assistants.
-
-**Windows:**
-Use setx or set command depending on your preference.
-
-```
-setx AZURE_OPENAI_API_KEY "Your Azure OpenAI Key"
-setx AZURE_OPENAI_ENDPOINT "Your OpenAI Endpoint"
-setx AZURE_OPENAI_API_VERSION "Azure OpenAI version"
-setx OPENAI_API_KEY "Your OpenAI Key"
+**Windows CMD**
+```cmd
+set PROJECT_CONNECTION_STRING=<your connection string>
 ```
 
-**Linux/Mac**
+**Linux/MacOS (bash)**
+```bash
+export PROJECT_CONNECTION_STRING="<your connection string>"
 ```
-export AZURE_OPENAI_API_KEY="Your Azure OpenAI Key"
-export AZURE_OPENAI_ENDPOINT="Your OpenAI Endpoint"
-export AZURE_OPENAI_API_VERSION="Azure OpenAI version"
-export OPENAI_API_KEY="Your OpenAI Key"
+
+> 🚩 No additional variables required for Azure AI Agents.
+
+---
+
+#### 🔷 **If using Azure OpenAI Assistants:**
+
+**Windows CMD**
+```cmd
+set AZURE_OPENAI_API_KEY=<Your Azure OpenAI key>
+set AZURE_OPENAI_ENDPOINT=<Your Azure OpenAI endpoint>
+set AZURE_OPENAI_API_VERSION=2024-05-01-preview
+set OPENAI_API_KEY=<Optional - your OpenAI key if applicable>
+```
+
+**Linux/MacOS (bash)**
+```bash
+export AZURE_OPENAI_API_KEY="Your Azure OpenAI key"
+export AZURE_OPENAI_ENDPOINT="Your Azure OpenAI endpoint"
+export AZURE_OPENAI_API_VERSION="2024-05-01-preview"
+export OPENAI_API_KEY="Optional - your OpenAI key if applicable"
+```
+
+---
+
+#### 🔷 **If using OpenAI (Direct):**
+
+**Windows CMD**
+
+```bash
+set OPENAI_API_KEY=<Your OpenAI key>
+```
+
+**Linux/MacOS (bash)**
+
+```bash
+export OPENAI_API_KEY="Your OpenAI key"
 ```
 
 ### Step 7: Launch the application
