@@ -7,7 +7,7 @@
 ![CrossPlatform](https://img.shields.io/badge/cross-platform-blue)
 </div>
 <div align="center">
-⚡Develop AI agents powered by Azure OpenAI Assistants, Chat Completion and Realtime APIs at lightning speed⚡
+⚡Develop AI agents powered by Azure AI Agents, Azure OpenAI Assistants, Chat Completion, and Realtime APIs at lightning speed⚡
 </div>
 <br>
 
