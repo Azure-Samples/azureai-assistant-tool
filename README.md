@@ -184,13 +184,20 @@ Build the wheel for `azure.ai.assistant` library using the following instruction
 Based on your choice earlier, gather these required credentials:
 
 #### ▶️ **Azure AI Agents**
-- **PROJECT_CONNECTION_STRING** from your Azure AI Foundry Project page on the Azure Portal.
-- *No other keys or endpoints required.*
 
-**Example:**
-```
-eastus.api.azureml.ms;12345678-abcd-1234-9fc6-62780b3d3e05;my-resource-group;my-project-name
-```
+If you selected Azure AI Agents, you need the following from your Azure AI Foundry Project on Azure Portal:
+
+- ✅ **PROJECT_CONNECTION_STRING** (mandatory, from Azure AI Foundry Project Overview page)
+- ✅ **MODEL DEPLOYMENT NAME** *(Required when creating Azure AI Agent using the tool.)*
+
+**Example Connection String:**
+
+`eastus.api.azureml.ms;12345678-abcd-1234-9fc6-62780b3d3e05;my-resource-group;my-project-name`
+
+**Example Model Deployment Name** (Model deployment used by the tool):
+
+`gpt-4o`
+
 
 #### ▶️ **Azure OpenAI Assistants**
 - Azure OpenAI **API KEY**, **ENDPOINT**, and **MODEL DEPLOYMENT NAME** from the Azure portal.
