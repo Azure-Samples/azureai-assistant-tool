@@ -262,6 +262,15 @@ class CustomListWidget(QListWidget):
             return new_id
         return existing_id
 
+    def mouseMoveEvent(self, event):
+        # If the user is dragging with the left mouse button down,
+        # ignore selection changes by not calling the parent implementation.
+        if event.buttons() & Qt.LeftButton:
+            # do nothing, effectively disabling drag-based selection
+            return
+        # Otherwise, preserve normal behavior (e.g., for other buttons)
+        super().mouseMoveEvent(event)
+
 
 class ConversationSidebar(QWidget):
 
