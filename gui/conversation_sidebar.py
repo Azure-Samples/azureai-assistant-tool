@@ -568,7 +568,8 @@ class ConversationSidebar(QWidget):
         self._select_thread(unique_thread_name)
 
     def _select_threadlist_item(self, unique_thread_name):
-        # Select the thread item in the sidebar
+        # Clear any existing selection first
+        self.threadList.clearSelection()
         for index in range(self.threadList.count()):
             if self.threadList.item(index).text() == unique_thread_name:
                 self.threadList.setCurrentRow(index)
