@@ -379,8 +379,6 @@ class AssistantConfigDialog(QDialog):
             codeInterpreterLayout = QVBoxLayout(codeInterpreterGroup)
             
             # Section for managing code interpreter files
-            # We previously called self.setup_code_interpreter_files(actionsLayout).
-            # Now, we call it with codeInterpreterLayout so it adds its widgets here.
             self.setup_code_interpreter_files(codeInterpreterLayout)
 
             # Checkbox to enable the Code Interpreter tool
@@ -390,7 +388,6 @@ class AssistantConfigDialog(QDialog):
             )
             codeInterpreterLayout.addWidget(self.codeInterpreterCheckBox)
 
-            # Finally, add this group to the overall actions layout
             actionsLayout.addWidget(codeInterpreterGroup)
 
         return actionsTab
@@ -608,7 +605,6 @@ class AssistantConfigDialog(QDialog):
         self.autoReconnectCheckBox.setToolTip(
             "Automatically reconnect to the server if the websocket connection is closed by server."
         )
-        # We can place this on its own row, no label needed
         formLayout.addRow("", self.autoReconnectCheckBox)
 
         # Turn Detection
@@ -631,14 +627,13 @@ class AssistantConfigDialog(QDialog):
         self.currentVadSettings = None
         self.update_vad_settings()
 
-        # Finally, set the main layout as the widget’s layout
         return audioTab
 
     def update_voice_combo_box(self):
         current_client_type = self.aiClientComboBox.currentText()
         voices = self.voices_dict.get(current_client_type, [])
 
-        self.voiceComboBox.blockSignals(True)  # Prevent recursive signals
+        self.voiceComboBox.blockSignals(True)
         self.voiceComboBox.clear()
         self.voiceComboBox.addItems(voices)
         self.voiceComboBox.blockSignals(False)
@@ -681,7 +676,6 @@ class AssistantConfigDialog(QDialog):
                 widget.deleteLater()
             elif item.layout() is not None:
                 self.clear_vad_layout(item.layout())
-        # Reset the layout after clearing
         layout.update()
 
     def setup_server_vad(self, layout):
@@ -718,15 +712,12 @@ class AssistantConfigDialog(QDialog):
         self.silenceDurationMsLayout.addWidget(self.silenceDurationMsLabel)
         self.silenceDurationMsLayout.addWidget(self.silenceDurationMsSpinBox)
 
-        # Add layouts to settings
         self.serverVadSettings.addLayout(self.prefixPaddingMsLayout)
         self.serverVadSettings.addLayout(self.silenceDurationMsLayout)
 
-        # Add server VAD settings to main layout
         layout.addLayout(self.serverVadSettings)
 
     def setup_local_vad(self, layout):
-        # We'll use a QFormLayout for local VAD
         self.localVadSettings = QFormLayout()
         self.localVadSettings.setLabelAlignment(Qt.AlignRight)
 
@@ -799,7 +790,6 @@ class AssistantConfigDialog(QDialog):
         vadFilePathLayout.addWidget(self.vadModelPathButton)
         self.localVadSettings.addRow(self.vadModelPathLabel, vadFilePathLayout)
 
-        # Finally, add the form to the parent layout
         layout.addLayout(self.localVadSettings)
 
     def setup_code_interpreter_files(self, layout):
@@ -858,6 +848,8 @@ class AssistantConfigDialog(QDialog):
         self.useDefaultSettingsCheckBox.stateChanged.connect(self.toggleCompletionSettings)
         completionLayout.addWidget(self.useDefaultSettingsCheckBox)
 
+        # If we have either a basic assistant, an agent, or a chat assistant
+        # we add relevant completion settings. Realtime assistant is handled separately.
         if self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
             self.init_assistant_completion_settings(completionLayout)
         elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
@@ -877,7 +869,10 @@ class AssistantConfigDialog(QDialog):
         self.maxCompletionTokensEdit = QSpinBox()
         self.maxCompletionTokensEdit.setRange(1, 5000)
         self.maxCompletionTokensEdit.setValue(1000)
-        self.maxCompletionTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
+        self.maxCompletionTokensEdit.setToolTip(
+            "The maximum number of tokens to generate. The model will stop once "
+            "it has generated this many tokens."
+        )
         maxCompletionTokensLayout.addWidget(self.maxCompletionTokensLabel)
         maxCompletionTokensLayout.addWidget(self.maxCompletionTokensEdit)
         completionLayout.addLayout(maxCompletionTokensLayout)
@@ -887,7 +882,10 @@ class AssistantConfigDialog(QDialog):
         self.maxPromptTokensEdit = QSpinBox()
         self.maxPromptTokensEdit.setRange(1, 5000)
         self.maxPromptTokensEdit.setValue(1000)
-        self.maxPromptTokensEdit.setToolTip("The maximum number of tokens to include in the prompt. The model will use the prompt to generate the completion.")
+        self.maxPromptTokensEdit.setToolTip(
+            "The maximum number of tokens to include in the prompt. "
+            "The model will use the prompt to generate the completion."
+        )
         maxPromptTokensLayout.addWidget(self.maxPromptTokensLabel)
         maxPromptTokensLayout.addWidget(self.maxPromptTokensEdit)
         completionLayout.addLayout(maxPromptTokensLayout)
@@ -897,65 +895,125 @@ class AssistantConfigDialog(QDialog):
         truncation_strategy_layout.addWidget(self.truncationStrategyLabel)
 
         self.truncationTypeComboBox = QComboBox()
-        self.truncationTypeComboBox.setToolTip("Select the truncation strategy to use for the thread. The default is `auto`. If set to `last_messages`, the thread will be truncated to the n most recent messages in the thread.")
+        self.truncationTypeComboBox.setToolTip(
+            "Select the truncation strategy to use for the thread. The default is `auto`. "
+            "If set to `last_messages`, the thread will be truncated to the n most recent "
+            "messages in the thread."
+        )
         self.truncationTypeComboBox.addItems(['auto', 'last_messages'])
         truncation_strategy_layout.addWidget(self.truncationTypeComboBox)
 
         self.lastMessagesSpinBox = CustomSpinBox()
         self.lastMessagesSpinBox.setRange(1, 100)
         self.lastMessagesSpinBox.setDisabled(True)
+        # Hide the spin box by default
+        self.lastMessagesSpinBox.setVisible(False)
         truncation_strategy_layout.addWidget(self.lastMessagesSpinBox)
 
+        # Connect to handle toggling of lastMessagesSpinBox visibility
         self.truncationTypeComboBox.currentTextChanged.connect(self.on_truncation_type_changed)
 
         completionLayout.addLayout(truncation_strategy_layout)
 
+        # Reasoning Effort (in a single horizontal layout)
+        reasoningEffortLayout = QHBoxLayout()
+        self.reasoningEffortLabel = QLabel("Reasoning Effort (o1 or o3-mini only):")
+        self.reasoningEffortComboBox = QComboBox()
+        self.reasoningEffortComboBox.addItem("")  # represents None
+        self.reasoningEffortComboBox.addItems(["low", "medium", "high"])
+
+        # Add a tooltip to the combo box (rather than the label)
+        self.reasoningEffortComboBox.setToolTip(
+            "When a reasoning effort (low, medium, or high) is set, only certain "
+            "completion settings (max completion tokens & max prompt tokens) are used; "
+            "temperature, top_p, etc. will be ignored."
+        )
+
+        reasoningEffortLayout.addWidget(self.reasoningEffortLabel)
+        reasoningEffortLayout.addWidget(self.reasoningEffortComboBox)
+        completionLayout.addLayout(reasoningEffortLayout)
+
     def on_truncation_type_changed(self, text):
-        # Enable or disable SpinBox based on selection
         if text == 'last_messages':
+            self.lastMessagesSpinBox.setVisible(True)
             self.lastMessagesSpinBox.setEnabled(True)
             self.lastMessagesSpinBox.setValue(10)
         else:
+            self.lastMessagesSpinBox.setVisible(False)
             self.lastMessagesSpinBox.setDisabled(True)
-            self.lastMessagesSpinBox.clear()
 
     def init_chat_assistant_completion_settings(self, completionLayout):
+        # Common settings
         self.init_common_completion_settings(completionLayout)
 
+        # Frequency Penalty
         self.frequencyPenaltyLabel = QLabel('Frequency Penalty:')
         self.frequencyPenaltySlider = QSlider(Qt.Horizontal)
-        self.frequencyPenaltySlider.setToolTip("Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.")
+        self.frequencyPenaltySlider.setToolTip(
+            "Positive values penalize new tokens based on their existing frequency in the text so far, "
+            "decreasing the model's likelihood to repeat the same line verbatim."
+        )
         self.frequencyPenaltySlider.setMinimum(-200)
         self.frequencyPenaltySlider.setMaximum(200)
         self.frequencyPenaltySlider.setValue(0)  # Default value
         self.frequencyPenaltyValueLabel = QLabel('0.0')
-        self.frequencyPenaltySlider.valueChanged.connect(lambda: self.frequencyPenaltyValueLabel.setText(f"{self.frequencyPenaltySlider.value() / 100:.1f}"))
+        self.frequencyPenaltySlider.valueChanged.connect(
+            lambda: self.frequencyPenaltyValueLabel.setText(f"{self.frequencyPenaltySlider.value() / 100:.1f}")
+        )
         completionLayout.addWidget(self.frequencyPenaltyLabel)
         completionLayout.addWidget(self.frequencyPenaltySlider)
         completionLayout.addWidget(self.frequencyPenaltyValueLabel)
-        
+
+        # Max Tokens
         maxTokensLayout = QHBoxLayout()
         self.maxTokensLabel = QLabel('Max Tokens (1-5000):')
         self.maxTokensEdit = QSpinBox()
         self.maxTokensEdit.setRange(1, 5000)
         self.maxTokensEdit.setValue(1000)
-        self.maxTokensEdit.setToolTip("The maximum number of tokens to generate. The model will stop once it has generated this many tokens.")
+        self.maxTokensEdit.setToolTip(
+            "The maximum number of tokens to generate. The model will stop once it has generated this many tokens."
+        )
         maxTokensLayout.addWidget(self.maxTokensLabel)
         maxTokensLayout.addWidget(self.maxTokensEdit)
         completionLayout.addLayout(maxTokensLayout)
-        
+
+        # Presence Penalty
         self.presencePenaltyLabel = QLabel('Presence Penalty:')
         self.presencePenaltySlider = QSlider(Qt.Horizontal)
-        self.presencePenaltySlider.setToolTip("Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.")
+        self.presencePenaltySlider.setToolTip(
+            "Positive values penalize new tokens based on whether they appear in the text so far, "
+            "increasing the model's likelihood to talk about new topics."
+        )
         self.presencePenaltySlider.setMinimum(-200)
         self.presencePenaltySlider.setMaximum(200)
         self.presencePenaltySlider.setValue(0)  # Default value
         self.presencePenaltyValueLabel = QLabel('0.0')
-        self.presencePenaltySlider.valueChanged.connect(lambda: self.presencePenaltyValueLabel.setText(f"{self.presencePenaltySlider.value() / 100:.1f}"))
+        self.presencePenaltySlider.valueChanged.connect(
+            lambda: self.presencePenaltyValueLabel.setText(f"{self.presencePenaltySlider.value() / 100:.1f}")
+        )
         completionLayout.addWidget(self.presencePenaltyLabel)
         completionLayout.addWidget(self.presencePenaltySlider)
         completionLayout.addWidget(self.presencePenaltyValueLabel)
+
+        # Max Messages Edit
         self.init_max_messages_edit(completionLayout)
+
+        # Reasoning Effort (single horizontal line, tooltip on combo box)
+        reasoningEffortLayout = QHBoxLayout()
+        self.reasoningEffortLabel = QLabel("Reasoning Effort (o1 or o3-mini only):")
+        self.reasoningEffortComboBox = QComboBox()
+        self.reasoningEffortComboBox.addItem("")  # Represents None
+        self.reasoningEffortComboBox.addItems(["low", "medium", "high"])
+        
+        # Add a tooltip to the combo box
+        self.reasoningEffortComboBox.setToolTip(
+            "When a reasoning effort (low, medium, or high) is set, only certain completion settings "
+            "(e.g. max tokens) are used; temperature, top_p, etc. will be ignored."
+        )
+
+        reasoningEffortLayout.addWidget(self.reasoningEffortLabel)
+        reasoningEffortLayout.addWidget(self.reasoningEffortComboBox)
+        completionLayout.addLayout(reasoningEffortLayout)
 
     def init_realtime_assistant_completion_settings(self, completionLayout):
         # For realtime assistant Sampling temperature for the model, limited to [0.6, 1.2]. Defaults to 0.8.
@@ -967,7 +1025,7 @@ class AssistantConfigDialog(QDialog):
         self.maxResponseOutputTokensLabel = QLabel('Max Response Output Tokens (1-4096 or "inf"):')
         self.maxResponseOutputTokensEdit = QLineEdit()
         self.maxResponseOutputTokensEdit.setPlaceholderText("inf")
-        self.maxResponseOutputTokensEdit.setToolTip("Maximum number of output tokens for a single assistant response, inclusive of tool calls. Provide a number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens for a given model.")
+        self.maxResponseOutputTokensEdit.setToolTip("Maximum number of output tokens for a single assistant response, inclusive of tool calls. Provide a number between 1 and 4096 to limit output tokens, or 'inf' for the maximum available tokens.")
         self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensLabel)
         self.maxResponseOutputTokensLayout.addWidget(self.maxResponseOutputTokensEdit)
         completionLayout.addLayout(self.maxResponseOutputTokensLayout)
@@ -1028,6 +1086,7 @@ class AssistantConfigDialog(QDialog):
             self.maxCompletionTokensEdit.setEnabled(isEnabled)
             self.maxPromptTokensEdit.setEnabled(isEnabled)
             self.truncationTypeComboBox.setEnabled(isEnabled)
+            self.reasoningEffortComboBox.setEnabled(isEnabled)
         elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             self.frequencyPenaltySlider.setEnabled(isEnabled)
             self.maxTokensEdit.setEnabled(isEnabled)
@@ -1036,6 +1095,7 @@ class AssistantConfigDialog(QDialog):
             self.topPSlider.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
             self.temperatureSlider.setEnabled(isEnabled)
+            self.reasoningEffortComboBox.setEnabled(isEnabled)
         elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             self.temperatureSlider.setEnabled(isEnabled)
             self.maxMessagesEdit.setEnabled(isEnabled)
@@ -1172,7 +1232,6 @@ class AssistantConfigDialog(QDialog):
             if not hasattr(self, 'instructions_reviewer'):
                 raise Exception("Instruction reviewer is not available, check the system assistant settings")
             self.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
-            # Combine instructions and check them
             instructions = self.newInstructionsEdit.toPlainText()
             self.reviewed_instructions = self.instructions_reviewer.process_messages(user_request=instructions, stream=False)
         except Exception as e:
@@ -1254,20 +1313,17 @@ class AssistantConfigDialog(QDialog):
             if azure_search:
                 self.azureSearchCheckBox.setChecked(azure_search.get("enabled", False))
                 saved_azure_conn_id = azure_search.get("connection_id", "")
-                # Now find the matching itemData in the Azure combo
                 for i in range(self.azureSearchConnectionComboBox.count()):
                     data = self.azureSearchConnectionComboBox.itemData(i, Qt.UserRole)
                     if data == saved_azure_conn_id:
                         self.azureSearchConnectionComboBox.setCurrentIndex(i)
                         break
-
                 self.azureSearchIndexLineEdit.setText(azure_search.get("index_name", ""))
 
             bing_search = getattr(self.assistant_config, "bing_search", None)
             if bing_search:
                 self.bingSearchCheckBox.setChecked(bing_search.get("enabled", False))
                 saved_bing_conn_id = bing_search.get("connection_id", "")
-                # Now find the matching itemData in the Bing combo
                 for i in range(self.bingSearchConnectionComboBox.count()):
                     data = self.bingSearchConnectionComboBox.itemData(i, Qt.UserRole)
                     if data == saved_bing_conn_id:
@@ -1287,12 +1343,19 @@ class AssistantConfigDialog(QDialog):
                 self.maxCompletionTokensEdit.setValue(completion_settings.get('max_completion_tokens', 1000))
                 self.maxPromptTokensEdit.setValue(completion_settings.get('max_prompt_tokens', 1000))
                 truncation_strategy = completion_settings.get('truncation_strategy', {'type': 'auto'})
-                truncation_type = truncation_strategy.get('type', 'auto')  # Default to 'auto' if 'type' is missing
+                truncation_type = truncation_strategy.get('type', 'auto')
                 self.truncationTypeComboBox.setCurrentText(truncation_type)
                 if truncation_type == 'last_messages':
                     last_messages = truncation_strategy.get('last_messages')
                     if last_messages is not None:
                         self.lastMessagesSpinBox.setValue(last_messages)
+
+                # Reasoning Effort
+                reasoning_effort = completion_settings.get('reasoning_effort')
+                if reasoning_effort:
+                    self.reasoningEffortComboBox.setCurrentText(reasoning_effort)
+                else:
+                    self.reasoningEffortComboBox.setCurrentIndex(0)
 
             elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.frequencyPenaltySlider.setValue(completion_settings.get('frequency_penalty', 0) * 100)
@@ -1302,6 +1365,13 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
                 self.topPSlider.setValue(completion_settings.get('top_p', 1.0) * 100)
                 self.maxMessagesEdit.setValue(completion_settings.get('max_text_messages', 50))
+
+                # Reasoning Effort
+                reasoning_effort = completion_settings.get('reasoning_effort')
+                if reasoning_effort:
+                    self.reasoningEffortComboBox.setCurrentText(reasoning_effort)
+                else:
+                    self.reasoningEffortComboBox.setCurrentIndex(0)
 
             elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.temperatureSlider.setValue(completion_settings.get('temperature', 1.0) * 100)
@@ -1317,6 +1387,7 @@ class AssistantConfigDialog(QDialog):
                 self.maxCompletionTokensEdit.setValue(1000)
                 self.maxPromptTokensEdit.setValue(1000)
                 self.truncationTypeComboBox.setCurrentText("auto")
+                self.reasoningEffortComboBox.setCurrentIndex(0)
 
             elif self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
                 self.frequencyPenaltySlider.setValue(0)
@@ -1326,6 +1397,7 @@ class AssistantConfigDialog(QDialog):
                 self.temperatureSlider.setValue(100)
                 self.topPSlider.setValue(100)
                 self.maxMessagesEdit.setValue(10)
+                self.reasoningEffortComboBox.setCurrentIndex(0)
 
             elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
                 self.temperatureSlider.setValue(100)
@@ -1360,19 +1432,15 @@ class AssistantConfigDialog(QDialog):
                     realtime_config.turn_detection.get('silence_duration_ms', 500)
                 )
             elif turn_detection_type == "local_vad":
-                # Here map the config keys to Silero VAD parameters
                 self.chunkSizeSpinBox.setValue(
                     realtime_config.turn_detection.get('chunk_size', 512)
                 )
                 self.windowSizeSpinBox.setValue(
                     realtime_config.turn_detection.get('window_size_samples', 512)
                 )
-                # Threshold is stored as (float in 0.0–1.0), so set directly
                 self.thresholdSpinBox.setValue(
                     realtime_config.turn_detection.get('threshold', 0.5)
                 )
-                # min_speech_duration & min_silence_duration are in seconds in Silero;
-                # your spin boxes are in ms, so multiply by 1000 for display
                 self.minSpeechDurationSpinBox.setValue(
                     int(realtime_config.turn_detection.get('min_speech_duration', 0.3) * 1000)
                 )
@@ -1386,61 +1454,42 @@ class AssistantConfigDialog(QDialog):
             func_type = func.get('type', 'function')  # default to 'function' if missing
 
             if func_type == 'openapi' and hasattr(self, 'openapiFunctionsList'):
-                # Handle OpenAPI as before
                 func_name = func.get('openapi', {}).get('name')
                 if not func_name:
-                    continue  # Skip if no name
-
-                # If not already selected, add to self.functions
+                    continue
                 if func not in self.functions:
                     self.functions.append(func)
-
-                # Mark the matching OpenAPI item in openapiFunctionsList
                 for i in range(self.openapiFunctionsList.count()):
                     listItem = self.openapiFunctionsList.item(i)
                     if listItem.text() == func_name:
                         listItem.setCheckState(Qt.Checked)
                         break
-
             else:
-                # Handle normal vs. azure
                 if func_type == 'azure_function':
-                    # Azure: name is at func["azure_function"]["function"]["name"]
                     func_name = func.get('azure_function', {}).get('function', {}).get('name')
                 else:
-                    # Normal (type=function or anything else)
                     func_name = func.get('function', {}).get('name')
 
-                # If we didn't get a name at all, skip
                 if not func_name:
                     continue
-
-                # Add the function to self.functions if it's not already there
                 if func not in self.functions:
                     self.functions.append(func)
 
-                # Now see if we can match it to an existing FunctionConfig in our manager
                 function_configs = self.function_config_manager.get_function_configs()
                 for category_type, funcs_in_category in function_configs.items():
                     for func_config in funcs_in_category:
                         if func_config.name == func_name:
-                            # If not already in self.functions, add func_config's spec
                             if func_config.get_full_spec() not in self.functions:
                                 self.functions.append(func_config.get_full_spec())
-
-                            # Decide which list widget to check
-                            #   - "system" remains systemFunctionsList
-                            #   - everything else (including "user" or "azure") goes in userFunctionsList
                             if category_type == 'system':
                                 list_widget = self.systemFunctionsList
                             else:
                                 list_widget = self.userFunctionsList
 
-                            # Check the matching item
                             for i in range(list_widget.count()):
                                 listItem = list_widget.item(i)
                                 if listItem.text() == func_name or \
-                                listItem.text() == f"{func_name} (Azure Function)": 
+                                listItem.text() == f"{func_name} (Azure Function)":
                                     listItem.setCheckState(Qt.Checked)
                                     break
 
@@ -1458,8 +1507,6 @@ class AssistantConfigDialog(QDialog):
 
     def handle_function_selection(self, item):
         self.functions = []
-
-        # Check if openapi functions list is available
         openAPIFunctionsList = QListWidget()
         if hasattr(self, 'openapiFunctionsList'):
             openAPIFunctionsList = self.openapiFunctionsList
@@ -1487,7 +1534,7 @@ class AssistantConfigDialog(QDialog):
             if filePath in file_dict:
                 QMessageBox.warning(None, "File Already Added", f"The file '{filePath}' is already in the list.")
             else:
-                file_dict[filePath] = None  # Initialize the file ID as None or any default value you wish
+                file_dict[filePath] = None
                 list_widget.addItem(filePath)
 
     def remove_file(self, file_dict, list_widget):
@@ -1508,13 +1555,11 @@ class AssistantConfigDialog(QDialog):
                 'silence_duration_ms': self.silenceDurationMsSpinBox.value()
             }
         elif self.turnDetectionComboBox.currentText() == "local_vad":
-            # For Silero VAD
             turn_detection = {
                 'type': 'local_vad',
                 'chunk_size': self.chunkSizeSpinBox.value(),
                 'window_size_samples': self.windowSizeSpinBox.value(),
                 'threshold': self.thresholdSpinBox.value(),
-                # Convert ms back to seconds for Silero
                 'min_speech_duration': self.minSpeechDurationSpinBox.value() / 1000.0,
                 'min_silence_duration': self.minSilenceDurationSpinBox.value() / 1000.0
             }
@@ -1540,8 +1585,12 @@ class AssistantConfigDialog(QDialog):
 
         self.assistant_name = self.get_name()
 
-        # Conditional setup for completion settings based on assistant_type
+        # Prepare a tool_resources placeholder for assistant/agent
+        tool_resources = None
+
+        # Build completion_settings if not default
         completion_settings = None
+
         if self.assistant_type == AssistantType.CHAT_ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
                 completion_settings = {
@@ -1551,7 +1600,8 @@ class AssistantConfigDialog(QDialog):
                     'response_format': self.responseFormatComboBox.currentText(),
                     'temperature': self.temperatureSlider.value() / 100,
                     'top_p': self.topPSlider.value() / 100,
-                    'max_text_messages': self.maxMessagesEdit.value()
+                    'max_text_messages': self.maxMessagesEdit.value(),
+                    'reasoning_effort': self.reasoningEffortComboBox.currentText() or None
                 }
 
         elif self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value:
@@ -1566,13 +1616,14 @@ class AssistantConfigDialog(QDialog):
                     'max_prompt_tokens': self.maxPromptTokensEdit.value(),
                     'top_p': self.topPSlider.value() / 100,
                     'response_format': self.responseFormatComboBox.currentText(),
-                    'truncation_strategy': truncation_strategy
+                    'truncation_strategy': truncation_strategy,
+                    'reasoning_effort': self.reasoningEffortComboBox.currentText() or None
                 }
-        
+
             code_interpreter_files = {}
             for i in range(self.codeFileList.count()):
-                item = self.codeFileList.item(i)  # Get the QListWidgetItem at index i
-                file_path = item.text()  # Assuming the file path is the item text
+                item = self.codeFileList.item(i)
+                file_path = item.text()
                 file_id = self.code_interpreter_files.get(file_path)
                 code_interpreter_files[file_path] = file_id
 
@@ -1581,7 +1632,7 @@ class AssistantConfigDialog(QDialog):
             for i in range(self.fileSearchList.count()):
                 item = self.fileSearchList.item(i)
                 file_path = item.text()
-                file_id = item.data(Qt.UserRole)  # Assuming file ID is stored as UserRole data
+                file_id = item.data(Qt.UserRole)
                 vector_store_files[file_path] = file_id
 
             id = self.vector_store_ids[0] if self.vector_store_ids else None
@@ -1598,7 +1649,6 @@ class AssistantConfigDialog(QDialog):
 
         elif self.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
             if not self.useDefaultSettingsCheckBox.isChecked():
-                # validate max_output_tokens
                 max_output_tokens_input = self.maxResponseOutputTokensEdit.text().strip()
                 if max_output_tokens_input.lower() != "inf":
                     try:
@@ -1627,7 +1677,7 @@ class AssistantConfigDialog(QDialog):
             'model': self.modelComboBox.currentText(),
             'assistant_id': self.assistant_id if not self.is_create else '',
             'file_references': [self.fileReferenceList.item(i).text() for i in range(self.fileReferenceList.count())] if self.assistant_type != AssistantType.REALTIME_ASSISTANT.value else [],
-            'tool_resources': tool_resources.to_dict() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else None,
+            'tool_resources': tool_resources.to_dict() if tool_resources else None,
             'functions': self.functions,
             'file_search': self.fileSearchCheckBox.isChecked() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else False,
             'code_interpreter': self.codeInterpreterCheckBox.isChecked() if (self.assistant_type == AssistantType.ASSISTANT.value or self.assistant_type == AssistantType.AGENT.value) else False,
@@ -1653,7 +1703,6 @@ class AssistantConfigDialog(QDialog):
             config['azure_ai_search'] = azure_ai_search
             config['bing_search'] = bing_search
 
-        # Validation and emission of the configuration
         if not config['name'] or not config['instructions'] or not config['model']:
             QMessageBox.information(self, "Missing Fields", "Name, Instructions, and Model are required fields.")
             return

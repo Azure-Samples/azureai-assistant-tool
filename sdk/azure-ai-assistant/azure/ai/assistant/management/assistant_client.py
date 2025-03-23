@@ -259,12 +259,15 @@ class AssistantClient(BaseAssistantClient):
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = self._create_tool_resources(assistant_config)
 
+            reasoning_effort = assistant_config.text_completion_config.reasoning_effort if assistant_config.text_completion_config else None
+
             assistant = self._ai_client.beta.assistants.create(
                 name=assistant_config.name,
                 instructions=instructions,
                 tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
+                reasoning_effort=reasoning_effort,
                 timeout=timeout
             )
             # Update the assistant_id in the assistant_config
@@ -492,18 +495,31 @@ class AssistantClient(BaseAssistantClient):
                     timeout=timeout
                 )
             else:
-                run = self._ai_client.beta.threads.runs.create(
-                    thread_id=thread_id,
-                    assistant_id=self.assistant_config.assistant_id,
-                    additional_instructions=additional_instructions,
-                    temperature=None if text_completion_config is None else text_completion_config.temperature,
-                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
-                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
-                    top_p=None if text_completion_config is None else text_completion_config.top_p,
-                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
-                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                    timeout=timeout
-                )
+                # If reasoning_effort is set, only use max_completion_tokens and max_prompt_tokens
+                if text_completion_config.reasoning_effort:
+                    run = self._ai_client.beta.threads.runs.create(
+                        thread_id=thread_id,
+                        assistant_id=self.assistant_config.assistant_id,
+                        additional_instructions=additional_instructions,
+                        max_completion_tokens=text_completion_config.max_completion_tokens,
+                        max_prompt_tokens=text_completion_config.max_prompt_tokens,
+                        timeout=timeout
+                    )
+                else:
+                    # Else use all the parameters from text_completion_config
+                    run = self._ai_client.beta.threads.runs.create(
+                        thread_id=thread_id,
+                        assistant_id=self.assistant_config.assistant_id,
+                        additional_instructions=additional_instructions,
+                        temperature=text_completion_config.temperature,
+                        max_completion_tokens=text_completion_config.max_completion_tokens,
+                        max_prompt_tokens=text_completion_config.max_prompt_tokens,
+                        top_p=text_completion_config.top_p,
+                        response_format={'type': text_completion_config.response_format}
+                            if text_completion_config.response_format else None,
+                        truncation_strategy=text_completion_config.truncation_strategy,
+                        timeout=timeout
+                    )
 
             # call the start_run callback
             run_start_time = str(datetime.now())
@@ -593,20 +609,32 @@ class AssistantClient(BaseAssistantClient):
                 ) as stream:
                     stream.until_done()
             else:
-                with self._ai_client.beta.threads.runs.stream(
-                    thread_id=thread_id,
-                    assistant_id=self._assistant_config.assistant_id,
-                    additional_instructions=additional_instructions,
-                    temperature=None if text_completion_config is None else text_completion_config.temperature,
-                    max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
-                    max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
-                    top_p=None if text_completion_config is None else text_completion_config.top_p,
-                    response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
-                    truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
-                    event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
-                    timeout=timeout
-                ) as stream:
-                    stream.until_done()
+                if text_completion_config.reasoning_effort:
+                    with self._ai_client.beta.threads.runs.stream(
+                        thread_id=thread_id,
+                        assistant_id=self._assistant_config.assistant_id,
+                        additional_instructions=additional_instructions,
+                        max_completion_tokens=text_completion_config.max_completion_tokens,
+                        max_prompt_tokens=text_completion_config.max_prompt_tokens,
+                        timeout=timeout,
+                        event_handler=StreamEventHandler(self, thread_id, timeout=timeout)
+                    ) as stream:
+                        stream.until_done()
+                else:
+                    with self._ai_client.beta.threads.runs.stream(
+                        thread_id=thread_id,
+                        assistant_id=self._assistant_config.assistant_id,
+                        additional_instructions=additional_instructions,
+                        temperature=None if text_completion_config is None else text_completion_config.temperature,
+                        max_completion_tokens=None if text_completion_config is None else text_completion_config.max_completion_tokens,
+                        max_prompt_tokens=None if text_completion_config is None else text_completion_config.max_prompt_tokens,
+                        top_p=None if text_completion_config is None else text_completion_config.top_p,
+                        response_format=None if text_completion_config is None else {'type': text_completion_config.response_format},
+                        truncation_strategy=None if text_completion_config is None else text_completion_config.truncation_strategy,
+                        event_handler=StreamEventHandler(self, thread_id, timeout=timeout),
+                        timeout=timeout
+                    ) as stream:
+                        stream.until_done()
 
         except Exception as e:
             logger.error(f"Error occurred during streaming processing run: {e}")
@@ -762,7 +790,8 @@ class AssistantClient(BaseAssistantClient):
             instructions = self._replace_file_references_with_content(assistant_config)
             tools_resources = self._update_tool_resources(assistant_config)
 
-            # TODO update the assistant with the new configuration only if there are changes
+            reasoning_effort = assistant_config.text_completion_config.reasoning_effort if assistant_config.text_completion_config else None
+
             self._ai_client.beta.assistants.update(
                 assistant_id=assistant_config.assistant_id,
                 name=assistant_config.name,
@@ -770,6 +799,7 @@ class AssistantClient(BaseAssistantClient):
                 tool_resources=tools_resources,
                 tools=tools,
                 model=assistant_config.model,
+                reasoning_effort=reasoning_effort,
                 timeout=timeout
             )
         except Exception as e:
