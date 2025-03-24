@@ -76,6 +76,7 @@ setup(
         "azure-ai-projects",
         "azure-identity",
         "azure-mgmt-logic",
+        "azure-mgmt-web",
     ],
     python_requires=">=3.8",
     project_urls={
