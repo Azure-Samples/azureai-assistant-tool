@@ -4,23 +4,32 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
+import os
+import json
+import threading
+from typing import List
+from concurrent.futures import ThreadPoolExecutor
+
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFont
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
-from azure.ai.assistant.management.attachment import Attachment, AttachmentType
-from azure.ai.assistant.management.task_manager import TaskManager
-from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
+from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks
 from azure.ai.assistant.management.assistant_config import AssistantType
-from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
+from azure.ai.assistant.management.attachment import Attachment, AttachmentType
+from azure.ai.assistant.management.azure_logic_app_manager import AzureLogicAppManager
+from azure.ai.assistant.management.azure_functions_manager import AzureFunctionManager
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.message import ConversationMessage
+from azure.ai.assistant.management.task import Task, BasicTask, BatchTask, MultiTask
+from azure.ai.assistant.management.task_manager import TaskManager
+from azure.ai.assistant.management.task_manager_callbacks import TaskManagerCallbacks
+
 from gui.menu import AssistantsMenu, FunctionsMenu, TasksMenu, SettingsMenu, DiagnosticsMenu
 from gui.status_bar import ActivityStatus, StatusBar
 from gui.assistant_client_manager import AssistantClientManager
@@ -41,11 +50,7 @@ from gui.signals import (
     ConversationAppendMessagesSignal,
     ConversationAppendImageSignal
 )
-from gui.utils import init_system_assistant
-
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import os, time, json
+from gui.utils import init_system_assistant, get_ai_client
 
 
 class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
@@ -55,7 +60,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         self.status_messages = {
             'ai_client_type': ''
         }
-        self.connection_timeout : float = 90.0
+        self.connection_timeout : float = 360.0
         self.use_system_assistant_for_thread_name : bool = False
         self.use_streaming_for_assistant : bool = True
         self.active_ai_client_type = None
@@ -82,7 +87,8 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             self.init_system_assistant_settings()
             self.init_system_assistants()
         except Exception as e:
-            error_message = f"An error occurred while initializing the system assistants: {e}"
+            error_message = f"{e}"
+            self.error_signal.error_signal.emit(error_message)
             logger.error(error_message)
 
     def init_system_assistants(self):
@@ -91,6 +97,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         init_system_assistant(self, "FunctionImplCreator")
         init_system_assistant(self, "TaskRequestsCreator")
         init_system_assistant(self, "InstructionsReviewer")
+        init_system_assistant(self, "AzureLogicAppFunctionCreator")
 
     def initialize_variables(self):
         self.scheduled_task_threads = {}
@@ -118,34 +125,20 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
     def init_system_assistant_settings(self):
         self.load_system_assistant_settings()
-
         self.system_client_type = self.system_assistant_settings.get("ai_client_type", AIClientType.AZURE_OPEN_AI.name)
         self.system_model = self.system_assistant_settings.get("model", "gpt-4-1106-preview")
         self.system_api_version = self.system_assistant_settings.get("api_version", "2024-02-15-preview")
 
-        try:
-            if self.system_client_type == AIClientType.AZURE_OPEN_AI.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI,
-                    api_version=self.system_api_version
-                )
-            elif self.system_client_type == AIClientType.OPEN_AI.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI
-                )
-            elif self.system_client_type == AIClientType.OPEN_AI_REALTIME.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI_REALTIME
-                )
-            elif self.system_client_type == AIClientType.AZURE_OPEN_AI_REALTIME.name:
-                self.system_client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI_REALTIME,
-                    api_version=self.system_api_version
-                )
-        except Exception as e:
-            logger.error(f"Error initializing system assistant client {self.system_client_type}: {e}")
-            raise ValueError(f"Error initializing system assistant client {self.system_client_type}: {e}")
+        resolved_client_type = AIClientType[self.system_client_type]
+        self.system_client = get_ai_client(resolved_client_type, self.system_api_version)
 
+        if self.system_client is None:
+            raise ValueError(
+                f"Unable to initialize system assistants of type: {self.system_client_type}. "
+                "System assistants are AI agents integrated into the application to provide "
+                "additional functionality; it is recommended (but not mandatory) to set up the system assistant settings for full functionality. "
+                "Check system_assistant_settings.json or configure them under the Settings menu."
+            )
     def initialize_ui(self):
         self.initialize_ui_components()
         self.initialize_signals()
@@ -280,36 +273,22 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         if self.assistants_menu is not None:
             self.assistants_menu.update_client_type(new_client_type)  # Update the menu for the new client type
 
-        client = None
-        try:
-            if self.active_ai_client_type == AIClientType.AZURE_OPEN_AI:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI
-                )
-            elif self.active_ai_client_type == AIClientType.OPEN_AI:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI
-                )
-            elif self.active_ai_client_type == AIClientType.OPEN_AI_REALTIME:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.OPEN_AI_REALTIME
-                )
-            elif self.active_ai_client_type == AIClientType.AZURE_OPEN_AI_REALTIME:
-                client = AIClientFactory.get_instance().get_client(
-                    AIClientType.AZURE_OPEN_AI_REALTIME
-                )
-        except Exception as e:
-            logger.error(f"Error getting client for active_ai_client_type {self.active_ai_client_type.name}: {e}")
+        client = get_ai_client(new_client_type)
+        if client is None:
+            message = f"{new_client_type.name} assistant client not initialized properly, check the API keys"
+            self.status_messages['ai_client_type'] = f'<span style="color: red;">{message}</span>'
+            self.update_client_label()
+            return
 
-        finally:
-            if client is None:
-                message = f"{self.active_ai_client_type.name} assistant client not initialized properly, check the API keys"
-                self.status_messages['ai_client_type'] = f'<span style="color: red;">{message}</span>'
-                self.update_client_label()
-            else:
-                message = ""
-                self.status_messages['ai_client_type'] = message
-                self.update_client_label()
+        # If it's an AZURE_AI_AGENT, set up Azure Logic App, TODO: move this to Functions menu
+        if self.active_ai_client_type == AIClientType.AZURE_AI_AGENT:
+            subscription_id = client.scope["subscription_id"]
+            resource_group = client.scope["resource_group_name"]
+            self.azure_logic_app_manager = AzureLogicAppManager.get_instance(subscription_id, resource_group)
+            self.azure_function_manager = AzureFunctionManager.get_instance(subscription_id, resource_group)
+
+        self.status_messages['ai_client_type'] = ""
+        self.update_client_label()
 
     def update_client_label(self):
         if hasattr(self, 'active_client_label'):
@@ -382,14 +361,34 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                 self.assistants_processing[assistant_name]['user_input'] = False
                 self.status_bar.stop_animation(ActivityStatus.PROCESSING_USER_INPUT)
 
-    def on_user_input_complete(self, user_input):
+    def on_user_input_complete(self, user_input, pasted_image_file_paths=None):
+        if pasted_image_file_paths is None:
+            pasted_image_file_paths = []
+
         try:
             assistants = self.conversation_sidebar.get_selected_assistants()
             if not assistants:
                 QMessageBox.warning(self, "Error", "Please select an assistant first.")
                 return
 
-            # Check if the assistant is realtime assistant
+            if not user_input and not pasted_image_file_paths:
+                return
+
+            sidebar_attachments = self.conversation_sidebar.threadList.get_attachments_for_selected_item() or []
+
+            pasted_image_attachments = []
+            for image_path in pasted_image_file_paths:
+                attachment_info = {
+                    "file_id": None,
+                    "file_name": os.path.basename(image_path),
+                    "file_path": image_path,
+                    "attachment_type": "image_file",
+                    "tools": []
+                }
+                pasted_image_attachments.append(attachment_info)
+
+            all_attachments = sidebar_attachments + pasted_image_attachments
+
             if not self.is_realtime_assistant(assistants[0]):
                 thread_name = self.setup_conversation_thread()
                 self.append_conversation_signal.update_signal.emit("user", user_input, "blue")
@@ -400,10 +399,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
                     self.update_conversation_title_signal.update_signal.emit(thread_name, updated_thread_name)
                     thread_name = updated_thread_name
 
-                # Get files from conversation thread list
-                attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-
-                self.executor.submit(self.process_input, user_input, assistants, thread_name, False, attachments_dicts)
+                self.executor.submit(self.process_input, user_input, assistants, thread_name, False, all_attachments)
                 self.conversation_view.inputField.clear()
             else:
                 thread_name = self.setup_conversation_thread()
@@ -467,7 +463,7 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
 
             self.update_attachments_from_ui_to_thread(thread_client, thread_id, attachments_dicts)
             self.create_thread_message(thread_client, user_input, thread_name, attachments_dicts)
-            self.update_attachments_in_ui_from_thread(thread_client, thread_id)
+            self.update_attachments_to_sidebar_from_thread(thread_client, thread_id)
 
             updated_conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
             self.update_conversation_messages(updated_conversation)
@@ -501,39 +497,46 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
             logger.error(error_message)
 
     def update_attachments_from_ui_to_thread(self, thread_client : ConversationThreadClient, thread_id, attachments_dicts):
+        if not attachments_dicts:
+            return
         # Synchronize the thread configuration and cloud client for deleted attachments
-        existing_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-        all_attachment_ids = [att["file_id"] for att in attachments_dicts]
-        attachments_to_remove = [att for att in existing_attachments if att.file_id not in all_attachment_ids]
+        existing_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        all_attachment_file_ids = [att["file_id"] for att in attachments_dicts]
+        attachments_to_remove = [att for att in existing_thread_attachments if att.file_id not in all_attachment_file_ids]
         
         for attachment in attachments_to_remove:
-            thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)
+            thread_client.get_config().remove_attachment_from_thread(thread_id, attachment.file_id)          
+            # Optionally remove from cloud thread if not an image. 
+            # Do not remove images from cloud thread due to issue with OpenAI bug if image is removed.
             if attachment.attachment_type != AttachmentType.IMAGE_FILE:
                 thread_client._ai_client.files.delete(file_id=attachment.file_id)
 
         logger.debug("Attachments synchronized from UI to thread")
 
     def create_thread_message(self, thread_client : ConversationThreadClient, user_input, thread_name, attachments_dicts = None):
-        conversation = thread_client.retrieve_conversation(thread_name, timeout=self.connection_timeout)
-        if attachments_dicts is None:
-            attachments = None
-        else:
-            attachments = [
-                Attachment.from_dict(att_dict) 
-                for att_dict in attachments_dicts 
-                if not conversation.contains_file_id(att_dict["file_id"])
-            ]
+        thread_id = thread_client.get_config().get_thread_id_by_name(thread_name)
+        local_thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        existing_file_ids = {att.file_id for att in local_thread_attachments}
+        new_attachments = []
+        for att_dict in attachments_dicts if attachments_dicts else []:
+            if att_dict["file_id"] not in existing_file_ids:
+                new_attachment = Attachment.from_dict(att_dict)
+                new_attachments.append(new_attachment)
+
+        cleaned_input = user_input.strip() if user_input else ""
+        if not cleaned_input:
+            cleaned_input = "…"
+
         thread_client.create_conversation_thread_message(
-            user_input, thread_name, 
-            attachments=attachments, 
+            cleaned_input, thread_name, 
+            attachments=new_attachments if new_attachments else None,
             timeout=self.connection_timeout
         )
 
-    def update_attachments_in_ui_from_thread(self, thread_client : ConversationThreadClient, thread_id):
-        # Refresh the attachments list in the UI after message creation
-        updated_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
-        attachments_dicts = [attachment.to_dict() for attachment in updated_attachments]
-        logger.debug(f"process_input: attachments updated: {attachments_dicts}")
+    def update_attachments_to_sidebar_from_thread(self, thread_client : ConversationThreadClient, thread_id):
+        # Refresh the attachments in the sidebar
+        thread_attachments = thread_client.get_config().get_attachments_of_thread(thread_id)
+        attachments_dicts = [attachment.to_dict() for attachment in thread_attachments]
         self.conversation_sidebar.set_attachments_for_selected_thread(attachments_dicts)
 
     def process_assistant_input(self, assistant_name, thread_name, is_scheduled_task):
@@ -565,21 +568,6 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
     def update_conversation_messages(self, conversation):
         self.conversation_view_clear_signal.update_signal.emit()
         self.conversation_append_messages_signal.append_signal.emit(conversation.messages)
-
-    def add_image_to_selected_thread(self, image_path):
-        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-        attachments_dicts.append({
-            "file_name": os.path.basename(image_path),
-            "file_path": image_path,
-            "attachment_type": "image_file",
-            "tools": []  # No specific tools for images
-        })
-        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
-
-    def remove_image_from_selected_thread(self, image_path):
-        attachments_dicts = self.conversation_sidebar.threadList.get_attachments_for_selected_item()
-        attachments_dicts = [att for att in attachments_dicts if att["file_path"] != image_path]
-        self.conversation_sidebar.threadList.set_attachments_for_selected_item(attachments_dicts)
 
     def is_realtime_assistant(self, assistant_name):
         assistant_client = self.assistant_client_manager.get_client(assistant_name)
@@ -676,33 +664,121 @@ class MainWindow(QMainWindow, AssistantClientCallbacks, TaskManagerCallbacks):
         conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
         self.update_conversation_messages(conversation)
 
-    def on_run_cancelled(self, assistant_name, run_identifier, run_end_time):
+    def on_run_cancelled(self, assistant_name, run_identifier, run_end_time, thread_name):
         logger.info(f"Run cancelled for assistant {assistant_name} with run identifier {run_identifier}")
         self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "Run cancelled")
 
-    def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name):
+    def on_run_end(self, assistant_name: str, run_identifier: str, run_end_time: str, thread_name: str):
         logger.info(f"Run end for assistant {assistant_name} with run identifier {run_identifier} and thread name {thread_name}")
 
         self.handle_realtime_run_end(assistant_name, run_identifier)
-
-        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(thread_name, timeout=self.connection_timeout)
+        conversation = self.conversation_thread_clients[self.active_ai_client_type].retrieve_conversation(
+            thread_name, timeout=self.connection_timeout
+        )
         last_assistant_message = conversation.get_last_text_message(assistant_name)
         if last_assistant_message is None:
-            logger.error(
-                f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'. Aborting run end process."
+            logger.error(f"No last message found for assistant '{assistant_name}' in thread '{thread_name}'.")
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(
+                assistant_name,
+                run_identifier,
+                run_end_time,
+                "No message found. Possibly a rate-limiting issue."
             )
-            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, "No message was found from the assistant in the specified thread. This may be due to a rate limiting issue. "
-                             "Please check Diagnostics for more detailed information and troubleshooting steps.")
         else:
-            self.diagnostics_sidebar.end_run_signal.end_signal.emit(assistant_name, run_identifier, run_end_time, last_assistant_message.content)
+            self.diagnostics_sidebar.end_run_signal.end_signal.emit(
+                assistant_name,
+                run_identifier,
+                run_end_time,
+                last_assistant_message.content
+            )
 
-        # copy files from conversation to output folder at the end of the run
+        # Download any files from conversation at run-end
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         for message in conversation.messages:
-            if len(message.file_messages) > 0:
-                for file_message in message.file_messages:
-                    file_path = file_message.retrieve_file(assistant_config.output_folder_path)
-                    logger.debug(f"File downloaded to {file_path} on run end")
+            for file_message in message.file_messages:
+                file_path = file_message.retrieve_file(assistant_config.output_folder_path)
+                logger.debug(f"File downloaded to {file_path} on run end")
+
+        # Retrieve steps from the active client, parse them, then emit them to the DiagnosticsSidebar when the run ends.
+        try:
+            # Get run steps from whichever client is active
+            steps_data = self.get_run_steps(
+                assistant_name=assistant_name,
+                run_identifier=run_identifier,
+                thread_name=thread_name
+            )
+
+            if steps_data:
+                # Send them to the DiagnosticsSidebar
+                # This will cause the “Steps” tree node + sub-items to appear
+                self.diagnostics_sidebar.add_run_steps_signal.steps_signal.emit(run_identifier, steps_data)
+
+        except Exception as e:
+            logger.error(f"Could not retrieve steps for run {run_identifier}: {e}")
+
+    def get_run_steps(self, assistant_name: str, run_identifier: str, thread_name: str) -> List[dict]:
+        client = self.assistant_client_manager.get_client(assistant_name)
+
+        if not hasattr(client, "get_run_steps"):
+            logger.debug(f"Assistant client {assistant_name} does not support run steps retrieval.")
+            return []
+
+        raw_steps = client.get_run_steps(thread_name, run_identifier, timeout=self.connection_timeout)
+
+        steps_data = []
+        for step_obj in raw_steps:
+            tool_calls_list = []
+
+            # If step type == "tool_calls", we pull out the list of calls
+            if step_obj.type.lower() == "tool_calls" and hasattr(step_obj, "step_details"):
+                step_details_dict = getattr(step_obj, "step_details", {}) or {}
+                maybe_tool_calls = step_details_dict.get("tool_calls", [])
+
+                for call in maybe_tool_calls:
+                    # Every call at least has "id" and "type"
+                    tool_call_entry = {
+                        "id":  call.get("id", ""),
+                        "type": call.get("type", "")
+                    }
+
+                    # Depending on tool-call type, we read different fields
+                    call_type = tool_call_entry["type"].lower()
+                    if call_type in ("openapi", "function"):
+                        function_dict = call.get("function", {})
+                        tool_call_entry["function_name"] = function_dict.get("name", "")
+                        tool_call_entry["arguments"] = function_dict.get("arguments", "")
+                    elif call_type == "azure_ai_search":
+                        azure_ai_search_dict = call.get("azure_ai_search", {})
+                        tool_call_entry["azure_ai_search_input"] = azure_ai_search_dict.get("input", "")
+                        tool_call_entry["azure_ai_search_output"] = azure_ai_search_dict.get("output", "")
+                    elif call_type == "bing_grounding":
+                        bg_dict = call.get("bing_grounding", {})
+                        tool_call_entry["bing_grounding_requesturl"] = bg_dict.get("requesturl", "")
+                    elif call_type == "file_search":
+                        fs_dict = call.get("file_search", {})
+                        tool_call_entry["file_search_ranking_options"] = fs_dict.get("ranking_options", {})
+                        tool_call_entry["file_search_results"] = fs_dict.get("results", [])
+                    elif call_type == "code_interpreter":
+                        ci_dict = call.get("code_interpreter", {})
+                        tool_call_entry["code_interpreter_input"] = ci_dict.get("input", "")
+                        tool_call_entry["code_interpreter_outputs"] = ci_dict.get("outputs", [])
+                    else:
+                        logger.warning(f"Unknown tool call type for run steps: {call_type}, all data not stored: {call}")
+
+                    tool_calls_list.append(tool_call_entry)
+
+            usage_info = getattr(step_obj, "usage", {}) or {}
+
+            single_step = {
+                "id": step_obj.id,
+                "status": step_obj.status,
+                "type": step_obj.type,
+                "tool_calls": tool_calls_list,
+                "usage": usage_info
+            }
+            steps_data.append(single_step)
+
+        return steps_data
 
     def on_run_audio_data(self, assistant_name, run_identifier, audio_data):
         if self.is_realtime_assistant(assistant_name):

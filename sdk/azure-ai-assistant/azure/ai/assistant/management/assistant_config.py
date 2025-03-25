@@ -13,6 +13,7 @@ class AssistantType(Enum):
     REALTIME_ASSISTANT = "realtime_assistant"
     CHAT_ASSISTANT = "chat_assistant"
     ASSISTANT = "assistant"
+    AGENT = "agent"
 
 
 class RealtimeConfig:
@@ -300,21 +301,26 @@ class TextCompletionConfig:
     :type temperature: float
     :param top_p: The top p.
     :type top_p: float
-    :param seed: The seed.
+    :param seed: The seed (optional).
     :type seed: Optional[int]
-    :param max_text_messages: The maximum number of text messages.
+    :param max_text_messages: The maximum number of text messages (optional).
     :type max_text_messages: Optional[int]
+    :param reasoning_effort: The reasoning effort level (optional).
+                              May be "low", "medium", or "high" if set, or None if unused.
+    :type reasoning_effort: Optional[str]
     """
-    def __init__(self, 
-                 frequency_penalty: float, 
-                 max_tokens: int, 
-                 presence_penalty: float,
-                 response_format: str,
-                 temperature: float, 
-                 top_p: float,
-                 seed: Optional[int] = None,
-                 max_text_messages: Optional[int] = None
-        ) -> None:
+    def __init__(
+        self,
+        frequency_penalty: float,
+        max_tokens: int,
+        presence_penalty: float,
+        response_format: str,
+        temperature: float,
+        top_p: float,
+        seed: Optional[int] = None,
+        max_text_messages: Optional[int] = None,
+        reasoning_effort: Optional[str] = None
+    ) -> None:
         self._frequency_penalty = frequency_penalty
         self._max_tokens = max_tokens
         self._presence_penalty = presence_penalty
@@ -323,6 +329,7 @@ class TextCompletionConfig:
         self._top_p = top_p
         self._seed = seed
         self._max_text_messages = max_text_messages
+        self._reasoning_effort = reasoning_effort
 
     def to_dict(self):
         return {
@@ -333,7 +340,8 @@ class TextCompletionConfig:
             'temperature': self.temperature,
             'top_p': self.top_p,
             'seed': self.seed,
-            'max_text_messages': self.max_text_messages
+            'max_text_messages': self.max_text_messages,
+            'reasoning_effort': self.reasoning_effort
         }
 
     @property
@@ -496,6 +504,26 @@ class TextCompletionConfig:
         """
         self._max_text_messages = value
 
+    @property
+    def reasoning_effort(self) -> Optional[str]:
+        """
+        Get the reasoning effort level.
+
+        :return: The reasoning effort level, which may be "low", "medium", or "high" if set, or None if unused.
+        :rtype: Optional[str]
+        """
+        return self._reasoning_effort
+    
+    @reasoning_effort.setter
+    def reasoning_effort(self, value) -> None:
+        """
+        Set the reasoning effort level.
+
+        :param value: The reasoning effort level, which may be "low", "medium", or "high" if set, or None if unused.
+        :type value: Optional[str]
+        """
+        self._reasoning_effort = value
+
 
 class AssistantTextCompletionConfig:
     """
@@ -513,14 +541,19 @@ class AssistantTextCompletionConfig:
     :type response_format: str
     :param truncation_strategy: The truncation strategy.
     :type truncation_strategy: dict
+    :param reasoning_effort: The reasoning effort level (optional).
+                             May be "low", "medium", or "high" if set, or None if unused.
+    :type reasoning_effort: Optional[str]
     """
-    def __init__(self, 
-                 temperature: float, 
-                 max_completion_tokens: int,
-                 max_prompt_tokens: int,
-                 top_p: float, 
-                 response_format: str,
-                 truncation_strategy : dict
+    def __init__(
+        self, 
+        temperature: float, 
+        max_completion_tokens: int,
+        max_prompt_tokens: int,
+        top_p: float, 
+        response_format: str,
+        truncation_strategy: dict,
+        reasoning_effort: Optional[str] = None
     ) -> None:
         self._temperature = temperature
         self._max_completion_tokens = max_completion_tokens
@@ -528,15 +561,18 @@ class AssistantTextCompletionConfig:
         self._top_p = top_p
         self._response_format = response_format
         self._truncation_strategy = truncation_strategy
+        self._reasoning_effort = reasoning_effort
 
     def to_dict(self):
-        return {'temperature': self.temperature,
-                'max_completion_tokens': self.max_completion_tokens,
-                'max_prompt_tokens': self.max_prompt_tokens,
-                'top_p': self.top_p,
-                'response_format': self.response_format,
-                'truncation_strategy': self.truncation_strategy
-                }
+        return {
+            'temperature': self.temperature,
+            'max_completion_tokens': self.max_completion_tokens,
+            'max_prompt_tokens': self.max_prompt_tokens,
+            'top_p': self.top_p,
+            'response_format': self.response_format,
+            'truncation_strategy': self.truncation_strategy,
+            'reasoning_effort': self.reasoning_effort
+        }
 
     @property
     def temperature(self) -> float:
@@ -657,6 +693,26 @@ class AssistantTextCompletionConfig:
         :type value: dict
         """
         self._truncation_strategy = value
+
+    @property
+    def reasoning_effort(self) -> Optional[str]:
+        """
+        Get the reasoning effort level.
+
+        :return: The reasoning effort level, which may be "low", "medium", or "high" if set, or None if unused.
+        :rtype: Optional[str]
+        """
+        return self._reasoning_effort
+    
+    @reasoning_effort.setter
+    def reasoning_effort(self, value) -> None:
+        """
+        Set the reasoning effort level.
+
+        :param value: The reasoning effort level, which may be "low", "medium", or "high" if set, or None if unused.
+        :type value: Optional[str]
+        """
+        self._reasoning_effort = value
 
 
 class RealtimeCompletionConfig:
@@ -988,9 +1044,7 @@ class AssistantConfig:
     :param config_data: The configuration data for the assistant.
     :type config_data: dict
     """
-    def __init__(self, 
-                 config_data : dict
-    ) -> None:
+    def __init__(self, config_data: dict) -> None:
         self._config_data = config_data
         self._name = config_data['name']
         self._instructions = self._remove_trailing_spaces(config_data['instructions']) if 'instructions' in config_data else ""
@@ -1001,87 +1055,77 @@ class AssistantConfig:
         self._model = config_data['model']
         self._assistant_type = config_data.get('assistant_type', AssistantType.ASSISTANT.value)
         self._file_references = config_data.get('file_references', [])
-        
-        # Extracting tool resources configuration
-        self._tool_resources = self._initialize_tool_resources(config_data.get('tool_resources'))
 
+        self._tool_resources = self._initialize_tool_resources(config_data.get('tool_resources'))
         self._functions = config_data.get('functions', [])
         self._function_configs = self._get_function_configs()
-        
-        # Manage tool activation based on config_data
+
         self._file_search = config_data.get('file_search', False)
         self._code_interpreter = config_data.get('code_interpreter', False)
-        
-        # Set default output folder as absolute path to 'output' folder in current directory
+
         default_output_folder_path = os.path.join(os.getcwd(), 'output')
         self._output_folder_path = config_data.get('output_folder_path', default_output_folder_path)
         self._assistant_role = config_data.get('assistant_role', 'user')
 
-        # Completion settings based on assistant type
+        # Set up the appropriate completion config (text / assistant / realtime)
         self._text_completion_config = self._setup_completion_settings(config_data)
         self._realtime_config = self._setup_realtime_config(config_data)
 
-        # Config folder for local assistant and threads configuration
+        # Extra fields for agent searches
+        self._azure_ai_search = config_data.get('azure_ai_search', {
+            'enabled': False,
+            'connection_id': '',
+            'index_name': ''
+        })
+        self._bing_search = config_data.get('bing_search', {
+            'enabled': False,
+            'connection_id': ''
+        })
+
+        # A placeholder for local usage if needed
         self._config_folder = None
 
-    def _setup_completion_settings(self, config_data):
-        if config_data.get('completion_settings', None) is not None:
-            if self._assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                completion_data = config_data.get('completion_settings', {
-                    'frequency_penalty': 0.0,
-                    'max_tokens': 1000,
-                    'presence_penalty': 0.0,
-                    'response_format': 'text',
-                    'temperature': 1.0,
-                    'top_p': 1.0,
-                    'seed': None,
-                    'max_text_messages': None,
-                })
-                # Constructing TextCompletionConfig from the dictionary
-                return TextCompletionConfig(
-                    frequency_penalty=completion_data['frequency_penalty'],
-                    max_tokens=completion_data['max_tokens'],
-                    presence_penalty=completion_data['presence_penalty'],
-                    response_format=completion_data['response_format'],
-                    temperature=completion_data['temperature'],
-                    top_p=completion_data['top_p'],
-                    seed=None,
-                    max_text_messages=completion_data['max_text_messages']
-                )
-            elif self._assistant_type == AssistantType.ASSISTANT.value:
-                completion_data = config_data.get('completion_settings', {
-                    'temperature': 1.0,
-                    'max_completion_tokens': 1000,
-                    'max_prompt_tokens': 1000,
-                    'top_p': 1.0,
-                    'response_format': 'text',
-                    'truncation_strategy': {
-                        'type': 'auto',
-                        'last_messages': None
-                    }
-                })
-                # Constructing AssistantTextCompletionConfig from the dictionary
-                return AssistantTextCompletionConfig(
-                    temperature=completion_data['temperature'],
-                    max_completion_tokens=completion_data['max_completion_tokens'],
-                    max_prompt_tokens=completion_data['max_prompt_tokens'],
-                    top_p=completion_data['top_p'],
-                    response_format=completion_data['response_format'],
-                    truncation_strategy=completion_data['truncation_strategy']
-                )
-            elif self._assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                completion_data = config_data.get('completion_settings', {
-                    'temperature': 1.0,
-                    'max_text_messages': None,
-                    'max_output_tokens': 'inf'
-                })
-                # Constructing RealtimeCompletionConfig from the dictionary
-                return RealtimeCompletionConfig(
-                    temperature=completion_data['temperature'],
-                    max_text_messages=completion_data['max_text_messages'],
-                    max_output_tokens=completion_data['max_output_tokens']
-                )
+    def _setup_completion_settings(self, config_data: dict):
 
+        completion_data = config_data.get('completion_settings', None)
+        if not completion_data:
+            return None
+
+        if self._assistant_type == AssistantType.CHAT_ASSISTANT.value:
+            # For the "chat" style
+            return TextCompletionConfig(
+                frequency_penalty=completion_data.get('frequency_penalty', 0.0),
+                max_tokens=completion_data.get('max_tokens', 1000),
+                presence_penalty=completion_data.get('presence_penalty', 0.0),
+                response_format=completion_data.get('response_format', 'text'),
+                temperature=completion_data.get('temperature', 1.0),
+                top_p=completion_data.get('top_p', 1.0),
+                seed=None,
+                max_text_messages=completion_data.get('max_text_messages'),
+                reasoning_effort=completion_data.get('reasoning_effort')  # Optional[str]
+            )
+
+        elif self._assistant_type in [AssistantType.ASSISTANT.value, AssistantType.AGENT.value]:
+            # For the "assistant" or "agent" style
+            return AssistantTextCompletionConfig(
+                temperature=completion_data.get('temperature', 1.0),
+                max_completion_tokens=completion_data.get('max_completion_tokens', 1000),
+                max_prompt_tokens=completion_data.get('max_prompt_tokens', 1000),
+                top_p=completion_data.get('top_p', 1.0),
+                response_format=completion_data.get('response_format', 'text'),
+                truncation_strategy=completion_data.get('truncation_strategy', {'type': 'auto', 'last_messages': None}),
+                reasoning_effort=completion_data.get('reasoning_effort')  # Optional[str]
+            )
+
+        elif self._assistant_type == AssistantType.REALTIME_ASSISTANT.value:
+            # For "realtime" use
+            return RealtimeCompletionConfig(
+                temperature=completion_data.get('temperature', 1.0),
+                max_text_messages=completion_data.get('max_text_messages'),
+                max_output_tokens=completion_data.get('max_output_tokens', 'inf')
+            )
+        else:
+            return None
 
     def _setup_realtime_config(self, config_data):
         if config_data.get('realtime_settings', None) is not None:
@@ -1143,7 +1187,7 @@ class AssistantConfig:
                 code_interpreter_files=code_interpreter_files, 
                 file_search_vector_stores=file_search_vector_stores
             )
-        if self._assistant_type == AssistantType.ASSISTANT.value:
+        if self._assistant_type == AssistantType.ASSISTANT.value or self._assistant_type == AssistantType.AGENT.value:
             return ToolResourcesConfig()
         else:
             return None
@@ -1161,7 +1205,9 @@ class AssistantConfig:
                 self._tool_resources == other._tool_resources and
                 self._functions == other._functions and
                 self._file_search == other._file_search and
-                self._code_interpreter == other._code_interpreter)
+                self._code_interpreter == other._code_interpreter and
+                self.azure_ai_search == other.azure_ai_search and
+                self.bing_search == other.bing_search)
 
     @classmethod
     def from_dict(
@@ -1208,6 +1254,8 @@ class AssistantConfig:
         self._config_data['completion_settings'] = self._text_completion_config.to_dict() if self._text_completion_config is not None else None
         self._config_data['realtime_settings'] = self._realtime_config.to_dict() if self._realtime_config is not None else None
         self._config_data['config_folder'] = self._config_folder
+        self._config_data['azure_ai_search'] = self._azure_ai_search
+        self._config_data['bing_search'] = self._bing_search
         return self._config_data
 
     def _get_function_configs(self):
@@ -1474,6 +1522,51 @@ class AssistantConfig:
         :type value: str
         """
         self._config_folder = value
+
+    @property
+    def azure_ai_search(self) -> dict:
+        """
+        Returns a dictionary describing the Azure AI Search configuration.
+        Example structure:
+            {
+                'enabled': bool,
+                'connection_id': str,
+                'index_name': str
+            }
+        """
+        return self._azure_ai_search
+
+    @azure_ai_search.setter
+    def azure_ai_search(self, value: dict) -> None:
+        """
+        Sets the Azure AI Search configuration.
+
+        :param value: A dict with keys 'enabled', 'connection_id', and 'index_name'.
+        :type value: dict
+        """
+        self._azure_ai_search = value
+
+    @property
+    def bing_search(self) -> dict:
+        """
+        Returns a dictionary describing the Bing Search configuration.
+        Example structure:
+            {
+                'enabled': bool,
+                'connection_id': str
+            }
+        """
+        return self._bing_search
+
+    @bing_search.setter
+    def bing_search(self, value: dict) -> None:
+        """
+        Sets the Bing Search configuration.
+
+        :param value: A dict with keys 'enabled' and 'connection_id'.
+        :type value: dict
+        """
+        self._bing_search = value
 
     def _remove_trailing_spaces(self, text):
         return '\n'.join(line.rstrip() for line in text.splitlines())

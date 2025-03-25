@@ -31,9 +31,13 @@ class ConversationInputView(QTextEdit):
 
     def __init__(self, parent, main_window):
         super().__init__(parent)
-        self.main_window = main_window  # Store a reference to the main window
+        self.main_window = main_window  # reference to the main window
         self.setInitialPlaceholderText()
-        self.image_file_paths = {}  # Dictionary to track image file paths
+
+        # A list to keep track of image attachments (file paths) pasted in this text editor
+        self.pasted_attachments = []
+        # A dictionary to map file_path -> the HTML snippet inserted for that image
+        self.pasted_images_html = {}
 
     def setInitialPlaceholderText(self):
         self.setText(self.PLACEHOLDER_TEXT)
@@ -51,84 +55,72 @@ class ConversationInputView(QTextEdit):
 
         cursor = self.textCursor()
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            # Check if the cursor is positioned at an image
-            cursor_pos = cursor.position()
-            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
-            if cursor.charFormat().isImageFormat():
-                logger.debug("Image found at cursor position, deleting image...")
-                html_before = self.toHtml()
-                cursor.removeSelectedText()
-                html_after = self.toHtml()
-                self.check_for_deleted_images(html_before, html_after)
-            else:
-                # Let the parent class handle other delete/backspace operations
-                cursor.setPosition(cursor_pos)
-                super().keyPressEvent(event)
-        # Check if Enter key is pressed
-        elif event.key() == Qt.Key_Return and not event.modifiers():
-            # Call on_user_input on the main window reference
-            self.main_window.on_user_input_complete(self.toPlainText())
-            self.clear()
-        elif event.key() == Qt.Key_Enter:
-            # Call on_user_input on the main window reference
-            self.main_window.on_user_input_complete(self.toPlainText())
-            self.clear()
-        else:
-            # Let the parent class handle all other key events
+            # Save the HTML before
+            html_before = self.toHtml()
+
+            # Let the parent handle the actual deletion
             super().keyPressEvent(event)
 
+            # Compare the HTML after
+            html_after = self.toHtml()
+            self.check_for_deleted_images(html_before, html_after)
+
+        # Detect Enter/Return (no modifiers) to send the message
+        elif event.key() in (Qt.Key_Return, Qt.Key_Enter) and not (event.modifiers() & Qt.ShiftModifier):
+            user_text = self.toPlainText()
+            # Gather the pasted image file paths
+            pasted_images = list(self.pasted_attachments)
+            # Clear them out locally
+            self.pasted_attachments.clear()
+
+            self.main_window.on_user_input_complete(user_text, pasted_image_file_paths=pasted_images)
+
+            self.clear()
+        else:
+            super().keyPressEvent(event)
+
+    def get_and_clear_pasted_attachments(self):
+        images = list(self.pasted_attachments)  # make a copy
+        self.pasted_attachments.clear()
+        return images
+
     def insertFromMimeData(self, mimeData: QMimeData):
-        IMAGE_FORMATS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+        IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+
         if mimeData.hasImage():
             image = QImage(mimeData.imageData())
             if not image.isNull():
                 logger.debug("Inserting image from clipboard...")
                 temp_dir = tempfile.gettempdir()
-                mime_file_name = self.generate_unique_filename("image.png")
-                temp_file_path = os.path.join(temp_dir, mime_file_name)
-                image.save(temp_file_path)
-                self.add_image_thumbnail(image, temp_file_path)
-                self.main_window.add_image_to_selected_thread(temp_file_path)
+                file_name = self.generate_unique_filename("pasted_image.png")
+                temp_path = os.path.join(temp_dir, file_name)
+                image.save(temp_path)
+                self.add_image_thumbnail(image, temp_path)
+            else:
+                logger.warning("Pasted image data was null.")
         elif mimeData.hasUrls():
-            logger.debug("Inserting image from URL...")
             for url in mimeData.urls():
                 if url.isLocalFile():
-                    file_path = url.toLocalFile()
-                    logger.debug(f"Local file path: {file_path}")
-                    if file_path.lower().endswith(IMAGE_FORMATS):
-                        image = QImage(file_path)
-                        temp_dir = tempfile.gettempdir()
-                        file_name = self.generate_unique_filename(os.path.basename(file_path))
-                        temp_file_path = os.path.join(temp_dir, file_name)
-                        image.save(temp_file_path)
+                    local_path = url.toLocalFile()
+                    ext = os.path.splitext(local_path)[1].lower()
+                    if ext in IMAGE_EXTENSIONS:
+                        image = QImage(local_path)
                         if not image.isNull():
-                            self.add_image_thumbnail(image, temp_file_path)
-                            self.main_window.add_image_to_selected_thread(temp_file_path)
+                            temp_dir = tempfile.gettempdir()
+                            file_name = self.generate_unique_filename(os.path.basename(local_path))
+                            temp_path = os.path.join(temp_dir, file_name)
+                            image.save(temp_path)
+                            self.add_image_thumbnail(image, temp_path)
                         else:
-                            logger.error(f"Could not load image from file: {file_path}")
+                            logger.warning(f"Could not load image from {local_path}")
                     else:
-                        logger.warning(f"Unsupported file type: {file_path}")
-                        QMessageBox.warning(self, "Error", "Unsupported file type. Please only upload image files.")
+                        logger.info(f"Unsupported file type pasted: {local_path}")
+                        super().insertFromMimeData(mimeData)
                 else:
                     super().insertFromMimeData(mimeData)
         elif mimeData.hasText():
-            text = mimeData.text()
-            # Convert URL to local file path
-            file_url = QUrl(text)
-            if file_url.isLocalFile():
-                file_path = file_url.toLocalFile()
-                if os.path.isfile(file_path):
-                    try:
-                        with open(file_path, 'r') as file:
-                            content = file.read()
-                            self.insertPlainText(content)
-                    except Exception as e:
-                        logger.error(f"Error reading file {file_path}: {e}")
-                else:
-                    logger.error(f"File {file_path} does not exist")
-            else:
-                # If it's not a file URL, proceed with the default paste operation
-                super().insertFromMimeData(mimeData)
+            # Plain text fallback
+            super().insertFromMimeData(mimeData)
         else:
             super().insertFromMimeData(mimeData)
 
@@ -138,7 +130,7 @@ class ConversationInputView(QTextEdit):
         return unique_name
 
     def add_image_thumbnail(self, image: QImage, file_path: str):
-        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio)  # Resize to 100x100 pixels
+        image_thumbnail = image.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         buffer = QBuffer()
         buffer.open(QIODevice.WriteOnly)
         image_thumbnail.save(buffer, "PNG")
@@ -147,23 +139,27 @@ class ConversationInputView(QTextEdit):
         
         cursor = self.textCursor()
         cursor.insertHtml(html)
-        self.image_file_paths[file_path] = html
+        self.pasted_images_html[file_path] = html
+        if file_path not in self.pasted_attachments:
+            self.pasted_attachments.append(file_path)
 
     def check_for_deleted_images(self, html_before: str, html_after: str):
         soup_before = BeautifulSoup(html_before, 'html.parser')
         soup_after = BeautifulSoup(html_after, 'html.parser')
 
-        file_paths_before = {img['alt'] for img in soup_before.find_all('img') if 'alt' in img.attrs}
-        file_paths_after = {img['alt'] for img in soup_after.find_all('img') if 'alt' in img.attrs}
+        file_paths_before = {img.get('alt', '') for img in soup_before.find_all('img')}
+        file_paths_after = {img.get('alt', '') for img in soup_after.find_all('img')}
 
         # Identify which images are missing
         missing_file_paths = file_paths_before - file_paths_after
+        if missing_file_paths:
+            logger.debug(f"User removed images: {missing_file_paths}")
 
-        # Remove missing images from tracked paths and attachments
         for file_path in missing_file_paths:
-            if file_path in self.image_file_paths:
-                del self.image_file_paths[file_path]
-                self.main_window.remove_image_from_selected_thread(file_path)
+            if file_path in self.pasted_images_html:
+                del self.pasted_images_html[file_path]
+            if file_path in self.pasted_attachments:
+                self.pasted_attachments.remove(file_path)
 
     def mouseReleaseEvent(self, event):
         cursor = self.cursorForPosition(event.pos())
@@ -181,43 +177,39 @@ class ConversationInputView(QTextEdit):
 class ClickableTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent
+        self.parent_widget = parent  # if you need back‐references
 
     def mousePressEvent(self, event: QMouseEvent):
-        cursor = self.cursorForPosition(event.pos())
-        pos = cursor.position()
-        text = self.toPlainText()
+        # Only process left‐button clicks for links
+        if event.button() == Qt.LeftButton:
+            # Find the character position under the mouse
+            cursor = self.cursorForPosition(event.pos())
+            char_format = cursor.charFormat()
 
-        text_to_url_map = self.parent.get_text_to_url_map()
-        cursor.select(QTextCursor.BlockUnderCursor)  # Select the entire line (block) of text
-        line_text = cursor.selectedText()
-
-        # Check if the click is on a link in this line
-        if line_text.strip() in text_to_url_map.keys():
-            # get the path from map
-            file_path = text_to_url_map[line_text.strip()]["path"]
-            self.open_file(file_path)
-
-        # Handle regular HTTP URLs
-        for url, start, end in self.find_urls(text):
-            if start <= pos <= end:
-                QDesktopServices.openUrl(QUrl(url))
+            # If there's an HTML anchor (href) at this position, open it
+            href = char_format.anchorHref()
+            if href:
+                if href.startswith("http://") or href.startswith("https://"):
+                    QDesktopServices.openUrl(QUrl(href))
+                else:
+                    # Otherwise treat it as a local file path
+                    self.open_file(href)
+                # Stop further text‐edit handling of this mouse press
                 return
 
+        # If no anchor was found, let the parent class handle normal text selection, etc.
         super().mousePressEvent(event)
 
     def open_file(self, file_path):
-        if sys.platform.startswith('linux'):
-            subprocess.call(["xdg-open", file_path])
-        elif sys.platform.startswith('win32'):
-            os.startfile(file_path)
-        elif sys.platform.startswith('darwin'):
-            subprocess.call(["open", file_path])
-
-    def find_urls(self, text):
-        url_pattern = r'\b(https?://[^\s)]+)'
-        for match in re.finditer(url_pattern, text):
-            yield (match.group(1), match.start(1), match.end(1))
+        try:
+            if sys.platform.startswith('linux'):
+                subprocess.call(["xdg-open", file_path])
+            elif sys.platform.startswith('win32'):
+                os.startfile(file_path)
+            elif sys.platform.startswith('darwin'):
+                subprocess.call(["open", file_path])
+        except Exception as e:
+            logger.error(f"Failed to open file: {file_path} - {e}")
 
 
 class ConversationView(QWidget):
@@ -251,6 +243,7 @@ class ConversationView(QWidget):
         self.inputField = ConversationInputView(self, self.main_window)
         self.inputField.setAcceptRichText(False)  # Accept only plain text
         self.inputField.setFixedHeight(100)  # Set an initial height
+        self.inputField.setToolTip("Type a message or paste an image here for the assistant.")
         self.inputField.setFont(QFont("Arial", 11))
 
         self.layout.addWidget(self.conversationView)
@@ -318,10 +311,10 @@ class ConversationView(QWidget):
             # Determine the color based on the role and the theme
             if self.is_dark_mode():
                 # Colors for dark mode
-                color = 'blue' if message.role != "assistant" else '#D3D3D3'
+                color = 'blue' if message.sender == "user" else '#D3D3D3'
             else:
                 # Colors for light mode
-                color = 'blue' if message.role != "assistant" else 'black'
+                color = 'blue' if message.sender == "user" else 'black'
 
             # Append the formatted text message
             self.append_message(message.sender, text_message.content, color=color, full_messages_append=full_messages_append)
@@ -378,8 +371,8 @@ class ConversationView(QWidget):
                     formatted_code = f"<pre class='code-block'>{escaped_code}</pre>"
                     html_content += formatted_code
                 else:
-                    text = self.format_file_links(text)
-                    text = self.format_urls(text)
+                    text = self.format_links(text)
+                    #text = self.format_urls(text)
                     formatted_text = f"<span class='text-block' style='white-space: pre-wrap;'>{text}</span>"
                     html_content += formatted_text
                 html_content += "<br>"
@@ -473,41 +466,75 @@ class ConversationView(QWidget):
         # Substitute URLs in the text with HTML anchor tags.
         return url_pattern.sub(replace_with_link, text)
 
-    def format_file_links(self, text):
-        # Pattern to find citations in the form [Download text]( [index])
-        citation_link_pattern = r'\[([^\]]+)\]\(\s*\[(\d+)\]\s*\)'
-        # Dictionary to store file paths indexed by the citation index
+    def format_links(self, text):
         citation_to_filename = {}
-
-        # First, extract all file citations like "[0] finance_sector_revenue_chart.png"
-        file_citations = re.findall(r'\[(\d+)\]\s*(.+)', text)
-        for index, filename in file_citations:
+        citation_pattern = re.compile(r'\[(\d+)\]\s*(\S+)')  # e.g. [0] file.png
+        for index, filename in citation_pattern.findall(text):
             citation_to_filename[index] = filename
 
-        # Function to replace citation links with clickable HTML links
+        link_pattern = re.compile(r'\[([^\]]+)\]\(([^\)]+)\)')
+
         def replace_with_clickable_text(match):
-            link_text = match.group(1)
-            citation_index = match.group(2)
-            file_name = citation_to_filename.get(citation_index)
+            link_text = match.group(1).strip()
+            link_target = match.group(2).strip()
+
+            # 1) Strip off leading/trailing quotes
+            link_target = link_target.strip('"').strip("'")
+
+            # 2) Split on the first space/quote so any trailing HTML attributes are discarded.
+            link_target = re.split(r'\s|["\']', link_target, maxsplit=1)[0]
+
+            # External URL check:
+            if link_target.startswith("http://") or link_target.startswith("https://"):
+                return (
+                    f'<a href="{link_target}" target="_blank" '
+                    f'style="color:blue; text-decoration: underline;">{link_text}</a>'
+                )
+
+            # Otherwise, treat it as a local file reference/citation:
+            index_match = re.match(r'^\[(\d+)\]$', link_target)
+            if index_match:
+                citation_index = index_match.group(1)
+                file_name = citation_to_filename.get(citation_index)
+            else:
+                # Remove any leading "sandbox:/mnt/data/" or just "sandbox:/"
+                # This covers both cases like:
+                #   sandbox:/mnt/data/generated_image_123.png
+                #   sandbox:/generated_image_123.png
+                file_name = re.sub(r'^sandbox:[/\\](?:mnt[/\\]data[/\\])?', '', link_target)
 
             if file_name:
                 local_file_path = os.path.normpath(os.path.join(self.file_path, file_name))
 
-                if link_text in self.text_to_url_map:
-                    link_text = f"{link_text} {len(self.text_to_url_map) + 1}"
-                
-                # Store the file path
-                self.text_to_url_map[link_text] = {"path": local_file_path}
+                # Use a link_text that is unique in self.text_to_url_map:
+                final_link_text = link_text
+                if final_link_text in self.text_to_url_map:
+                    final_link_text = f"{final_link_text} {len(self.text_to_url_map) + 1}"
 
-                # Return the HTML link and the local file path in separate inline-block divs
-                return (f'<div style="display: inline-block;"><a href="{local_file_path}" style="color:green; text-decoration: underline;" download="{file_name}">{link_text}</a></div>'
-                        f'<div style="display: inline-block; color:gray;">{local_file_path}</div>')
+                self.text_to_url_map[final_link_text] = {"path": local_file_path}
 
-        # Replace links in the original text
-        updated_text = re.sub(citation_link_pattern, replace_with_clickable_text, text)
+                # Render a simpler link with optional file path as a tooltip.
+                return (
+                    f'<a href="{local_file_path}" '
+                    f'style="color:green; text-decoration: underline;" '
+                    f'download="{file_name}" '
+                    f'title="{local_file_path}">'
+                    f'{final_link_text}'
+                    f'</a>'
+                )
 
-        # Remove the original citation lines
-        updated_text = re.sub(r'\[\d+\]\s*[^ ]+\.png', '', updated_text)
+            # If we failed to find the file, just return the original match:
+            return match.group(0)
+
+        updated_text = link_pattern.sub(replace_with_clickable_text, text)
+
+        # Remove leftover [N] file references
+        updated_text = re.sub(
+            r'\[\d+\]\s*\S+\.(png|jpg|jpeg|gif|bmp)',
+            '',
+            updated_text,
+            flags=re.IGNORECASE
+        )
 
         return updated_text
 

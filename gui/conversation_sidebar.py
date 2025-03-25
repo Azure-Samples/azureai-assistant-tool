@@ -4,25 +4,22 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu
-from PySide6.QtCore import Qt, Signal, QSize
+import uuid
+import os
+import time
+
+from PySide6.QtWidgets import QWidget, QCheckBox, QLabel, QComboBox, QListWidgetItem, QFileDialog, QVBoxLayout, QSizePolicy, QHBoxLayout, QPushButton, QListWidget, QMessageBox, QMenu, QAbstractItemView
+from PySide6.QtCore import Qt, Signal, QThreadPool
 from PySide6.QtGui import QFont, QIcon, QAction
 
-import os, time
-
-from azure.ai.assistant.audio.realtime_audio import RealtimeAudio
-from azure.ai.assistant.management.ai_client_factory import AIClientType
+from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
-from azure.ai.assistant.management.assistant_config import AssistantConfig
-from azure.ai.assistant.management.assistant_client import AssistantClient
 from azure.ai.assistant.management.assistant_config import AssistantType
-from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
-from azure.ai.assistant.management.realtime_assistant_client import RealtimeAssistantClient
 from azure.ai.assistant.management.conversation_thread_client import ConversationThreadClient
 from azure.ai.assistant.management.logger_module import logger
 from gui.assistant_client_manager import AssistantClientManager
-from gui.assistant_dialogs import AssistantConfigDialog
-from gui.utils import resource_path
+from gui.assistant_gui_workers import open_assistant_config_dialog, LoadAssistantWorker, ProcessAssistantWorker, DeleteThreadsWorker, DeleteThreadsWorkerSignals
+from gui.status_bar import ActivityStatus
 
 
 class AssistantItemWidget(QWidget):
@@ -51,15 +48,15 @@ class AssistantItemWidget(QWidget):
 
 
 class CustomListWidget(QListWidget):
-    itemDeleted = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
-        self.itemToFileMap = {}  # Maps list items to attached file paths
+        # Instead of item → attachments, store id_string → attachments
+        self.itemIdToFileMap = {}  # {str: [attachment_dict, ...]}
 
     def clear_files(self):
-        self.itemToFileMap.clear()
+        self.itemIdToFileMap.clear()
 
     def contextMenuEvent(self, event):
         context_menu = QMenu(self)
@@ -69,14 +66,19 @@ class CustomListWidget(QListWidget):
 
         current_item = self.currentItem()
         remove_file_menu = None
-        if current_item:
-            row = self.row(current_item)
-            if row in self.itemToFileMap and self.itemToFileMap[row]:
-                remove_file_menu = context_menu.addMenu("Remove File")
-                for file_info in self.itemToFileMap[row]:
-                    actual_file_path = file_info['file_path']
-                    tool_type = file_info['tools'][0]['type'] if file_info['tools'] else "Image"
 
+        if current_item:
+            item_id = self._get_item_id(current_item)
+            file_list = self.itemIdToFileMap.get(item_id, [])
+            if file_list:
+                remove_file_menu = context_menu.addMenu("Remove File")
+                for file_info in file_list:
+                    actual_file_path = file_info["file_path"]
+                    tool_type = (
+                        file_info["tools"][0]["type"]
+                        if file_info["tools"]
+                        else "Image"
+                    )
                     file_label = f"{os.path.basename(actual_file_path)} ({tool_type})"
                     action = remove_file_menu.addAction(file_label)
                     action.setData(file_info)
@@ -91,43 +93,50 @@ class CustomListWidget(QListWidget):
             self.attach_file_to_selected_item(None, is_image=True)
         elif remove_file_menu and isinstance(selected_action, QAction) and selected_action.parent() == remove_file_menu:
             file_info = selected_action.data()
-            self.remove_specific_file_from_selected_item(file_info, self.row(current_item))
+            self.remove_specific_file_from_selected_item(file_info, current_item)
 
     def attach_file_to_selected_item(self, mode, is_image=False):
         """Attaches a file to the selected item with a specified mode indicating its intended use."""
         file_dialog = QFileDialog(self)
         if is_image:
-            file_path, _ = file_dialog.getOpenFileName(self, "Select Image File", filter="Images (*.png *.jpg *.jpeg *.gif *.webp)")
+            file_path, _ = file_dialog.getOpenFileName(
+                self,
+                "Select Image File",
+                filter="Images (*.png *.jpg *.jpeg *.gif *.webp)"
+            )
         else:
             file_path, _ = file_dialog.getOpenFileName(self, "Select File")
 
         if file_path:
             current_item = self.currentItem()
             if current_item:
-                row = self.row(current_item)
-                if row not in self.itemToFileMap:
-                    self.itemToFileMap[row] = []
+                item_id = self._get_item_id(current_item)
+                if item_id not in self.itemIdToFileMap:
+                    self.itemIdToFileMap[item_id] = []
 
                 file_info = {
                     "file_id": None,  # This will be updated later
                     "file_path": file_path,
                     "attachment_type": "image_file" if is_image else "document_file",
-                    "tools": [] if is_image else [{"type": mode}]  # No tools for image files
+                    "tools": [] if is_image else [{"type": mode}]
                 }
-                self.itemToFileMap[row].append(file_info)
-                self.update_item_icon(current_item, self.itemToFileMap[row])
+                self.itemIdToFileMap[item_id].append(file_info)
+                self.update_item_icon(current_item, self.itemIdToFileMap[item_id])
 
-    def remove_specific_file_from_selected_item(self, file_info, row):
+    def remove_specific_file_from_selected_item(self, file_info, item):
         """Removes a specific file from the selected item based on the file info provided."""
-        if row in self.itemToFileMap:
-            file_path_to_remove = file_info['file_path']
-            self.itemToFileMap[row] = [fi for fi in self.itemToFileMap[row] if fi['file_path'] != file_path_to_remove]
-
-            current_item = self.item(row)
-            if not self.itemToFileMap[row]:
-                current_item.setIcon(QIcon())
-            else:
-                self.update_item_icon(current_item, self.itemToFileMap[row])
+        if item:
+            item_id = self._get_item_id(item)
+            if item_id in self.itemIdToFileMap:
+                file_path_to_remove = file_info["file_path"]
+                self.itemIdToFileMap[item_id] = [
+                    fi for fi in self.itemIdToFileMap[item_id]
+                    if fi["file_path"] != file_path_to_remove
+                ]
+                if not self.itemIdToFileMap[item_id]:
+                    item.setIcon(QIcon())
+                else:
+                    self.update_item_icon(item, self.itemIdToFileMap[item_id])
 
     def update_item_icon(self, item, files):
         """Updates the list item's icon based on whether there are attached files."""
@@ -137,24 +146,22 @@ class CustomListWidget(QListWidget):
             item.setIcon(QIcon())
 
     def get_attachments_for_selected_item(self):
-        """Return the details of files attached to the currently selected item including file path and specific tool usage."""
+        """Return the details of files attached to the currently selected item."""
         current_item = self.currentItem()
         if current_item:
-            row = self.row(current_item)
-            attached_files_info = self.itemToFileMap.get(row, [])
+            item_id = self._get_item_id(current_item)
+            attached_files_info = self.itemIdToFileMap.get(item_id, [])
             attachments = []
             for file_info in attached_files_info:
-                file_path = file_info['file_path']
+                file_path = file_info["file_path"]
                 file_name = os.path.basename(file_path)
-                file_id = file_info.get('file_id', None)
-                tools = file_info.get('tools', [])
-                attachment_type = file_info.get('attachment_type', 'document_file')
-
-                # Create a structured entry for the attachments list including file_path
+                file_id = file_info.get("file_id", None)
+                tools = file_info.get("tools", [])
+                attachment_type = file_info.get("attachment_type", "document_file")
                 attachments.append({
                     "file_name": file_name,
                     "file_id": file_id,
-                    "file_path": file_path,  # Include the full file path for upload or further processing
+                    "file_path": file_path,
                     "attachment_type": attachment_type,
                     "tools": tools
                 })
@@ -165,51 +172,46 @@ class CustomListWidget(QListWidget):
         """Set the attachments for the currently selected item."""
         current_item = self.currentItem()
         if current_item is not None:
-            row = self.row(current_item)
-            self.itemToFileMap[row] = attachments[:]
+            item_id = self._get_item_id(current_item)
+            self.itemIdToFileMap[item_id] = attachments[:]
             self.update_item_icon(current_item, attachments)
         else:
             logger.warning("No item is currently selected.")
 
     def load_threads_with_attachments(self, threads):
         """Load threads into the list widget, adding icons for attached files only, based on attachments info."""
-        self.clear_files()  # Clear itemToFileMap before loading new threads
+        self.clear_files()
         for thread in threads:
-            item = QListWidgetItem(thread['thread_name'])
+            item = QListWidgetItem(thread["thread_name"])
             self.addItem(item)
-            thread_tooltip_text = "You can add/remove files by right-clicking this item."
-            item.setToolTip(thread_tooltip_text)
-
-            # Get attachments from the thread data
-            attachments = thread.get('attachments', [])
-
-            # Update the item to reflect any attachments
+            # Provide a unique ID for the item so we can store attachments
+            self._get_item_id(item)
+            # Show a tooltip
+            item.setToolTip("You can add/remove files by right-clicking this item.")
+            attachments = thread.get("attachments", [])
             self.update_item_with_attachments(item, attachments)
 
     def update_item_with_attachments(self, item, attachments):
         """Update the given item with a paperclip icon if there are attachments."""
-        row = self.row(item)
         if attachments:
             item.setIcon(QIcon("gui/images/paperclip_icon.png"))
         else:
             item.setIcon(QIcon())
 
         # Store complete attachment information in the mapping
-        self.itemToFileMap[row] = attachments[:]
+        item_id = self._get_item_id(item)
+        self.itemIdToFileMap[item_id] = attachments[:]
 
     def keyPressEvent(self, event):
-        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
-            current_item = self.currentItem()
-            if current_item:
-                row = self.row(current_item)
-                item_text = current_item.text()
-                self.takeItem(row)
-                # delete the attachments for the deleted item
-                if row in self.itemToFileMap:
-                    del self.itemToFileMap[row]
-                self.itemDeleted.emit(item_text)
-        else:
-            super().keyPressEvent(event)
+        super().keyPressEvent(event)
+
+    def delete_selected_item(self, item):
+        if item:
+            row = self.row(item)
+            self.takeItem(row)
+            item_id = self._get_item_id(item)
+            if item_id in self.itemIdToFileMap:
+               del self.itemIdToFileMap[item_id]
 
     def selectNewItem(self, previousRow):
         if previousRow < self.count():
@@ -248,6 +250,27 @@ class CustomListWidget(QListWidget):
             return self.item(self.count() - 1).text()
         return ""
 
+    def _get_item_id(self, item):
+        """
+        Ensure the item has a unique ID stored in Qt.UserRole. Returns that ID.
+        If it doesn't have one yet, generate it.
+        """
+        existing_id = item.data(Qt.UserRole)
+        if existing_id is None:
+            new_id = str(uuid.uuid4())
+            item.setData(Qt.UserRole, new_id)
+            return new_id
+        return existing_id
+
+    def mouseMoveEvent(self, event):
+        # If the user is dragging with the left mouse button down,
+        # ignore selection changes by not calling the parent implementation.
+        if event.buttons() & Qt.LeftButton:
+            # do nothing, effectively disabling drag-based selection
+            return
+        # Otherwise, preserve normal behavior (e.g., for other buttons)
+        super().mouseMoveEvent(event)
+
 
 class ConversationSidebar(QWidget):
 
@@ -260,58 +283,54 @@ class ConversationSidebar(QWidget):
         self.assistant_config_manager = AssistantConfigManager.get_instance()
         self.assistant_client_manager = AssistantClientManager.get_instance()
 
-        # Create a button for adding new threads
         self.addThreadButton = QPushButton("Add Thread", self)
         self.addThreadButton.setFixedHeight(23)
         self.addThreadButton.setFont(QFont("Arial", 11))
 
-        # Create a button for canceling the current run
         self.cancelRunButton = QPushButton("Cancel Run", self)
         self.cancelRunButton.setFixedHeight(23)
         self.cancelRunButton.setFont(QFont("Arial", 11))
 
-        # Horizontal layout to hold both buttons
         buttonLayout = QHBoxLayout()
         buttonLayout.addWidget(self.addThreadButton)
         buttonLayout.addWidget(self.cancelRunButton)
-        buttonLayout.setSpacing(10)  # Adjust spacing as needed
+        buttonLayout.setSpacing(10)
 
-        # Create a list widget for displaying the threads
         self.threadList = CustomListWidget(self)
-        self.threadList.setStyleSheet("QListWidget {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
-            "  padding: 1px;"
-            "}")
+        self.threadList.setStyleSheet("""
+            QListWidget {
+                border-style: solid;
+                border-width: 1px;
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.threadList.setFont(QFont("Arial", 11))
 
-        # Create connections for the thread and button
         self.addThreadButton.clicked.connect(self.on_add_thread_button_clicked)
         self.cancelRunButton.clicked.connect(self.main_window.on_cancel_run_button_clicked)
         self.threadList.itemClicked.connect(self.select_conversation_thread_by_item)
-        self.threadList.itemDeleted.connect(self.on_selected_thread_delete)
+        self.threadList.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
-        # Create a list widget for displaying assistants
         self.assistantList = QListWidget(self)
         self.assistantList.setFont(QFont("Arial", 11))
         self.assistantList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.assistantList.setStyleSheet("QListWidget {"
-            "  border-style: solid;"
-            "  border-width: 1px;"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"  # Light on top and left, dark on bottom and right
-            "  padding: 1px;"
-            "}")
+        self.assistantList.setStyleSheet("""
+            QListWidget {
+                border-style: solid;
+                border-width: 1px;
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.assistantList.itemDoubleClicked.connect(self.on_assistant_double_clicked)
         self.assistantList.setToolTip("Select assistants to use in the conversation or double-click to edit the selected assistant.")
-        self.threadList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.aiClientComboBox = QComboBox()
         ai_client_type_names = [client_type.name for client_type in AIClientType]
         self.aiClientComboBox.addItems(ai_client_type_names)
         self.aiClientComboBox.currentIndexChanged.connect(self.on_ai_client_type_changed)
 
-        # Layout for the sidebar
         layout = QVBoxLayout(self)
         layout.addWidget(self.aiClientComboBox)
         layout.addWidget(self.assistantList, 1)
@@ -319,13 +338,12 @@ class ConversationSidebar(QWidget):
         layout.addLayout(buttonLayout)
         layout.setAlignment(Qt.AlignTop)
 
-        # Set the style for the sidebar
-        self.setStyleSheet(
-            "QWidget {"
-            "  border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;"
-            "  padding: 1px;"
-            "}"
-        )
+        self.setStyleSheet("""
+            QWidget {
+                border-color: #a0a0a0 #ffffff #ffffff #a0a0a0;
+                padding: 1px;
+            }
+        """)
         self.on_ai_client_type_changed(self.aiClientComboBox.currentIndex())
         self.assistant_checkbox_toggled.connect(self.main_window.handle_assistant_checkbox_toggled)
 
@@ -333,6 +351,8 @@ class ConversationSidebar(QWidget):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             if self.assistantList.hasFocus():
                 self.delete_selected_assistant()
+            elif self.threadList.hasFocus():
+                self.delete_selected_threads()
         else:
             super().keyPressEvent(event)
 
@@ -341,41 +361,48 @@ class ConversationSidebar(QWidget):
         assistant_name = widget.label.text()
         assistant_config = self.assistant_config_manager.get_config(assistant_name)
         if assistant_config:
-            if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.CHAT_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-
-            elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                self.dialog = AssistantConfigDialog(parent=self.main_window, assistant_type=AssistantType.REALTIME_ASSISTANT.value, assistant_name=assistant_name, function_config_manager=self.main_window.function_config_manager)
-            self.dialog.assistantConfigSubmitted.connect(self.on_assistant_config_submitted)
-            self.dialog.show()
+            self.dialog = open_assistant_config_dialog(
+                parent=self.main_window,
+                assistant_type=assistant_config.assistant_type,
+                assistant_name=assistant_name,
+                function_config_manager=self.main_window.function_config_manager,
+                callback=self.on_assistant_config_submitted
+            )
 
     def on_assistant_config_submitted(self, assistant_config_json, ai_client_type, assistant_type, assistant_name):
-        try:
-            realtime_audio = None
-            if assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                assistant_client = ChatAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+        worker = ProcessAssistantWorker(
+            assistant_config_json=assistant_config_json,
+            ai_client_type=ai_client_type,
+            assistant_type=assistant_type,
+            assistant_name=assistant_name,
+            main_window=self.main_window,
+            assistant_client_manager=self.assistant_client_manager
+        )
+        worker.signals.finished.connect(self.on_assistant_config_submit_finished)
+        worker.signals.error.connect(self.on_assistant_config_submit_error)
 
-            elif assistant_type == AssistantType.ASSISTANT.value:
-                assistant_client = AssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
+        self.dialog.start_processing_signal.start_signal.emit(ActivityStatus.PROCESSING)
+        # Execute the worker in a separate thread using QThreadPool
+        QThreadPool.globalInstance().start(worker)
 
-            elif assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                assistant_client = self.assistant_client_manager.get_client(name=assistant_name)
-                realtime_audio = self.assistant_client_manager.get_audio(name=assistant_name)
-                if assistant_client and assistant_client.assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                    assistant_client.update(assistant_config_json, self.main_window.connection_timeout)
-                    realtime_audio.update(assistant_client.assistant_config)
-                else:
-                    assistant_client = RealtimeAssistantClient.from_json(assistant_config_json, self.main_window, self.main_window.connection_timeout)
-                    realtime_audio = RealtimeAudio(assistant_client)
-            self.assistant_client_manager.register_client(name=assistant_name, assistant_client=assistant_client, realtime_audio=realtime_audio)
-            client_type = AIClientType[ai_client_type]
-            self.main_window.conversation_sidebar.load_assistant_list(client_type)
-            self.dialog.update_assistant_combobox()
-        except Exception as e:
-            QMessageBox.warning(self.main_window, "Error", f"An error occurred while creating/updating the assistant: {e}")
+    def on_assistant_config_submit_finished(self, result):
+        assistant_client, realtime_audio, assistant_name, ai_client_type = result
+        self.assistant_client_manager.register_client(
+            name=assistant_name,
+            assistant_client=assistant_client,
+            realtime_audio=realtime_audio
+        )
+        self.dialog.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
+        client_type = AIClientType[ai_client_type]
+        # UI update runs on the main thread.
+        self.main_window.conversation_sidebar.load_assistant_list(client_type)
+        self.dialog.update_assistant_combobox()
+
+    def on_assistant_config_submit_error(self, error_msg):
+        self.dialog.stop_processing_signal.stop_signal.emit(ActivityStatus.PROCESSING)
+        # Show error using a message box on the main thread.
+        QMessageBox.warning(self.main_window, "Error",
+                            f"An error occurred while creating/updating the assistant: {error_msg}")
 
     def delete_selected_assistant(self):
         current_item = self.assistantList.currentItem()
@@ -390,7 +417,7 @@ class ConversationSidebar(QWidget):
 
             if reply == QMessageBox.Yes:
                 try:
-                    assistant_client : AssistantClient = self.assistant_client_manager.get_client(assistant_name)
+                    assistant_client = self.assistant_client_manager.get_client(assistant_name)
                     if assistant_client:
                         assistant_client.purge(self.main_window.connection_timeout)
                     self.assistant_client_manager.remove_client(assistant_name)
@@ -448,30 +475,30 @@ class ConversationSidebar(QWidget):
         """Return the AI client type selected in the combo box."""
         return self._ai_client_type
 
-    def load_assistant_list(self, ai_client_type : AIClientType):
+    def load_assistant_list(self, ai_client_type: AIClientType):
         """Populate the assistant list with the given assistant names."""
-        try:
-            assistant_names = self.assistant_config_manager.get_assistant_names_by_client_type(ai_client_type.name)
-            for name in assistant_names:
-                if not self.assistant_client_manager.get_client(name):
-                    assistant_config : AssistantConfig = self.assistant_config_manager.get_config(name)
-                    assistant_config.config_folder = "config"
-                    realtime_audio = None
-                    if assistant_config.assistant_type == AssistantType.ASSISTANT.value:
-                        assistant_client = AssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+        worker = LoadAssistantWorker(
+            ai_client_type=ai_client_type,
+            assistant_config_manager=self.assistant_config_manager,
+            assistant_client_manager=self.assistant_client_manager,
+            main_window=self.main_window
+        )
+        worker.signals.finished.connect(self.on_load_assistant_list_finished)
+        worker.signals.error.connect(self.on_load_assistant_list_error)
+        QThreadPool.globalInstance().start(worker)
 
-                    elif assistant_config.assistant_type == AssistantType.CHAT_ASSISTANT.value:
-                        assistant_client = ChatAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
+    def on_load_assistant_list_finished(self, assistant_names):
+        """
+        Callback on successful load; update the assistant list in the UI.
+        """
+        self.populate_assistants(assistant_names)
 
-                    elif assistant_config.assistant_type == AssistantType.REALTIME_ASSISTANT.value:
-                        assistant_client = RealtimeAssistantClient.from_json(assistant_config.to_json(), self.main_window, self.main_window.connection_timeout)
-                        realtime_audio = RealtimeAudio(assistant_client)
-
-                    self.assistant_client_manager.register_client(name=name, assistant_client=assistant_client, realtime_audio=realtime_audio)
-        except Exception as e:
-            logger.error(f"Error while loading assistant list: {e}")
-        finally:
-            self.populate_assistants(assistant_names)
+    def on_load_assistant_list_error(self, error_msg, assistant_names):
+        """
+        Callback on error; display a warning message.
+        """
+        self.populate_assistants(assistant_names)
+        QMessageBox.warning(self, "Error", f"Error loading assistants: {error_msg}")
 
     def on_ai_client_type_changed(self, index):
         """Handle changes in the selected AI client type."""
@@ -536,14 +563,22 @@ class ConversationSidebar(QWidget):
             QMessageBox.warning(self, "Error", f"An error occurred while creating a new thread: {e}")
 
     def select_conversation_thread_by_item(self, selected_item):
-        unique_thread_name = selected_item.text()
-        self._select_thread(unique_thread_name)
+        selected_count = len(self.threadList.selectedItems())
+        if selected_count == 1:
+            # Only load the conversation if exactly one item is selected
+            unique_thread_name = selected_item.text()
+            self._select_thread(unique_thread_name)
+        else:
+            # Multiple items selected – do nothing
+            # so the user can continue shift/ctrl selection, etc.
+            pass
 
     def select_conversation_thread_by_name(self, unique_thread_name):
         self._select_thread(unique_thread_name)
 
     def _select_threadlist_item(self, unique_thread_name):
-        # Select the thread item in the sidebar
+        # Clear any existing selection first
+        self.threadList.clearSelection()
         for index in range(self.threadList.count()):
             if self.threadList.item(index).text() == unique_thread_name:
                 self.threadList.setCurrentRow(index)
@@ -568,34 +603,89 @@ class ConversationSidebar(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred while selecting the thread: {e}")
 
-    def on_selected_thread_delete(self, thread_name):
-        try:
-            # Get current scroll position and selected row
-            current_scroll_position = self.threadList.verticalScrollBar().value()
-            current_row = self.threadList.currentRow()
+    def on_delete_thread_status_update(self, thread_name: str):
+        self.main_window.status_bar.start_animation(
+            ActivityStatus.DELETING,
+            interval=500,
+            thread_name=thread_name
+        )
 
-            # Remove the selected thread from the assistant manager
-            threads_client = ConversationThreadClient.get_instance(self._ai_client_type)
-            threads_client.delete_conversation_thread(thread_name)
-            threads_client.save_conversation_threads()
-            
-            # Clear and reload the thread list
-            self.threadList.clear()
-            threads = threads_client.get_conversation_threads()
-            self.threadList.load_threads_with_attachments(threads)
-            
-            # Restore the scroll position
-            self.threadList.verticalScrollBar().setValue(current_scroll_position)
-            
-            # Restore the selected row
-            if current_row >= self.threadList.count():
-                current_row = self.threadList.count() - 1
-            self.threadList.setCurrentRow(current_row)
-            
-            # Clear the selection in the sidebar
-            self.threadList.clearSelection()
-            
-            # Clear the conversation area
-            self.main_window.conversation_view.conversationView.clear()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while deleting the thread: {e}")
+    def on_delete_threads_finished(self, updated_threads, scroll_position, row):
+        # Stop the status bar animation (or you can produce a different message if you like)
+        self.main_window.status_bar.clear_all_statuses()
+
+        # 1) Clear out the list
+        self.threadList.clear()
+
+        # 2) Reload updated threads with attachments
+        self.threadList.load_threads_with_attachments(updated_threads)
+
+        # 3) Restore scroll position, etc.
+        self.threadList.verticalScrollBar().setValue(scroll_position)
+        if row >= self.threadList.count():
+            row = self.threadList.count() - 1
+        self.threadList.setCurrentRow(row)
+        self.threadList.clearSelection()
+
+        # 4) Clear the conversation area for safety
+        self.main_window.conversation_view.conversationView.clear()
+
+    def on_delete_threads_error(self, error_msg):
+        self.main_window.status_bar.stop_animation(ActivityStatus.DELETING)
+        logger.error(f"Error deleting threads asynchronously: {error_msg}")
+        QMessageBox.warning(
+            self,
+            "Error Deleting Threads",
+            f"An error occurred: {error_msg}"
+        )
+
+    def delete_selected_threads(self):
+        # Gather the items
+        current_scroll_position = self.threadList.verticalScrollBar().value()
+        current_row = self.threadList.currentRow()
+        selected_items = self.threadList.selectedItems()
+        if not selected_items:
+            return  # Nothing selected, nothing to delete
+
+        selected_count = len(selected_items)
+
+        # If multiple items, confirm with user
+        if selected_count > 1:
+            all_names = ", ".join([item.text() for item in selected_items])
+            prompt_title = f"Delete {selected_count} Threads"
+            prompt_text = (
+                f"Are you sure you want to delete these {selected_count} threads?"
+            )
+            reply = QMessageBox.question(
+                self,
+                prompt_title,
+                prompt_text,
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return  # User canceled
+
+        # Prepare thread names to delete
+        thread_names = [item.text() for item in selected_items]
+
+        # Create the worker and connect signals
+        worker = DeleteThreadsWorker(
+            ai_client_type=self._ai_client_type,
+            thread_names=thread_names,
+            main_window=self.main_window
+        )
+        # When a thread is about to be deleted, show 'Deleting <thread_name>'
+        worker.signals.status_update.connect(self.on_delete_thread_status_update)
+        # When deletion is done, refresh the thread list
+        worker.signals.finished.connect(lambda updated_threads:
+            self.on_delete_threads_finished(
+                updated_threads,
+                current_scroll_position,
+                current_row
+            )
+        )
+        # Handle errors
+        worker.signals.error.connect(self.on_delete_threads_error)
+
+        # Execute the worker in a separate thread via QThreadPool
+        QThreadPool.globalInstance().start(worker)

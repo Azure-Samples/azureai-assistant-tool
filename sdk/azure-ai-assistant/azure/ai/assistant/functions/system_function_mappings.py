@@ -18,7 +18,6 @@ from azure.ai.assistant.functions.file_functions import (
 )
 
 from azure.ai.assistant.functions.llm_functions import (
-    generate_o1_response,
     take_screenshot,
     look_at_screen,
     generate_image,
@@ -38,7 +37,6 @@ system_functions = {
     "retrieve_current_directory_structure_subfolders": retrieve_current_directory_structure_subfolders,
     "find_files_by_name_in_directory": find_files_by_name_in_directory,
     "find_files_by_extension_in_directory": find_files_by_extension_in_directory,
-    "generate_o1_response": generate_o1_response,
     "take_screenshot": take_screenshot,
     "look_at_screen": look_at_screen,
     "generate_image": generate_image,

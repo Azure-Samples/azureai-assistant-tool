@@ -1,10 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AsyncAIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory
+from azure.ai.assistant.management.ai_client_type import AsyncAIClientType
 from azure.ai.assistant.management.attachment import Attachment, AttachmentType
 from azure.ai.assistant.management.async_conversation import AsyncConversation
-from azure.ai.assistant.management.async_message import AsyncConversationMessage
 from azure.ai.assistant.management.conversation_thread_config import ConversationThreadConfig
 from azure.ai.assistant.management.message_utils import _extract_image_urls
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
@@ -194,19 +194,7 @@ class AsyncConversationThreadClient:
             error_message = f"Error retrieving messages content: Exception: {e}"
             logger.error(error_message)
             raise EngineError(error_message)
-
-    async def retrieve_message(self, original_message: Message) -> AsyncConversationMessage:
-        """
-        Retrieves a single conversation message.
-
-        :param original_message: The original message to retrieve.
-        :type original_message: Message
-
-        :return: The conversation message.
-        :rtype: ConversationMessage
-        """
-        return await AsyncConversationMessage().create(self._ai_client, original_message)
-    
+ 
     async def create_conversation_thread_message(
             self, 
             message : str,

@@ -31,6 +31,7 @@ function_spec_template = {
     }
 }
 
+
 class FunctionConfigManager:
     _instance = None
     """
@@ -49,6 +50,7 @@ class FunctionConfigManager:
             self._config_folder = config_folder
         self.load_function_configs()
         self.load_function_error_specs()
+        self.load_openapi_functions()
 
     @staticmethod
     def _default_config_path() -> str:
@@ -92,17 +94,19 @@ class FunctionConfigManager:
             with open(file_path, 'r') as file:
                 config_list = json.load(file)
                 for func_spec in config_list:
-                    module_name = func_spec['function']['module']
-                    function_type = self._parse_function_type(file_path.name)
+                    spec_type = func_spec.get("type", "")
+                    if spec_type == "azure_function":
+                        function_type = "azure"   
+                    else:
+                        # System or User
+                        function_type = self._parse_function_type(file_path.name)
+                    
                     if function_type not in self._function_configs:
                         self._function_configs[function_type] = []
+
                     self._function_configs[function_type].append(FunctionConfig(func_spec))
-        except FileNotFoundError:
-            logger.error(f"The '{file_path}' file was not found.")
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in the '{file_path}' file.")
         except Exception as e:
-            logger.error(f"An error occurred: {e}")
+            logger.error(f"Error loading specs from {file_path}: {e}")
 
     def load_function_error_specs(self) -> None:
         """
@@ -272,49 +276,106 @@ class FunctionConfigManager:
 
         return user_functions_path
 
-    def save_function_spec(
-            self, 
-            new_spec : str,
-            existing_function_name : str = None
-    ) -> tuple:
+    def save_function_spec(self, new_spec: str) -> tuple:
         """
-        Saves a new function spec or updates an existing one.
+        Saves a new system or user function spec. If a function with the same name 
+        and the same spec type already exists in the relevant file, it is updated; 
+        otherwise, it is added as a new entry.
 
-        :param new_spec: The new function spec to save.
+        1) Determine whether the spec is a 'system' function or a 'user' function.
+        - "system" if type == "function" AND module starts with 
+            "azure.ai.assistant.functions."
+        - "user" if type == "function" or "azure_function" (and does not match
+            the above criterion for system).
+        2) Depending on whether it's system or user, we read either 
+        system_function_specs.json or user_function_specs.json.
+        3) We only overwrite an entry if the function name *and* the type matches.
+        ("function" only overwrites "function", "azure_function" only overwrites 
+        "azure_function".)
+        4) Return (True, new_function_name).
+
+        :param new_spec: The new function spec to save (JSON string).
         :type new_spec: str
-        :param existing_function_name: The name of the existing function to update.
-        :type existing_function_name: str
 
         :return: A tuple of (success, new_function_name).
         :rtype: tuple
         """
         try:
-            # Define paths for system and user specs
-            system_file_path = Path(self._config_folder) / "system_function_specs.json"
-            user_file_path = Path(self._config_folder) / "user_function_specs.json"
-
             new_spec_dict = json.loads(new_spec)
+
+            # Determine if it's system vs. user spec
+            spec_type = new_spec_dict.get("type", "")
+            if spec_type == "function" and "function" in new_spec_dict:
+                module_name = new_spec_dict["function"].get("module", "")
+                if module_name.startswith("azure.ai.assistant.functions."):
+                    # system function
+                    file_path = Path(self._config_folder) / "system_function_specs.json"
+                else:
+                    # user function
+                    file_path = Path(self._config_folder) / "user_function_specs.json"
+            elif spec_type == "azure_function" and "azure_function" in new_spec_dict:
+                # user azure function
+                file_path = Path(self._config_folder) / "user_function_specs.json"
+            else:
+                # If we reach here, we can't classify well, or the user has an unexpected spec
+                error_message = f"Spec type '{spec_type}' not recognized or missing required blocks."
+                logger.error(error_message)
+                raise EngineError(error_message)
 
             # Extract the function name from the new spec
             new_function_name = self._get_function_name_from_spec(new_spec_dict)
+            if not new_function_name:
+                raise EngineError("The new spec does not contain a valid function name.")
 
-            if existing_function_name is not None:
-                logger.info(f"Updating function spec from {existing_function_name} to {new_function_name}")
-                # First, try to find and update the function in the system specs
-                if self._update_function_in_file(existing_function_name, new_spec, system_file_path):
-                    return True, new_function_name
+            logger.info(
+                f"save_function_spec: Determined target file as {file_path}, "
+                f"type='{spec_type}', name='{new_function_name}'"
+            )
 
-                # If not found in system, update or add to user specs
-                if self._update_function_in_file(existing_function_name, new_spec, user_file_path):
-                    return True, new_function_name
+            # Check if the function name already exists
+            if file_path.exists():
+                with open(file_path, 'r') as file:
+                    specs = json.load(file)
             else:
-                logger.info(f"Adding new function spec {new_function_name}")
-                # Add new function to user specs
-                self._add_to_file(new_spec, user_file_path)
-                return True, new_function_name
+                specs = []
+
+            # Attempt to find an entry with the same function name AND the same 'type'
+            updated = False
+            for i, spec in enumerate(specs):
+                existing_type = spec.get("type", "")
+                existing_name = None
+
+                if "function" in spec:
+                    existing_name = spec["function"].get("name")
+                elif "azure_function" in spec and "function" in spec["azure_function"]:
+                    existing_name = spec["azure_function"]["function"].get("name")
+
+                # Only update if both name and type match
+                if (existing_name == new_function_name) and (existing_type == spec_type):
+                    specs[i] = new_spec_dict
+                    updated = True
+                    logger.info(f"Updated existing '{spec_type}' spec: '{new_function_name}' in {file_path}")
+                    break
+
+            if not updated:
+                logger.info(f"Adding new '{spec_type}' function spec: '{new_function_name}' to {file_path}")
+                specs.append(new_spec_dict)
+
+            # Write updated list of specs back to disk
+            self._write_specs_to_file(specs, file_path)
+            return True, new_function_name
 
         except json.JSONDecodeError:
-            error_message = f"Invalid JSON in the function spec"
+            error_message = "Invalid JSON in the function spec."
+            logger.error(error_message)
+            raise EngineError(error_message)
+        except Exception as e:
+            error_message = f"A runtime error occurred: {e} in save_function_spec"
+            logger.error(error_message)
+            raise EngineError(error_message)
+
+        except json.JSONDecodeError:
+            error_message = "Invalid JSON in the function spec."
             logger.error(error_message)
             raise EngineError(error_message)
         except Exception as e:
@@ -384,7 +445,14 @@ class FunctionConfigManager:
                     specs = json.load(file)
 
                 for i, spec in enumerate(specs):
-                    if spec['function']['name'] == function_name:
+                    # Check 'function' or nested 'azure_function' -> 'function'
+                    name_in_spec = None
+                    if "function" in spec:
+                        name_in_spec = spec["function"].get("name")
+                    elif "azure_function" in spec and "function" in spec["azure_function"]:
+                        name_in_spec = spec["azure_function"]["function"].get("name")
+
+                    if name_in_spec == function_name:
                         specs.pop(i)  # Delete the spec
                         self._write_specs_to_file(specs, file_path)
                         return True
@@ -396,50 +464,6 @@ class FunctionConfigManager:
             raise EngineError(error_message)
         except Exception as e:
             error_message = f"A runtime error occurred: {e} in _delete_function_spec"
-            logger.error(error_message)
-            raise EngineError(error_message)
-
-    def _update_function_in_file(self, function_name, new_spec, file_path):
-        try:
-            # Convert new_spec from JSON string to dict if it's a string
-            if isinstance(new_spec, str):
-                new_spec = json.loads(new_spec)
-
-            if file_path.exists():
-                with open(file_path, 'r') as file:
-                    specs = json.load(file)
-
-                for i, spec in enumerate(specs):
-                    if spec['function']['name'] == function_name:
-                        specs[i] = new_spec  # Update the spec
-                        self._write_specs_to_file(specs, file_path)
-                        return True
-
-            return False
-        except json.JSONDecodeError as e:
-            error_message = f"JSON decode error: {e} in _update_function_in_file"
-            logger.error(error_message)
-            raise EngineError(error_message)
-        except Exception as e:
-            error_message = f"A runtime error occurred: {e} in _update_function_in_file"
-            logger.error(error_message)
-            raise EngineError(error_message)
-
-    def _add_to_file(self, new_spec, file_path):
-        try:
-            # Convert new_spec from JSON string to dict if it's a string
-            if isinstance(new_spec, str):
-                new_spec = json.loads(new_spec)
-
-            specs = []
-            if file_path.exists():
-                with open(file_path, 'r') as file:
-                    specs = json.load(file)
-
-            specs.append(new_spec)
-            self._write_specs_to_file(specs, file_path)
-        except Exception as e:
-            error_message = f"A runtime error occurred: {e} in _add_to_file"
             logger.error(error_message)
             raise EngineError(error_message)
 
@@ -625,27 +649,142 @@ class FunctionConfigManager:
         if not isinstance(spec, dict):
             return False, "Spec is not a dictionary"
 
-        # Check for main blocks in the spec
-        main_blocks = ['type', 'function']
-        for block in main_blocks:
-            if block not in spec:
-                return False, f"Missing main block: {block}"
+        if 'type' not in spec:
+            return False, "Missing main block: 'type'"
 
-        # Validate the 'function' block
-        function_block_keys = ['name', 'module', 'description', 'parameters']
-        for key in function_block_keys:
-            if key not in spec['function']:
-                return False, f"Missing key in 'function' block: {key}"
+        required_function_keys = ['name', 'module', 'description', 'parameters']
 
-        return True, "Valid spec"
+        if 'function' in spec:
+            function_block = spec['function']
+            if not isinstance(function_block, dict):
+                return False, "The 'function' block must be a dictionary"
+            for key in required_function_keys:
+                if key not in function_block:
+                    return False, f"Missing key in 'function' block: {key}"
+            return True, "Valid spec"
+
+        if 'azure_function' in spec:
+            azure_function_block = spec['azure_function']
+            if not isinstance(azure_function_block, dict):
+                return False, "The 'azure_function' block must be a dictionary"
+
+            if 'function' not in azure_function_block:
+                return False, "Missing 'function' block in 'azure_function'"
+
+            function_block = azure_function_block['function']
+            if not isinstance(function_block, dict):
+                return False, "The 'azure_function' -> 'function' block must be a dictionary"
+            for key in required_function_keys:
+                if key not in function_block:
+                    return False, f"Missing key in nested 'function' block: {key}"
+
+            return True, "Valid spec"
+
+        return False, "Missing main block: 'function' or 'azure_function'"
 
     def _get_function_name_from_spec(self, spec_dict):
-        return spec_dict.get("function", {}).get("name", "")
+        if "function" in spec_dict and isinstance(spec_dict["function"], dict):
+            return spec_dict["function"].get("name", "")
+
+        if ("azure_function" in spec_dict 
+            and isinstance(spec_dict["azure_function"], dict) 
+            and "function" in spec_dict["azure_function"]
+            and isinstance(spec_dict["azure_function"]["function"], dict)):
+            return spec_dict["azure_function"]["function"].get("name", "")
+
+        return ""
 
     def _find_function_in_code(self, code, function_name):
         pattern = fr'def {re.escape(function_name)}\('
         match = re.search(pattern, code)
         return bool(match)
+
+    def load_openapi_functions(self) -> None:
+        """
+        Loads OpenAPI definitions from "openapi_functions.json" into memory.
+        Stores them in self._openapi_functions as a list of dicts, each like:
+            {
+               "type": "openapi",
+               "openapi": {
+                   "name": "...",
+                   "description": "...",
+                   "spec": {...}
+               },
+               "auth": {
+                   "type": "anonymous|connection|managed_identity"
+               }
+            }
+        """
+        self._openapi_functions = []
+        openapi_file_path = Path(self._config_folder) / "openapi_functions.json"
+        if openapi_file_path.exists():
+            try:
+                with open(openapi_file_path, 'r') as f:
+                    self._openapi_functions = json.load(f)
+            except json.JSONDecodeError:
+                logger.error(f"Invalid JSON in '{openapi_file_path}'.")
+            except Exception as e:
+                logger.error(f"Error loading OpenAPI definitions: {e}")
+        else:
+            logger.info(f"No 'openapi_functions.json' found at {openapi_file_path}. Starting with empty list.")
+
+    def get_all_openapi_functions(self) -> list:
+        """
+        Returns the list of all loaded OpenAPI definitions as raw dicts.
+        """
+        return self._openapi_functions
+
+    def save_openapi_function(self, openapi_dict: dict) -> None:
+        """
+        Creates or updates an OpenAPI definition in "openapi_functions.json".
+        If an entry with the same openapi['name'] exists, this updates it;
+        otherwise, it appends a new entry.
+        """
+        if "openapi" not in openapi_dict:
+            raise EngineError("Invalid OpenAPI definition: Missing 'openapi' block.")
+        name_to_save = openapi_dict["openapi"].get("name")
+        if not name_to_save:
+            raise EngineError("Invalid OpenAPI definition: Missing 'openapi.name'.")
+
+        updated = False
+        for i, entry in enumerate(self._openapi_functions):
+            existing_name = entry.get("openapi", {}).get("name")
+            if existing_name == name_to_save:
+                self._openapi_functions[i] = openapi_dict
+                updated = True
+                break
+        if not updated:
+            self._openapi_functions.append(openapi_dict)
+
+        self._write_openapi_functions_to_file()
+
+    def delete_openapi_function(self, name: str) -> bool:
+        """
+        Removes an OpenAPI function by name from self._openapi_functions.
+        Returns True if found and removed, False if no matching entry exists.
+        """
+        found = False
+        for i, entry in enumerate(self._openapi_functions):
+            openapi_name = entry.get("openapi", {}).get("name")
+            if openapi_name == name:
+                del self._openapi_functions[i]
+                found = True
+                break
+
+        if found:
+            self._write_openapi_functions_to_file()
+
+        return found
+
+    def _write_openapi_functions_to_file(self) -> None:
+        openapi_file_path = Path(self._config_folder) / "openapi_functions.json"
+        try:
+            with open(openapi_file_path, 'w') as f:
+                json.dump(self._openapi_functions, f, indent=4)
+            logger.info(f"Saved OpenAPI definitions to {openapi_file_path}")
+        except Exception as e:
+            logger.error(f"Could not write to {openapi_file_path}: {e}")
+            raise EngineError(f"Could not save OpenAPI definitions: {e}")
 
     @staticmethod
     def get_function_spec_template() -> str:

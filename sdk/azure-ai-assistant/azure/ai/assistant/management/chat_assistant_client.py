@@ -218,6 +218,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
             presence_penalty = text_config.presence_penalty if text_config else None
             top_p = text_config.top_p if text_config else None
             response_format = {"type": text_config.response_format} if text_config else None
+            reasoning_effort = text_config.reasoning_effort if text_config else None
 
             while continue_processing:
                 if self._cancel_run_requested.is_set():
@@ -226,7 +227,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                     break
 
                 try:
-                    if not model.startswith("o1"):
+                    if not (model.startswith("o1") or model.startswith("o3")):
                         response = self._ai_client.chat.completions.create(
                             model=model,
                             messages=self._messages,
@@ -250,6 +251,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                             tools=self._tools,
                             tool_choice=None if self._tools is None else "auto",
                             response_format=response_format,
+                            reasoning_effort=reasoning_effort if reasoning_effort else None,
                             timeout=timeout
                         )
                 except Exception as e:
@@ -262,7 +264,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                                 self._messages[i]["role"] = "system"
 
                         # Retry creation call after removing the "developer" role
-                        if not model.startswith("o1"):
+                        if not (model.startswith("o1") or model.startswith("o3")):
                             response = self._ai_client.chat.completions.create(
                                 model=model,
                                 messages=self._messages,
@@ -286,6 +288,7 @@ class ChatAssistantClient(BaseChatAssistantClient):
                                 tools=self._tools,
                                 tool_choice=None if self._tools is None else "auto",
                                 response_format=response_format,
+                                reasoning_effort=reasoning_effort if reasoning_effort else None,
                                 timeout=timeout
                             )
                     else:

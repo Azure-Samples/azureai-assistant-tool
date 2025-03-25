@@ -1,7 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 # Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-from azure.ai.assistant.management.ai_client_factory import AIClientFactory, AIClientType
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory
+from azure.ai.assistant.management.ai_client_type import AIClientType
 from azure.ai.assistant.management.assistant_config import AssistantConfig, AssistantType
 from azure.ai.assistant.management.assistant_config_manager import AssistantConfigManager
 from azure.ai.assistant.management.assistant_client_callbacks import AssistantClientCallbacks

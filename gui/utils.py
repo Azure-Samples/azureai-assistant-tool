@@ -4,12 +4,16 @@
 # This software uses the PySide6 library, which is licensed under the GNU Lesser General Public License (LGPL).
 # For more details on PySide6's license, see <https://www.qt.io/licensing>
 
-from PySide6.QtWidgets import QMessageBox
+import os
+import sys
+import re
+from typing import Optional
 
-import sys, os, re
+from PySide6.QtWidgets import QMessageBox
 
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.assistant_config import AssistantConfig
+from azure.ai.assistant.management.ai_client_factory import AIClientFactory
 from azure.ai.assistant.management.ai_client_factory import AIClientType
 from azure.ai.assistant.management.chat_assistant_client import ChatAssistantClient
 
@@ -70,3 +74,35 @@ def init_system_assistant(instance, assistant_name: str):
     except Exception as e:
         error_message = f"An error occurred while initializing the {assistant_name} assistant, check the system settings: {e}"
         QMessageBox.warning(instance, "Error", error_message)
+
+
+def get_ai_client(ai_client_type: AIClientType, api_version: Optional[str] = None) -> Optional[object]:
+    """
+    Returns an AI client instance for the given AIClientType, optionally using a specified api_version.
+    Logs an error if any exception occurs during creation.
+    """
+    client_factory = AIClientFactory.get_instance()
+
+    client_map = {
+        AIClientType.AZURE_OPEN_AI: lambda: client_factory.get_client(
+            AIClientType.AZURE_OPEN_AI, api_version=api_version
+        ),
+        AIClientType.OPEN_AI: lambda: client_factory.get_client(
+            AIClientType.OPEN_AI
+        ),
+        AIClientType.OPEN_AI_REALTIME: lambda: client_factory.get_client(
+            AIClientType.OPEN_AI_REALTIME
+        ),
+        AIClientType.AZURE_OPEN_AI_REALTIME: lambda: client_factory.get_client(
+            AIClientType.AZURE_OPEN_AI_REALTIME, api_version=api_version
+        ),
+        AIClientType.AZURE_AI_AGENT: lambda: client_factory.get_client(
+            AIClientType.AZURE_AI_AGENT
+        ),
+    }
+
+    try:
+        return client_map.get(ai_client_type, lambda: None)()
+    except Exception as e:
+        logger.error(f"[get_ai_client] Error getting client for {ai_client_type.name}: {e}")
+        return None

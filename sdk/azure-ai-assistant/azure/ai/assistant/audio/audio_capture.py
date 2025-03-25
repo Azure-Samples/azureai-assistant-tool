@@ -4,6 +4,7 @@
 from azure.ai.assistant.management.logger_module import logger
 from azure.ai.assistant.management.exceptions import EngineError
 
+import sys
 import pyaudio
 import numpy as np
 from typing import Optional
@@ -163,7 +164,7 @@ class AudioCapture:
             except Exception as e:
                 logger.error(f"Failed to start AzureKeywordRecognizer: {e}")
 
-        # ensure the pyaudio instance is initialized
+        # Ensure the PyAudio instance is initialized
         if not self.pyaudio_instance:
             self.pyaudio_instance = pyaudio.PyAudio()
 
@@ -334,19 +335,16 @@ class AudioCapture:
         if new_length >= buffer_size:
             buffer[:] = new_audio[-buffer_size:]
             pointer = 0
-            #logger.debug("Buffer overwritten with new audio data.")
         else:
             end_space = buffer_size - pointer
             if new_length <= end_space:
                 buffer[pointer:pointer + new_length] = new_audio
                 pointer += new_length
-                #logger.debug(f"Buffer updated. New pointer position: {pointer}")
             else:
                 buffer[pointer:] = new_audio[:end_space]
                 remaining = new_length - end_space
                 buffer[:remaining] = new_audio[end_space:]
                 pointer = remaining
-                #logger.debug(f"Buffer wrapped around. New pointer position: {pointer}")
         return pointer
 
     def _get_buffer_content(self, buffer: np.ndarray, pointer: int, buffer_size: int) -> np.ndarray:
@@ -359,9 +357,7 @@ class AudioCapture:
         :return: Ordered audio data as a NumPy array.
         """
         if pointer == 0:
-            #logger.debug("Buffer content retrieved without wrapping.")
             return buffer.copy()
-        #logger.debug("Buffer content retrieved with wrapping.")
         return np.concatenate((buffer[pointer:], buffer[:pointer]))
 
     def _on_keyword_detected(self, result):
